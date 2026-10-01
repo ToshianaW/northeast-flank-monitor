@@ -30,6 +30,7 @@ import {
 } from "@/lib/event-labels";
 import type { EventField, EventFormValues, EventSourceFormRow } from "@/lib/events";
 import { COUNTRY_SUGGESTIONS } from "@/lib/source-labels";
+import { ReviewerField } from "@/components/admin/reviewer-field";
 
 type SourceOption = { id: string; name: string };
 type ExerciseOption = { id: string; exercise_name: string };
@@ -46,6 +47,9 @@ type Props = {
   exerciseOptions: ExerciseOption[];
   submitLabel: string;
   isEdit?: boolean;
+  fromReview?: boolean;
+  returnTo?: string;
+  reviewerDefault?: string | null;
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -82,6 +86,9 @@ export function EventForm({
   exerciseOptions,
   submitLabel,
   isEdit = false,
+  fromReview = false,
+  returnTo,
+  reviewerDefault,
 }: Props) {
   const [state, formAction, pending] = useActionState(action, {});
   const values = state.values ?? initialValues;
@@ -122,6 +129,13 @@ export function EventForm({
       className="grid max-w-4xl gap-6"
       noValidate
     >
+      {fromReview ? (
+        <>
+          <input type="hidden" name="fromReview" value="1" />
+          {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
+        </>
+      ) : null}
+
       {state.formError ? (
         <p
           role="alert"
@@ -587,11 +601,20 @@ export function EventForm({
         </div>
       </Section>
 
+      {fromReview ? (
+        <div className="max-w-md">
+          <ReviewerField defaultValue={reviewerDefault} />
+        </div>
+      ) : null}
+
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={pending}>
           {pending ? "Saving…" : submitLabel}
         </Button>
-        <Link href="/admin/events" className={buttonVariants({ variant: "ghost" })}>
+        <Link
+          href={fromReview && returnTo ? returnTo : "/admin/events"}
+          className={buttonVariants({ variant: "ghost" })}
+        >
           Cancel
         </Link>
       </div>

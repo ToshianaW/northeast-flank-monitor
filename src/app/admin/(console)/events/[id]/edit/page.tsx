@@ -8,22 +8,29 @@ import {
   listExerciseOptions,
 } from "@/lib/events";
 import { listSources } from "@/lib/sources";
+import { getReviewerName } from "@/lib/reviewer";
 import { updateEventAction } from "../../actions";
 
 export const metadata = { title: "Edit event" };
 
 export default async function EditEventPage({
   params,
+  searchParams,
 }: PageProps<"/admin/events/[id]/edit">) {
   await connection();
   const { id } = await params;
+  const { fromReview } = await searchParams;
+  const fromReviewQueue = fromReview === "1";
+  const returnTo = `/admin/review/${id}`;
 
-  const [event, eventSources, sources, exercises] = await Promise.all([
-    getEvent(id),
-    listEventSources(id),
-    listSources(),
-    listExerciseOptions(),
-  ]);
+  const [event, eventSources, sources, exercises, reviewerDefault] =
+    await Promise.all([
+      getEvent(id),
+      listEventSources(id),
+      listSources(),
+      listExerciseOptions(),
+      fromReviewQueue ? getReviewerName() : Promise.resolve(null),
+    ]);
 
   if (!event) notFound();
 
@@ -36,12 +43,17 @@ export default async function EditEventPage({
 
   return (
     <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
-      <p className="meta-label mb-2">Admin · events</p>
+      <p className="meta-label mb-2">
+        Admin · {fromReviewQueue ? "review" : "events"}
+      </p>
       <h1 className="mb-6 text-2xl font-semibold tracking-tight">Edit event</h1>
       <EventForm
         action={boundUpdate}
         submitLabel="Save changes"
         isEdit
+        fromReview={fromReviewQueue}
+        returnTo={fromReviewQueue ? returnTo : undefined}
+        reviewerDefault={reviewerDefault}
         initialValues={eventFormValuesFromEvent(event)}
         initialSources={
           eventSources.length > 0

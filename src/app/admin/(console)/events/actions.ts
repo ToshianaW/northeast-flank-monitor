@@ -15,6 +15,11 @@ import {
   type EventSourceFormRow,
   type EventWritePayload,
 } from "@/lib/events";
+import { logEditReviewAction, payloadHasSupportsSource } from "@/lib/review";
+import {
+  requireReviewerName,
+  reviewerFromForm,
+} from "@/lib/reviewer";
 
 export type EventFormState = {
   values?: EventFormValues;
@@ -44,12 +49,24 @@ async function saveEvent(
   validateOptions: Parameters<typeof validateEventForm>[1] & {
     humanReviewed: boolean;
   },
+  redirectTo?: string,
 ): Promise<EventFormState> {
   await requireAdmin();
 
   const result = await validateEventForm(formData, validateOptions);
   if (!result.ok) {
     return { ...stateFromForm(formData), errors: result.errors };
+  }
+
+  if (
+    validateOptions.preserveReviewStatus === "PUBLISHED" &&
+    !payloadHasSupportsSource(result.payload)
+  ) {
+    return {
+      ...stateFromForm(formData),
+      formError:
+        "Cannot save: published events must keep at least one supporting source (relationship SUPPORTS).",
+    };
   }
 
   try {
@@ -63,7 +80,8 @@ async function saveEvent(
   }
 
   revalidatePath("/admin/events");
-  redirect("/admin/events?saved=1");
+  revalidatePath("/admin/review");
+  redirect(redirectTo ?? "/admin/events?saved=1");
 }
 
 export async function createEventAction(
@@ -90,9 +108,24 @@ export async function updateEventAction(
     return { formError: "Event not found." };
   }
 
+  const fromReview = formData.get("fromReview") === "1";
+  const returnTo = String(formData.get("returnTo") ?? "").trim();
+
+  let reviewerForEdit: string | null = null;
+  if (fromReview) {
+    reviewerForEdit = reviewerFromForm(formData);
+    const reviewerError = requireReviewerName(reviewerForEdit);
+    if (reviewerError) {
+      return { ...stateFromForm(formData), formError: reviewerError };
+    }
+  }
+
   return saveEvent(
     formData,
     async (payload) => {
+      if (fromReview && reviewerForEdit) {
+        await logEditReviewAction(existing, reviewerForEdit);
+      }
       const updated = await updateEvent(id, payload, existing.review_status);
       if (!updated) throw new Error(`Event ${id} not found`);
     },
@@ -100,5 +133,6 @@ export async function updateEventAction(
       preserveReviewStatus: existing.review_status,
       humanReviewed: existing.human_reviewed,
     },
+    fromReview && returnTo.startsWith("/admin/") ? returnTo : undefined,
   );
 }

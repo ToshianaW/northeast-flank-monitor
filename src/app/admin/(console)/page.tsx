@@ -10,8 +10,7 @@ export default function AdminDashboardPage() {
         Moderation dashboard
       </h1>
       <p className="mt-3 max-w-2xl text-sm text-text-secondary">
-        All AI-extracted events require human review at launch.         Manual event entry is available under Events. The review queue arrives in
-        step 1.5.
+        All AI-extracted events require human review at launch.         Manual event entry is under Events; the review queue is under Review.
       </p>
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Link
@@ -30,6 +29,15 @@ export default function AdminDashboardPage() {
           <p className="meta-label">Events</p>
           <p className="mt-2 text-sm text-text-secondary">
             Create and edit draft events with attached sources.
+          </p>
+        </Link>
+        <Link
+          href="/admin/review"
+          className="block border border-border bg-surface-dark p-4 transition-colors hover:border-teal-blue"
+        >
+          <p className="meta-label">Review queue</p>
+          <p className="mt-2 text-sm text-text-secondary">
+            Approve, reject, merge, or edit draft and pending events.
           </p>
         </Link>
       </div>

@@ -1,0 +1,20 @@
+import "server-only";
+import { cookies } from "next/headers";
+
+export const REVIEWER_NAME_COOKIE = "nfm_reviewer_name";
+
+export async function getReviewerName(): Promise<string | null> {
+  const store = await cookies();
+  const value = store.get(REVIEWER_NAME_COOKIE)?.value?.trim();
+  return value || null;
+}
+
+export function reviewerFromForm(formData: FormData): string {
+  return String(formData.get("reviewer") ?? "").trim();
+}
+
+export function requireReviewerName(name: string): string | null {
+  if (!name) return "Enter your reviewer name.";
+  if (name.length > 120) return "Keep the reviewer name under 120 characters.";
+  return null;
+}
