@@ -29,6 +29,16 @@ Dev server defaults to [http://127.0.0.1:43127](http://127.0.0.1:43127).
 
 Admin: [http://127.0.0.1:43127/admin](http://127.0.0.1:43127/admin) (password from `ADMIN_PASSWORD`).
 
+## Database
+
+PostgreSQL with PostGIS (Neon). Migrations are plain SQL in `src/db/migrations/`, applied in filename order with `psql` using the **direct** (non-pooled) `DATABASE_URL`:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f src/db/migrations/0001_initial_schema.sql
+```
+
+Each migration runs in a single transaction, so a failure leaves the database unchanged.
+
 ## Current milestone
 
 **Step 1.1** — app scaffold, design tokens (spec §§47–51), shell navigation with stub routes, `/admin` auth gate stub, folder layout for workers/data/docs.

@@ -100,7 +100,20 @@ CREATE TYPE review_status AS ENUM (
   'DRAFT',
   'PENDING_REVIEW',
   'PUBLISHED',
-  'REJECTED'
+  'REJECTED',
+  'MERGED'
+);
+
+CREATE TYPE source_relationship AS ENUM (
+  'SUPPORTS',
+  'CONTRADICTS'
+);
+
+CREATE TYPE location_precision AS ENUM (
+  'EXACT',
+  'BASE',
+  'DISTRICT',
+  'REGION'
 );
 
 CREATE TYPE review_action AS ENUM (
@@ -213,6 +226,7 @@ CREATE TABLE events (
   country                  text,
   region                   text,
   location_name            text,
+  location_precision       location_precision,
   latitude                 double precision CHECK (latitude BETWEEN -90 AND 90),
   longitude                double precision CHECK (longitude BETWEEN -180 AND 180),
   geom                     geography (Point, 4326) GENERATED ALWAYS AS (
@@ -257,6 +271,7 @@ CREATE TABLE events (
   human_reviewed           boolean NOT NULL DEFAULT false,
   review_status            review_status NOT NULL DEFAULT 'DRAFT',
   contradiction_flag       boolean NOT NULL DEFAULT false,
+  contradiction_notes      text,
   created_at               timestamptz NOT NULL DEFAULT now(),
   updated_at               timestamptz NOT NULL DEFAULT now(),
   CHECK ((latitude IS NULL) = (longitude IS NULL)),
@@ -283,11 +298,12 @@ CREATE TRIGGER events_set_updated_at
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE event_sources (
-  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  event_id     uuid NOT NULL REFERENCES events (event_id) ON DELETE CASCADE,
-  source_id    uuid NOT NULL REFERENCES sources (id) ON DELETE RESTRICT,
-  article_url  text NOT NULL,
-  is_primary   boolean NOT NULL DEFAULT false,
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id      uuid NOT NULL REFERENCES events (event_id) ON DELETE CASCADE,
+  source_id     uuid NOT NULL REFERENCES sources (id) ON DELETE RESTRICT,
+  article_url   text NOT NULL,
+  relationship  source_relationship NOT NULL DEFAULT 'SUPPORTS',
+  is_primary    boolean NOT NULL DEFAULT false,
   excerpt      text,
   created_at   timestamptz NOT NULL DEFAULT now(),
   UNIQUE (event_id, source_id, article_url)
@@ -339,17 +355,26 @@ CREATE CONSTRAINT TRIGGER event_sources_keep_published_source
 -- review_actions (decisions.md #6: log every review action)
 -- ---------------------------------------------------------------------------
 
+-- event_type and source_ids are captured at action time so accuracy can be
+-- measured even after the event is later edited.
 CREATE TABLE review_actions (
-  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  event_id         uuid NOT NULL REFERENCES events (event_id) ON DELETE RESTRICT,
-  action           review_action NOT NULL,
-  reviewer         text NOT NULL,
-  previous_values  jsonb,
-  created_at       timestamptz NOT NULL DEFAULT now()
+  id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id              uuid NOT NULL REFERENCES events (event_id) ON DELETE RESTRICT,
+  action                review_action NOT NULL,
+  reviewer              text NOT NULL,
+  event_type            event_type NOT NULL,
+  source_ids            uuid[] NOT NULL DEFAULT '{}',
+  merged_into_event_id  uuid REFERENCES events (event_id) ON DELETE RESTRICT,
+  previous_values       jsonb,
+  created_at            timestamptz NOT NULL DEFAULT now(),
+  CHECK ((action = 'MERGE') = (merged_into_event_id IS NOT NULL)),
+  CHECK (merged_into_event_id IS DISTINCT FROM event_id)
 );
 
 CREATE INDEX review_actions_event_id_idx ON review_actions (event_id, created_at);
 CREATE INDEX review_actions_created_at_idx ON review_actions (created_at);
+CREATE INDEX review_actions_merged_into_idx ON review_actions (merged_into_event_id)
+  WHERE merged_into_event_id IS NOT NULL;
 
 -- Audit log is append-only.
 CREATE FUNCTION forbid_review_action_changes() RETURNS trigger
