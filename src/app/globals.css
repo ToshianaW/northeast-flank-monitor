@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+:root {
+  /* Spec §47 — core palette */
+  --teal-blue: #00738b;
+  --slate-indigo: #455378;
+  --forest-green: #0f633f;
+  --operational-teal: #008574;
+  --deep-navy: #1a1e4f;
+
+  /* Spec §47 — supporting */
+  --background-dark: #0b1020;
+  --surface-dark: #11172a;
+  --surface-raised: #171d33;
+  --text-primary: #f4f7fb;
+  --text-secondary: #aeb8c8;
+  --text-muted: #748096;
+  --border: rgba(130, 160, 185, 0.18);
+
+  --background: var(--background-dark);
+  --foreground: var(--text-primary);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-teal-blue: var(--teal-blue);
+  --color-slate-indigo: var(--slate-indigo);
+  --color-forest-green: var(--forest-green);
+  --color-operational-teal: var(--operational-teal);
+  --color-deep-navy: var(--deep-navy);
+  --color-surface-dark: var(--surface-dark);
+  --color-surface-raised: var(--surface-raised);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-border: var(--border);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background-dark);
+  color: var(--text-primary);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* Spec §50 — faint grid, restrained */
+.bg-grid {
+  background-color: var(--background-dark);
+  background-image:
+    linear-gradient(rgba(130, 160, 185, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(130, 160, 185, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.meta-label {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
