@@ -8,10 +8,8 @@ export default function AdminLoginPage() {
       <p className="meta-label mb-3">Admin</p>
       <h1 className="text-2xl font-semibold">Sign in</h1>
       <p className="mt-2 text-sm text-text-secondary">
-        Protected route stub for step 1.1. Set{" "}
-        <code className="font-mono text-xs text-text-muted">ADMIN_PASSWORD</code>{" "}
-        in the environment (default:{" "}
-        <code className="font-mono text-xs text-text-muted">changeme</code>).
+        Enter the password configured in{" "}
+        <code className="font-mono text-xs text-text-muted">ADMIN_PASSWORD</code>.
       </p>
       <AdminLoginForm />
     </section>

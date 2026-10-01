@@ -17,9 +17,11 @@ Observe behavior. Track the baseline. Compare historically. Do not predict inten
 
 ```bash
 npm install
-cp .env.example .env.local   # optional; default admin password is changeme
+cp .env.example .env.local   # then set ADMIN_PASSWORD
 npm run dev
 ```
+
+`ADMIN_PASSWORD` is required, with no default. `npm run dev` and `npm start` exit with an error if it is unset. `npm run build` does not need it.
 
 Dev server defaults to [http://127.0.0.1:43127](http://127.0.0.1:43127).
 

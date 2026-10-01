@@ -2,7 +2,13 @@
 export const ADMIN_SESSION_COOKIE = "nfm_admin_session";
 
 export function getAdminPassword(): string {
-  return process.env.ADMIN_PASSWORD ?? "changeme";
+  const password = process.env.ADMIN_PASSWORD;
+  if (!password) {
+    throw new Error(
+      "ADMIN_PASSWORD is not set. Set it in .env.local (see .env.example) before starting the server.",
+    );
+  }
+  return password;
 }
 
 export function isValidAdminSession(token: string | undefined): boolean {
