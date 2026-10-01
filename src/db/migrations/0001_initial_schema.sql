@@ -306,14 +306,17 @@ CREATE TABLE event_sources (
   is_primary    boolean NOT NULL DEFAULT false,
   excerpt      text,
   created_at   timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (event_id, source_id, article_url)
+  UNIQUE (event_id, source_id, article_url),
+  CONSTRAINT event_sources_primary_must_support
+    CHECK (NOT (is_primary AND relationship = 'CONTRADICTS'))
 );
 
 CREATE INDEX event_sources_source_id_idx ON event_sources (source_id);
 CREATE UNIQUE INDEX event_sources_one_primary_idx
   ON event_sources (event_id) WHERE is_primary;
 
--- Project rule 2: every published event keeps at least one attributed source.
+-- Project rule 2: every published event keeps at least one SUPPORTS source;
+-- contradicting sources alone do not count.
 -- Deferred to commit so an event and its sources can be written in one transaction.
 CREATE FUNCTION check_published_event_has_source() RETURNS trigger
 LANGUAGE plpgsql AS $$
@@ -331,10 +334,11 @@ BEGIN
        WHERE e.event_id = target AND e.review_status = 'PUBLISHED'
      )
      AND NOT EXISTS (
-       SELECT 1 FROM event_sources es WHERE es.event_id = target
+       SELECT 1 FROM event_sources es
+       WHERE es.event_id = target AND es.relationship = 'SUPPORTS'
      )
   THEN
-    RAISE EXCEPTION 'Published event % must have at least one source', target
+    RAISE EXCEPTION 'Published event % must have at least one SUPPORTS source', target
       USING ERRCODE = 'check_violation';
   END IF;
   RETURN NULL;
@@ -347,7 +351,7 @@ CREATE CONSTRAINT TRIGGER events_published_requires_source
   FOR EACH ROW EXECUTE FUNCTION check_published_event_has_source();
 
 CREATE CONSTRAINT TRIGGER event_sources_keep_published_source
-  AFTER DELETE OR UPDATE OF event_id ON event_sources
+  AFTER DELETE OR UPDATE OF event_id, relationship ON event_sources
   DEFERRABLE INITIALLY DEFERRED
   FOR EACH ROW EXECUTE FUNCTION check_published_event_has_source();
 
