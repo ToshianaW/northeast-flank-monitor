@@ -37,7 +37,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               Similarity is not trajectory. This site does not predict intent or
               conflict.
             </p>
-            <p className="font-mono">Step 1.1 scaffold</p>
           </div>
         </footer>
       </body>

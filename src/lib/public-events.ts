@@ -74,15 +74,64 @@ const UUID_RE =
 
 const FEED_LIMIT = 100;
 
-export async function listPublishedEvents(): Promise<PublicEvent[]> {
+export async function listPublishedEvents(
+  limit: number = FEED_LIMIT,
+): Promise<PublicEvent[]> {
   const { rows } = await getPool().query<PublicEvent>(
     `SELECT ${PUBLIC_EVENT_COLUMNS}
      FROM events
      WHERE review_status = 'PUBLISHED'
      ORDER BY event_date DESC, first_reported DESC NULLS LAST, created_at DESC
-     LIMIT ${FEED_LIMIT}`,
+     LIMIT $1`,
+    [limit],
   );
   return rows;
+}
+
+/** Header "LAST UPDATE": newest updated_at among PUBLISHED events. */
+export async function getLastPublishedUpdate(): Promise<Date | null> {
+  const { rows } = await getPool().query<{ last: Date | null }>(
+    `SELECT max(updated_at) AS last FROM events WHERE review_status = 'PUBLISHED'`,
+  );
+  return rows[0]?.last ?? null;
+}
+
+export type SnapshotCounts = {
+  verifiedEvents: number;
+  activeExercises: number;
+  externalDeployments: number;
+  borderIncidents: number;
+};
+
+/**
+ * Homepage 24-hour snapshot (spec §12). event_date is a date with no time,
+ * so "last 24 hours" means dated today or yesterday in UTC.
+ */
+export async function getSnapshotCounts(): Promise<SnapshotCounts> {
+  const { rows } = await getPool().query<{
+    verified: number;
+    deployments: number;
+    border: number;
+    exercises: number;
+  }>(
+    `SELECT
+       count(*)::int AS verified,
+       count(*) FILTER (
+         WHERE event_type IN ('RUSSIAN_DEPLOYMENT', 'BELARUSIAN_DEPLOYMENT')
+       )::int AS deployments,
+       count(*) FILTER (WHERE event_type = 'BORDER_INCIDENT')::int AS border,
+       (SELECT count(*)::int FROM exercises WHERE exercise_status = 'ACTIVE') AS exercises
+     FROM events
+     WHERE review_status = 'PUBLISHED'
+       AND event_date >= ((now() AT TIME ZONE 'UTC') - interval '24 hours')::date`,
+  );
+  const row = rows[0];
+  return {
+    verifiedEvents: row.verified,
+    activeExercises: row.exercises,
+    externalDeployments: row.deployments,
+    borderIncidents: row.border,
+  };
 }
 
 export async function getPublishedEvent(id: string): Promise<PublicEvent | null> {

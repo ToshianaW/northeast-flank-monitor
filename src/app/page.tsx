@@ -1,51 +1,105 @@
 import Link from "next/link";
+import { connection } from "next/server";
+import { EventLogEntry } from "@/components/event-log-entry";
+import {
+  getSnapshotCounts,
+  listPublishedEvents,
+} from "@/lib/public-events";
 
-export default function HomePage() {
+/** Spec §23, verbatim. */
+const ACTIVITY_INDEX_DISCLAIMER =
+  "The Northeast Flank Activity Index measures observable military activity and force posture. It does not estimate the probability of conflict or predict political intent.";
+
+function Panel({
+  title,
+  className = "",
+  children,
+}: {
+  title: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6">
-      <p className="meta-label mb-3">Home · monitoring shell</p>
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-        What changed during the last 24 hours?
-      </h1>
-      <p className="mt-3 max-w-2xl text-sm text-text-secondary sm:text-base">
-        Intelligence-style monitoring surface for NATO&apos;s northeastern
-        flank. Panels and live data arrive in later foundation steps — this
-        scaffold establishes navigation, design tokens, and route stubs.
-      </p>
+    <section
+      aria-label={title}
+      className={`border border-border bg-surface-dark p-5 ${className}`}
+    >
+      <h2 className="meta-label mb-4">{title}</h2>
+      {children}
+    </section>
+  );
+}
 
-      <div className="mt-8 grid gap-4 md:grid-cols-2">
-        <div className="border border-border bg-surface-dark p-4">
-          <p className="meta-label">Regional activity</p>
-          <p className="mt-2 text-lg text-text-muted">Placeholder</p>
-          <p className="mt-1 text-xs text-text-muted">
-            Activity Index lands in Phase 6. Not a forecast of conflict.
+export default async function HomePage() {
+  await connection();
+  const [counts, latest] = await Promise.all([
+    getSnapshotCounts(),
+    listPublishedEvents(5),
+  ]);
+
+  const snapshotRows: Array<{ label: string; value: string }> = [
+    { label: "Verified events", value: String(counts.verifiedEvents) },
+    { label: "Active exercises", value: String(counts.activeExercises) },
+    { label: "New external deployments", value: String(counts.externalDeployments) },
+    { label: "Border incidents", value: String(counts.borderIncidents) },
+    { label: "Post-exercise reset", value: "No data" },
+  ];
+
+  return (
+    <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
+      <h1 className="sr-only">Northeast Flank Monitor overview</h1>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-12">
+        <Panel title="Regional activity" className="lg:col-span-5">
+          <p className="text-lg font-medium text-text-secondary">
+            Activity Index: not yet calculated
           </p>
-        </div>
-        <div className="border border-border bg-surface-dark p-4">
-          <p className="meta-label">24-hour snapshot</p>
-          <p className="mt-2 font-mono text-sm text-text-secondary">
-            Verified events — —
+          <p className="mt-3 text-xs leading-relaxed text-text-muted">
+            {ACTIVITY_INDEX_DISCLAIMER}
           </p>
-          <p className="font-mono text-sm text-text-secondary">
-            Active exercises — —
+        </Panel>
+
+        <Panel title="24-hour snapshot" className="lg:col-span-7">
+          <dl className="divide-y divide-border">
+            {snapshotRows.map((row) => (
+              <div
+                key={row.label}
+                className="flex items-baseline justify-between gap-4 py-2 first:pt-0 last:pb-0"
+              >
+                <dt className="meta-label">{row.label}</dt>
+                <dd className="font-mono text-sm text-foreground">{row.value}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-4 text-xs text-text-muted">
+            Published events dated today or yesterday (UTC).
           </p>
-          <p className="font-mono text-sm text-text-secondary">
-            Reset status — —
+        </Panel>
+
+        <Panel title="Latest verified events" className="md:col-span-2 lg:col-span-8">
+          {latest.length === 0 ? (
+            <p className="text-sm text-text-secondary">No published events yet.</p>
+          ) : (
+            <div className="-my-5 divide-y divide-border">
+              {latest.map((event) => (
+                <EventLogEntry key={event.event_id} event={event} />
+              ))}
+            </div>
+          )}
+          <Link
+            href="/latest"
+            className="mt-4 inline-block border-t border-border pt-4 text-xs text-teal-blue hover:underline"
+          >
+            View all →
+          </Link>
+        </Panel>
+
+        <Panel title="Active exercises" className="md:col-span-2 lg:col-span-12">
+          <p className="text-sm text-text-secondary">
+            No exercises are recorded yet.
           </p>
-        </div>
+        </Panel>
       </div>
-
-      <p className="mt-8 text-sm text-text-secondary">
-        Continue to{" "}
-        <Link href="/latest" className="text-teal-blue hover:underline">
-          Latest
-        </Link>{" "}
-        or{" "}
-        <Link href="/methodology" className="text-teal-blue hover:underline">
-          Methodology
-        </Link>
-        .
-      </p>
     </div>
   );
 }
