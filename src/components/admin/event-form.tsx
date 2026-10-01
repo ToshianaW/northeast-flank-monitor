@@ -459,6 +459,13 @@ export function EventForm({
           <Label htmlFor="ai_generated_summary">AI-generated summary</Label>
           <Textarea {...fieldProps("ai_generated_summary")} rows={3} />
         </div>
+        <div className="grid gap-2">
+          <Label htmlFor="internal_notes">Internal notes</Label>
+          <Textarea {...fieldProps("internal_notes")} rows={3} />
+          <p className="text-xs text-text-muted">
+            Reviewer-only. Never shown on the public site.
+          </p>
+        </div>
         <p className="text-xs text-text-muted">
           Source name, URL, type, country, language, and reliability on the event
           row are filled from the primary attached source when you save — not

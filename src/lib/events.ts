@@ -66,6 +66,7 @@ export type Event = {
   historical_analogue: string | null;
   historical_notes: string | null;
   ai_generated_summary: string | null;
+  internal_notes: string | null;
   human_reviewed: boolean;
   review_status: ReviewStatus;
   contradiction_flag: boolean;
@@ -135,6 +136,7 @@ export const EVENT_FORM_FIELDS = [
   "historical_analogue",
   "historical_notes",
   "ai_generated_summary",
+  "internal_notes",
   "human_reviewed",
   "contradiction_flag",
   "contradiction_notes",
@@ -171,8 +173,8 @@ const EVENT_COLUMNS = `
   confidence_level, first_reported, last_updated, announced_start_date, announced_end_date,
   observed_start_date, observed_end_date, personnel_return_status, equipment_return_status,
   infrastructure_status, follow_on_activity, overall_reset_status, historical_analogue,
-  historical_notes, ai_generated_summary, human_reviewed, review_status, contradiction_flag,
-  contradiction_notes, created_at, updated_at
+  historical_notes, ai_generated_summary, internal_notes, human_reviewed, review_status,
+  contradiction_flag, contradiction_notes, created_at, updated_at
 `;
 
 function optionalText(value: string): string | null {
@@ -274,6 +276,7 @@ export function emptyEventFormValues(): EventFormValues {
     historical_analogue: "",
     historical_notes: "",
     ai_generated_summary: "",
+    internal_notes: "",
     human_reviewed: "",
     contradiction_flag: "",
     contradiction_notes: "",
@@ -332,6 +335,7 @@ export function eventFormValuesFromEvent(event: Event): EventFormValues {
     historical_analogue: event.historical_analogue ?? "",
     historical_notes: event.historical_notes ?? "",
     ai_generated_summary: event.ai_generated_summary ?? "",
+    internal_notes: event.internal_notes ?? "",
     human_reviewed: event.human_reviewed ? "true" : "",
     contradiction_flag: event.contradiction_flag ? "true" : "",
     contradiction_notes: event.contradiction_notes ?? "",
@@ -624,6 +628,7 @@ export async function validateEventForm(
       historical_analogue: optionalText(values.historical_analogue),
       historical_notes: optionalText(values.historical_notes),
       ai_generated_summary: optionalText(values.ai_generated_summary),
+      internal_notes: optionalText(values.internal_notes),
       human_reviewed: options.humanReviewed,
       review_status,
       contradiction_flag: values.contradiction_flag === "true",
@@ -684,6 +689,7 @@ function eventInsertParams(
     event.historical_analogue,
     event.historical_notes,
     event.ai_generated_summary,
+    event.internal_notes,
     event.human_reviewed,
     review_status,
     event.contradiction_flag,
@@ -767,11 +773,11 @@ export async function createEvent(payload: EventWritePayload): Promise<string> {
          confidence_level, first_reported, last_updated, announced_start_date, announced_end_date,
          observed_start_date, observed_end_date, personnel_return_status, equipment_return_status,
          infrastructure_status, follow_on_activity, overall_reset_status, historical_analogue,
-         historical_notes, ai_generated_summary, human_reviewed, review_status, contradiction_flag,
-         contradiction_notes
+         historical_notes, ai_generated_summary, internal_notes, human_reviewed, review_status,
+         contradiction_flag, contradiction_notes
        ) VALUES (
          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,
-         $24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48
+         $24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49
        )
        RETURNING event_id`,
       eventInsertParams(payload.event, "DRAFT"),
@@ -811,9 +817,10 @@ export async function updateEvent(
          announced_end_date = $34, observed_start_date = $35, observed_end_date = $36,
          personnel_return_status = $37, equipment_return_status = $38, infrastructure_status = $39,
          follow_on_activity = $40, overall_reset_status = $41, historical_analogue = $42,
-         historical_notes = $43, ai_generated_summary = $44, human_reviewed = $45,
-         review_status = $46, contradiction_flag = $47, contradiction_notes = $48
-       WHERE event_id = $49`,
+         historical_notes = $43, ai_generated_summary = $44, internal_notes = $45,
+         human_reviewed = $46, review_status = $47, contradiction_flag = $48,
+         contradiction_notes = $49
+       WHERE event_id = $50`,
       [...eventInsertParams(payload.event, reviewStatus), id],
     );
     if (rowCount !== 1) {
