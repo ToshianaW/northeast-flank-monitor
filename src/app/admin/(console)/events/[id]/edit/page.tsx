@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
+import { BackLink } from "@/components/admin/back-link";
 import { EventForm } from "@/components/admin/event-form";
 import {
   eventFormValuesFromEvent,
@@ -43,6 +44,11 @@ export default async function EditEventPage({
 
   return (
     <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
+      {fromReviewQueue ? (
+        <BackLink href={returnTo} label="Back to review" />
+      ) : (
+        <BackLink href="/admin/events" label="Back to events" />
+      )}
       <p className="meta-label mb-2">
         Admin · {fromReviewQueue ? "review" : "events"}
       </p>

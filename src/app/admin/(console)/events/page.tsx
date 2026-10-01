@@ -74,7 +74,7 @@ export default async function AdminEventsPage({
                   <TableCell className="whitespace-nowrap font-mono text-xs">
                     {formatDate(event.event_date)}
                   </TableCell>
-                  <TableCell className="max-w-md font-medium">{event.headline}</TableCell>
+                  <TableCell className="max-w-md whitespace-normal font-medium">{event.headline}</TableCell>
                   <TableCell className="text-xs">
                     {EVENT_TYPE_LABELS[event.event_type]}
                   </TableCell>

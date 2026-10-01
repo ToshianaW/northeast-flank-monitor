@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
+import { BackLink } from "@/components/admin/back-link";
 import { ReviewEventActions } from "@/components/admin/review-event-actions";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import {
   CONFIDENCE_LEVEL_LABELS,
   EVENT_TYPE_LABELS,
@@ -60,6 +60,7 @@ export default async function ReviewEventPage({
 
   return (
     <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
+      <BackLink href="/admin/review" label="Back to review queue" />
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="meta-label mb-2">Admin · review</p>
@@ -78,9 +79,6 @@ export default async function ReviewEventPage({
             ) : null}
           </p>
         </div>
-        <Link href="/admin/review" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-          Back to queue
-        </Link>
       </div>
 
       {flags.submitted ? (

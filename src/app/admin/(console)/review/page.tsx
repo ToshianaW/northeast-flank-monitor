@@ -61,7 +61,7 @@ export default async function ReviewQueuePage() {
                   <TableCell className="whitespace-nowrap font-mono text-xs">
                     {item.event_date.toISOString().slice(0, 10)}
                   </TableCell>
-                  <TableCell className="max-w-xs font-medium">{item.headline}</TableCell>
+                  <TableCell className="max-w-xs whitespace-normal font-medium">{item.headline}</TableCell>
                   <TableCell className="text-xs">
                     {EVENT_TYPE_LABELS[item.event_type]}
                   </TableCell>

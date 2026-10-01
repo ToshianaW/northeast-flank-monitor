@@ -1,4 +1,5 @@
 import { connection } from "next/server";
+import { BackLink } from "@/components/admin/back-link";
 import { EventForm } from "@/components/admin/event-form";
 import { emptyEventFormValues, listExerciseOptions } from "@/lib/events";
 import { listSources } from "@/lib/sources";
@@ -15,6 +16,7 @@ export default async function NewEventPage() {
 
   return (
     <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
+      <BackLink href="/admin/events" label="Back to events" />
       <p className="meta-label mb-2">Admin · events</p>
       <h1 className="mb-6 text-2xl font-semibold tracking-tight">Add event</h1>
       <EventForm
