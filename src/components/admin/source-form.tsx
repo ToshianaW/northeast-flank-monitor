@@ -53,7 +53,14 @@ export function SourceForm({ action, initialValues, submitLabel }: Props) {
   });
 
   return (
-    <form action={formAction} className="grid max-w-3xl gap-5" noValidate>
+    // React resets the form after each action; some fields fall back to their
+    // first-render defaults, so remount with the submitted values instead.
+    <form
+      key={JSON.stringify(values)}
+      action={formAction}
+      className="grid max-w-3xl gap-5"
+      noValidate
+    >
       {state.formError ? (
         <p
           role="alert"
