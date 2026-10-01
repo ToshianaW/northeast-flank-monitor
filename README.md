@@ -21,7 +21,9 @@ cp .env.example .env.local   # then set ADMIN_PASSWORD
 npm run dev
 ```
 
-`ADMIN_PASSWORD` is required, with no default. `npm run dev` and `npm start` exit with an error if it is unset. `npm run build` does not need it.
+`ADMIN_PASSWORD` is required, with no default. `npm run dev` and `npm start` exit with an error if it is unset or still the `.env.example` placeholder. `npm run build` does not need it.
+
+Secrets: all `.env*` files are gitignored except `.env.example`, which holds placeholders only. This repository is public, so anything committed stays in git history even if deleted later — never commit real credentials.
 
 Dev server defaults to [http://127.0.0.1:43127](http://127.0.0.1:43127).
 
