@@ -1,0 +1,34 @@
+# Northeast Flank Monitor: project rules
+
+## What this project is
+An open-source OSINT monitoring site for military activity on NATO's northeastern flank.
+Full spec: docs/spec.md. Follow the spec. If a step is ambiguous or two requirements
+conflict, ask me instead of deciding.
+
+## Core question
+"Is the regional military baseline changing?" Observe behavior, track the baseline,
+compare historically. Do not predict intent.
+
+## Rules
+1. No predictive or alarmist language (UI copy, digests, sample text) unless directly
+   quoted and attributed to a credible named source.
+2. Every event has at least one attributed source (name, URL, type).
+3. Locations and positions: publish what a source reports, with attribution to that
+   source. Do not invent or infer positions that no source states.
+4. Official Russian/Belarusian claims are labeled as state sources and not treated as
+   independently verified.
+5. Historical comparison always carries the note that similarity is not trajectory.
+6. Northeast Flank Activity Index: part of the project. Build it per the spec, with the
+   permanent disclaimer that it measures observable activity and is not a probability of
+   conflict. Scoring formula must be documented. Build order follows the roadmap I set.
+7. AI-extracted events go to a review queue first; only approved events are public.
+
+## Engineering rules
+- Work in small steps, one per prompt. Outline the plan before any step touching
+  more than 3 files.
+- Follow the stack and repo structure in docs/spec.md unless I say otherwise.
+- Schema changes go through migrations.
+- After each step: list what changed, what you did not do, and open questions.
+
+## Design (UI steps only)
+Palette and typography are in docs/spec.md sections 47-51.
