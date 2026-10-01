@@ -175,6 +175,48 @@ export async function updateSource(
   return rowCount === 1;
 }
 
+export type SourceReferenceCounts = {
+  event_sources: number;
+  exercise_sources: number;
+  review_actions: number;
+};
+
+export async function getSourceReferenceCounts(
+  id: string,
+): Promise<SourceReferenceCounts | null> {
+  if (!UUID_RE.test(id)) return null;
+  const { rows } = await getPool().query<SourceReferenceCounts>(
+    `SELECT
+       (SELECT count(*)::int FROM event_sources WHERE source_id = $1) AS event_sources,
+       (SELECT count(*)::int FROM exercise_sources WHERE source_id = $1) AS exercise_sources,
+       (SELECT count(*)::int FROM review_actions WHERE $1 = ANY (source_ids)) AS review_actions`,
+    [id],
+  );
+  return rows[0] ?? null;
+}
+
+export type DeleteSourceResult =
+  | { ok: true }
+  | { ok: false; reason: "not_found" | "in_use"; counts?: SourceReferenceCounts };
+
+export async function deleteSource(id: string): Promise<DeleteSourceResult> {
+  if (!UUID_RE.test(id)) return { ok: false, reason: "not_found" };
+
+  const counts = await getSourceReferenceCounts(id);
+  if (!counts) return { ok: false, reason: "not_found" };
+
+  const inUse =
+    counts.event_sources > 0 ||
+    counts.exercise_sources > 0 ||
+    counts.review_actions > 0;
+  if (inUse) return { ok: false, reason: "in_use", counts };
+
+  const { rowCount } = await getPool().query(`DELETE FROM sources WHERE id = $1`, [
+    id,
+  ]);
+  return rowCount === 1 ? { ok: true } : { ok: false, reason: "not_found" };
+}
+
 export function isUniqueViolation(error: unknown): boolean {
   return (
     typeof error === "object" &&

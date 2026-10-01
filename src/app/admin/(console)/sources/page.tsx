@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SourceDeleteButton } from "@/components/admin/source-delete-button";
 import {
   isStateOfficialSource,
   RELIABILITY_LABELS,
@@ -23,7 +24,8 @@ export default async function AdminSourcesPage({
   searchParams,
 }: PageProps<"/admin/sources">) {
   await connection();
-  const [{ saved }, sources] = await Promise.all([searchParams, listSources()]);
+  const [params, sources] = await Promise.all([searchParams, listSources()]);
+  const { saved, deleted, delete_blocked, delete_error } = params;
 
   return (
     <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
@@ -46,6 +48,31 @@ export default async function AdminSourcesPage({
           className="mt-6 border border-operational-teal/40 bg-operational-teal/10 px-3 py-2 text-sm text-foreground"
         >
           Source saved.
+        </p>
+      ) : null}
+      {deleted ? (
+        <p
+          role="status"
+          className="mt-6 border border-operational-teal/40 bg-operational-teal/10 px-3 py-2 text-sm text-foreground"
+        >
+          Source deleted.
+        </p>
+      ) : null}
+      {delete_blocked ? (
+        <p
+          role="status"
+          className="mt-6 border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-foreground"
+        >
+          This source is linked to events, exercises, or review history and cannot
+          be deleted.
+        </p>
+      ) : null}
+      {delete_error ? (
+        <p
+          role="status"
+          className="mt-6 border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-foreground"
+        >
+          Could not delete that source. Try again.
         </p>
       ) : null}
 
@@ -118,12 +145,18 @@ export default async function AdminSourcesPage({
                     {source.notes ?? "—"}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Link
-                      href={`/admin/sources/${source.id}/edit`}
-                      className={buttonVariants({ variant: "outline", size: "sm" })}
-                    >
-                      Edit
-                    </Link>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <Link
+                        href={`/admin/sources/${source.id}/edit`}
+                        className={buttonVariants({ variant: "outline", size: "sm" })}
+                      >
+                        Edit
+                      </Link>
+                      <SourceDeleteButton
+                        sourceId={source.id}
+                        sourceName={source.name}
+                      />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

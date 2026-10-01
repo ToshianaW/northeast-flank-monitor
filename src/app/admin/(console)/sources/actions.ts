@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin-session";
 import {
   createSource,
+  deleteSource,
   formValuesFrom,
   isUniqueViolation,
   updateSource,
@@ -63,4 +64,22 @@ export async function updateSourceAction(
     const updated = await updateSource(id, input);
     if (!updated) throw new Error(`Source ${id} not found`);
   });
+}
+
+export async function deleteSourceAction(formData: FormData): Promise<void> {
+  await requireAdmin();
+
+  const id = String(formData.get("source_id") ?? "").trim();
+  const result = await deleteSource(id);
+
+  if (!result.ok) {
+    if (result.reason === "in_use") {
+      redirect("/admin/sources?delete_blocked=1");
+    }
+    redirect("/admin/sources?delete_error=1");
+  }
+
+  revalidatePath("/sources");
+  revalidatePath("/admin/sources");
+  redirect("/admin/sources?deleted=1");
 }

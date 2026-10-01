@@ -20,6 +20,10 @@
 # production
 /build
 
+# local one-off DB scripts (not for the repo)
+/scripts/seed-sources.mts
+/scripts/patch-source-urls.mts
+
 # misc
 .DS_Store
 *.pem
