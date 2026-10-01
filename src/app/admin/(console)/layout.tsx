@@ -28,6 +28,9 @@ export default function AdminConsoleLayout({
             <Link href="/admin/review" className="text-teal-blue hover:underline">
               Review
             </Link>
+            <Link href="/admin/digests" className="text-teal-blue hover:underline">
+              Digests
+            </Link>
             <form action="/api/admin/logout" method="post">
               <button
                 type="submit"

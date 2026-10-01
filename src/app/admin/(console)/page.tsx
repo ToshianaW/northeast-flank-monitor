@@ -40,6 +40,15 @@ export default function AdminDashboardPage() {
             Approve, reject, merge, or edit draft and pending events.
           </p>
         </Link>
+        <Link
+          href="/admin/digests"
+          className="block border border-border bg-surface-dark p-4 transition-colors hover:border-teal-blue"
+        >
+          <p className="meta-label">Daily digests</p>
+          <p className="mt-2 text-sm text-text-secondary">
+            Write, save as draft, and publish the daily digest.
+          </p>
+        </Link>
       </div>
     </section>
   );
