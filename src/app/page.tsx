@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { connection } from "next/server";
+import { formatDigestDate } from "@/components/digest-view";
 import { EventLogEntry } from "@/components/event-log-entry";
+import { getLatestPublishedDigest } from "@/lib/digests";
 import {
   getSnapshotCounts,
   listPublishedEvents,
@@ -32,10 +34,15 @@ function Panel({
 
 export default async function HomePage() {
   await connection();
-  const [counts, latest] = await Promise.all([
+  const [counts, latest, digest] = await Promise.all([
     getSnapshotCounts(),
     listPublishedEvents(5),
+    getLatestPublishedDigest(),
   ]);
+  // First paragraph of the Executive Summary as the homepage excerpt.
+  const digestExcerpt = digest?.sections.executive_summary
+    .split(/\n\s*\n/)
+    .find((p) => p.trim() !== "");
 
   const snapshotRows: Array<{ label: string; value: string }> = [
     { label: "Verified events", value: String(counts.verifiedEvents) },
@@ -74,6 +81,37 @@ export default async function HomePage() {
           <p className="mt-4 text-xs text-text-muted">
             Published events dated today or yesterday (UTC).
           </p>
+        </Panel>
+
+        <Panel title="Daily digest" className="md:col-span-2 lg:col-span-12">
+          {digest ? (
+            <>
+              <p className="font-mono text-xs text-text-secondary">
+                {formatDigestDate(digest.digest_date)}
+              </p>
+              <h3 className="mt-1 text-base font-medium">
+                <Link
+                  href={`/digest/${digest.digest_date}`}
+                  className="hover:text-teal-blue hover:underline"
+                >
+                  {digest.title}
+                </Link>
+              </h3>
+              {digestExcerpt ? (
+                <p className="mt-2 max-w-4xl text-sm leading-relaxed whitespace-pre-line text-text-secondary">
+                  {digestExcerpt}
+                </p>
+              ) : null}
+              <Link
+                href={`/digest/${digest.digest_date}`}
+                className="mt-4 inline-block text-xs text-teal-blue hover:underline"
+              >
+                Read full digest →
+              </Link>
+            </>
+          ) : (
+            <p className="text-sm text-text-secondary">No digest published yet.</p>
+          )}
         </Panel>
 
         <Panel title="Latest verified events" className="md:col-span-2 lg:col-span-8">

@@ -3,9 +3,10 @@ export type NavItem = {
   label: string;
 };
 
-/** Spec §8 / §52 primary navigation */
+/** Spec §8 / §52 primary navigation, plus Digest (spec §16). */
 export const PRIMARY_NAV: NavItem[] = [
   { href: "/latest", label: "Latest" },
+  { href: "/digest", label: "Digest" },
   { href: "/map", label: "Map" },
   { href: "/exercises", label: "Exercises" },
   { href: "/air-activity", label: "Air Activity" },
