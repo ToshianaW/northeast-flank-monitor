@@ -353,7 +353,9 @@ export function eventSourceRowsFromFormData(formData: FormData): EventSourceForm
 export function eventFormValuesFrom(formData: FormData): EventFormValues {
   const values = emptyEventFormValues();
   for (const field of EVENT_FORM_FIELDS) {
-    if (field === "human_reviewed" || field === "contradiction_flag") {
+    if (field === "human_reviewed") {
+      values[field] = String(formData.get(field) ?? "") === "true" ? "true" : "";
+    } else if (field === "contradiction_flag") {
       values[field] = formData.get(field) === "on" ? "true" : "";
     } else {
       values[field] = String(formData.get(field) ?? "");
@@ -364,7 +366,7 @@ export function eventFormValuesFrom(formData: FormData): EventFormValues {
 
 export async function validateEventForm(
   formData: FormData,
-  options: { preserveReviewStatus?: ReviewStatus },
+  options: { preserveReviewStatus?: ReviewStatus; humanReviewed: boolean },
 ): Promise<EventValidationResult> {
   const errors: EventFormErrors = {};
   const values = eventFormValuesFrom(formData);
@@ -622,7 +624,7 @@ export async function validateEventForm(
       historical_analogue: optionalText(values.historical_analogue),
       historical_notes: optionalText(values.historical_notes),
       ai_generated_summary: optionalText(values.ai_generated_summary),
-      human_reviewed: values.human_reviewed === "true",
+      human_reviewed: options.humanReviewed,
       review_status,
       contradiction_flag: values.contradiction_flag === "true",
       contradiction_notes: optionalText(values.contradiction_notes),

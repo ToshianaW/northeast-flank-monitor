@@ -23,6 +23,7 @@
 # local one-off DB scripts (not for the repo)
 /scripts/seed-sources.mts
 /scripts/patch-source-urls.mts
+/scripts/seed-two-events.mts
 
 # misc
 .DS_Store

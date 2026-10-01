@@ -41,7 +41,9 @@ function stateFromForm(formData: FormData): Pick<
 async function saveEvent(
   formData: FormData,
   write: (payload: EventWritePayload) => Promise<void>,
-  validateOptions: Parameters<typeof validateEventForm>[1],
+  validateOptions: Parameters<typeof validateEventForm>[1] & {
+    humanReviewed: boolean;
+  },
 ): Promise<EventFormState> {
   await requireAdmin();
 
@@ -68,9 +70,13 @@ export async function createEventAction(
   _prev: EventFormState,
   formData: FormData,
 ): Promise<EventFormState> {
-  return saveEvent(formData, async (payload) => {
-    await createEvent(payload);
-  }, {});
+  return saveEvent(
+    formData,
+    async (payload) => {
+      await createEvent(payload);
+    },
+    { humanReviewed: false },
+  );
 }
 
 export async function updateEventAction(
@@ -90,6 +96,9 @@ export async function updateEventAction(
       const updated = await updateEvent(id, payload, existing.review_status);
       if (!updated) throw new Error(`Event ${id} not found`);
     },
-    { preserveReviewStatus: existing.review_status },
+    {
+      preserveReviewStatus: existing.review_status,
+      humanReviewed: existing.human_reviewed,
+    },
   );
 }

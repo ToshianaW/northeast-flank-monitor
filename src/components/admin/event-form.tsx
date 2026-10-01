@@ -207,15 +207,20 @@ export function EventForm({
           <Textarea {...fieldProps("activity_description")} rows={3} />
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex items-center gap-2 text-sm">
+          <div className="grid gap-1 text-sm">
+            <span className="text-text-secondary">Human reviewed</span>
+            <p className="font-medium">
+              {values.human_reviewed === "true" ? "Yes" : "No"}
+            </p>
+            <p className="text-xs text-text-muted">
+              Set when an event is approved (step 1.5).
+            </p>
             <input
-              type="checkbox"
+              type="hidden"
               name="human_reviewed"
-              defaultChecked={values.human_reviewed === "true"}
-              className="size-4 accent-teal-blue"
+              value={values.human_reviewed === "true" ? "true" : ""}
             />
-            Human reviewed
-          </label>
+          </div>
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"

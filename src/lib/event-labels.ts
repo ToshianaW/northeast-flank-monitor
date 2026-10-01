@@ -104,8 +104,18 @@ function titleCaseEnum(value: string): string {
     .join(" ");
 }
 
+/** Display labels that need acronyms or spec wording, not naive title case. */
+const EVENT_TYPE_LABEL_OVERRIDES: Partial<Record<EventType, string>> = {
+  NATO_REINFORCEMENT: "NATO Reinforcement",
+  ELECTRONIC_WARFARE: "Electronic Warfare (EW)",
+  COMMAND_CONTROL: "Command & Control (C2)",
+};
+
 export const EVENT_TYPE_LABELS = Object.fromEntries(
-  EVENT_TYPE_VALUES.map((v) => [v, titleCaseEnum(v)]),
+  EVENT_TYPE_VALUES.map((v) => [
+    v,
+    EVENT_TYPE_LABEL_OVERRIDES[v] ?? titleCaseEnum(v),
+  ]),
 ) as Record<EventType, string>;
 
 export const EXERCISE_STATUS_LABELS = Object.fromEntries(
