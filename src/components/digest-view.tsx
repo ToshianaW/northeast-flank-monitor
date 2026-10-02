@@ -44,7 +44,7 @@ export function DigestView({
       </h1>
 
       {shown.length === 0 ? (
-        <p className="mt-8 text-sm text-text-secondary">
+        <p className="mt-8 text-base text-text-secondary">
           This digest has no content yet.
         </p>
       ) : (
@@ -52,7 +52,7 @@ export function DigestView({
           {shown.map(({ key, label }) => (
             <section key={key} className="border-t border-border pt-5">
               <h2 className="meta-label mb-3">{label}</h2>
-              <div className="max-w-3xl text-sm leading-relaxed text-text-secondary sm:text-base">
+              <div className="max-w-3xl text-base leading-relaxed text-text-secondary">
                 <PlainText text={digest.sections[key]} />
               </div>
             </section>

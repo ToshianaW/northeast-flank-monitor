@@ -19,8 +19,22 @@
   --surface-raised: #171d33;
   --text-primary: #f4f7fb;
   --text-secondary: #aeb8c8;
-  --text-muted: #748096;
+  /* Lightened from §47 #748096 (4.18:1 on surface-raised) to clear WCAG AA (≥5.4:1). */
+  --text-muted: #8994a8;
   --border: rgba(130, 160, 185, 0.18);
+
+  /* Ocean-foam outline for panels and cards; full foam on hover and focus. */
+  --foam: #e9e4d4;
+  --foam-muted: rgba(233, 228, 212, 0.6);
+  --glow: rgba(0, 133, 116, 0.28); /* operational teal */
+  --nav-glow: rgba(0, 133, 116, 0.6);
+  --radius-panel: 0.625rem;
+
+  /* Text-only tints of §47 colors. The originals stay for fills and borders but
+     fall below AA as text on the dark surfaces (3.0–4.2:1). All ≥6.4:1 here. */
+  --link: #4cb0c7; /* teal-blue */
+  --status-ok-text: #2fb3a0; /* operational teal */
+  --status-alert-text: #e0827a; /* destructive */
 
   --background: var(--background-dark);
   --foreground: var(--text-primary);
@@ -68,6 +82,11 @@
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
   --color-border: var(--border);
+  --color-foam: var(--foam);
+  --color-link: var(--link);
+  --color-status-ok: var(--status-ok-text);
+  --color-status-alert: var(--status-alert-text);
+  --text-base--line-height: 1.6;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-geist-sans);
@@ -117,7 +136,159 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-size: 1rem;
+    line-height: 1.6;
   }
+}
+
+@layer components {
+  /* Static panel: foam outline on the dark surface. */
+  .panel {
+    border: 2px solid var(--foam-muted);
+    border-radius: var(--radius-panel);
+    background-color: var(--surface-dark);
+    padding: 1.5rem;
+  }
+
+  /* Clickable panel. Pair with .panel-target on the main link, whose ::after
+     covers the whole card so the card is one click target. */
+  .panel-link {
+    position: relative;
+    transition:
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      transform 180ms ease;
+  }
+  .panel-target::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .panel-link:hover {
+      border-color: var(--foam);
+      box-shadow: 0 0 24px var(--glow);
+      transform: translateY(-2px);
+    }
+  }
+  /* Touch: no hover; show a pressed state instead. */
+  @media (hover: none) {
+    .panel-link:active {
+      border-color: var(--foam);
+      background-color: var(--surface-raised);
+    }
+  }
+  .panel-link:focus-within {
+    border-color: var(--foam);
+  }
+
+  /* Text link. */
+  .link {
+    color: var(--link);
+    text-underline-offset: 3px;
+    transition: color 180ms ease;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .link:hover {
+      color: var(--foam);
+      text-decoration-line: underline;
+    }
+  }
+  @media (hover: none) {
+    .link:active {
+      color: var(--foam);
+      text-decoration-line: underline;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .panel-link,
+    .link {
+      transition: none;
+    }
+    .panel-link:hover {
+      transform: none;
+      box-shadow: none;
+    }
+  }
+}
+
+/* Primary nav item. Unlayered and after .meta-label so its colors win. */
+a.nav-item {
+  border: 2px solid transparent;
+  border-radius: var(--radius-panel);
+  padding: 0.3rem 0.65rem;
+  color: var(--text-secondary);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    color 180ms ease;
+}
+a.nav-item[aria-current="page"] {
+  border-color: var(--foam-muted);
+  color: var(--foam);
+}
+@media (hover: hover) and (pointer: fine) {
+  a.nav-item:hover {
+    border-color: var(--foam);
+    color: var(--foam);
+    /* Stronger and offset down: a small pill needs more glow to read the same as a card. */
+    box-shadow:
+      0 8px 24px -2px var(--nav-glow),
+      0 0 12px var(--glow);
+    transform: translateY(-2px);
+  }
+}
+@media (hover: none) {
+  a.nav-item:active {
+    border-color: var(--foam);
+    color: var(--foam);
+    background-color: var(--surface-raised);
+  }
+}
+
+/* "Live" indicator: steady pulse of the operational-teal dot. */
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow:
+      0 0 6px 1px rgba(0, 133, 116, 0.9),
+      0 0 0 0 rgba(0, 133, 116, 0.55);
+  }
+  50% {
+    opacity: 0.55;
+    box-shadow:
+      0 0 12px 3px rgba(0, 133, 116, 0.75),
+      0 0 0 6px rgba(0, 133, 116, 0);
+  }
+}
+.live-dot {
+  background-color: #00a891; /* brighter operational teal so it reads as "on" */
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  a.nav-item {
+    transition: none;
+  }
+  a.nav-item:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  /* Keep a steady glow instead of pulsing. */
+  .live-dot {
+    animation: none;
+    box-shadow: 0 0 8px 2px rgba(0, 133, 116, 0.8);
+  }
+}
+
+/* Unlayered so it wins over component `outline-none` utilities. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--foam);
+  outline-offset: 2px;
 }
 
 /* Spec §50 — faint grid, restrained */

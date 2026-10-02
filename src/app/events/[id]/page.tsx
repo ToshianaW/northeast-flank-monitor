@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { ArrowLeft } from "lucide-react";
 import { formatEventDate, formatUtcTime } from "@/components/event-log-entry";
+import { LabelHelp } from "@/components/label-help";
 import { Badge } from "@/components/ui/badge";
 import {
   CONFIDENCE_LEVEL_LABELS,
@@ -42,7 +43,7 @@ function FieldSection({ title, fields }: { title: string; fields: Field[] }) {
         {shown.map((f) => (
           <div key={f.label}>
             <dt className="text-xs text-text-muted">{f.label}</dt>
-            <dd className="mt-0.5 text-sm whitespace-pre-line">{f.value}</dd>
+            <dd className="mt-0.5 text-base whitespace-pre-line">{f.value}</dd>
           </div>
         ))}
       </dl>
@@ -59,7 +60,7 @@ function SourceItem({ source }: { source: PublicEventSource }) {
             href={source.home_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-medium hover:text-teal-blue hover:underline"
+            className="font-medium transition-colors hover:text-link hover:underline"
           >
             {source.name}
           </a>
@@ -78,8 +79,8 @@ function SourceItem({ source }: { source: PublicEventSource }) {
           variant="outline"
           className={
             source.relationship === "CONTRADICTS"
-              ? "border-destructive/50 text-destructive"
-              : "border-operational-teal/50 text-operational-teal"
+              ? "border-destructive/50 text-status-alert"
+              : "border-operational-teal/50 text-status-ok"
           }
         >
           {SOURCE_RELATIONSHIP_LABELS[source.relationship]}
@@ -92,12 +93,12 @@ function SourceItem({ source }: { source: PublicEventSource }) {
         href={source.article_url}
         target="_blank"
         rel="noopener noreferrer"
-        className="mt-1 block break-all font-mono text-xs text-teal-blue hover:underline"
+        className="mt-1 block break-all font-mono text-xs link"
       >
         {source.article_url}
       </a>
       {source.excerpt ? (
-        <blockquote className="mt-2 max-w-3xl border-l-2 border-border pl-3 text-sm text-text-secondary">
+        <blockquote className="mt-2 max-w-3xl border-l-2 border-border pl-3 text-base text-text-secondary">
           {source.excerpt}
         </blockquote>
       ) : null}
@@ -127,7 +128,7 @@ export default async function EventPage({ params }: PageProps<"/events/[id]">) {
     <article className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6">
       <Link
         href="/latest"
-        className="mb-6 inline-flex items-center gap-1.5 text-xs text-teal-blue hover:underline"
+        className="mb-6 inline-flex items-center gap-1.5 text-sm link"
       >
         <ArrowLeft className="size-3.5" aria-hidden />
         Back to latest
@@ -140,7 +141,7 @@ export default async function EventPage({ params }: PageProps<"/events/[id]">) {
         </p>
         {event.country ? <p className="meta-label">{event.country}</p> : null}
       </div>
-      <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-teal-blue">
+      <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-link">
         {EVENT_TYPE_LABELS[event.event_type]}
         {event.event_subtype ? ` · ${event.event_subtype}` : null}
       </p>
@@ -148,7 +149,7 @@ export default async function EventPage({ params }: PageProps<"/events/[id]">) {
         {event.headline}
       </h1>
 
-      <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-2 text-sm">
+      <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-2 text-base">
         <div>
           <dt className="meta-label">Confidence</dt>
           <dd className="mt-0.5">{CONFIDENCE_LEVEL_LABELS[event.confidence_level]}</dd>
@@ -166,9 +167,10 @@ export default async function EventPage({ params }: PageProps<"/events/[id]">) {
           </div>
         ) : null}
       </dl>
+      <LabelHelp className="mt-3 max-w-3xl" />
 
       {event.contradiction_flag ? (
-        <div className="mt-6 border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
+        <div className="mt-6 border border-destructive/40 bg-destructive/10 px-4 py-3 text-base">
           <p className="meta-label mb-1">Conflicting reports</p>
           <p className="text-text-secondary">
             {event.contradiction_notes ??
@@ -271,13 +273,13 @@ export default async function EventPage({ params }: PageProps<"/events/[id]">) {
           <section className="border-t border-border pt-5">
             <h2 className="meta-label mb-3">Historical context</h2>
             {event.historical_analogue ? (
-              <p className="text-sm">
+              <p className="text-base">
                 <span className="text-xs text-text-muted">Analogue: </span>
                 {event.historical_analogue}
               </p>
             ) : null}
             {event.historical_notes ? (
-              <p className="mt-2 max-w-3xl text-sm text-text-secondary whitespace-pre-line">
+              <p className="mt-2 max-w-3xl text-base text-text-secondary whitespace-pre-line">
                 {event.historical_notes}
               </p>
             ) : null}

@@ -17,7 +17,7 @@ export function PageStub({
       <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
         {title}
       </h1>
-      <p className="mt-3 max-w-2xl text-sm leading-relaxed text-text-secondary sm:text-base">
+      <p className="mt-3 max-w-2xl text-base leading-relaxed text-text-secondary">
         {description}
       </p>
       {nextStep ? (

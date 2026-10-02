@@ -8,7 +8,7 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
   return (
     <section className="border-t border-border pt-6">
       <h2 className="meta-label mb-3">{title}</h2>
-      <div className="grid max-w-3xl gap-3 text-sm leading-relaxed text-text-secondary sm:text-base">
+      <div className="grid max-w-3xl gap-3 text-base leading-relaxed text-text-secondary">
         {children}
       </div>
     </section>
@@ -22,7 +22,7 @@ export default function AboutPage() {
       <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
         About Northeast Flank Monitor
       </h1>
-      <p className="mt-3 max-w-2xl text-sm leading-relaxed text-text-secondary sm:text-base">
+      <p className="mt-3 max-w-2xl text-base leading-relaxed text-text-secondary">
         Independent open-source monitoring of military activity across
         Kaliningrad, Belarus, Poland and the Baltic states.
       </p>
@@ -44,7 +44,7 @@ export default function AboutPage() {
           </p>
           <p>
             How events are selected, sourced, and reviewed is described on the{" "}
-            <Link href="/methodology" className="text-teal-blue hover:underline">
+            <Link href="/methodology" className="link">
               Methodology
             </Link>{" "}
             page.
@@ -58,7 +58,7 @@ export default function AboutPage() {
               href={REPOSITORY_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-teal-blue hover:underline"
+              className="link"
             >
               GitHub
             </a>
@@ -87,7 +87,7 @@ export default function AboutPage() {
               href={REPOSITORY_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-teal-blue hover:underline"
+              className="link"
             >
               GitHub repository
             </a>

@@ -25,7 +25,7 @@ export async function SiteHeader() {
           </div>
           <div className="flex items-center gap-2 sm:text-right">
             <span
-              className="inline-block h-2 w-2 rounded-full bg-operational-teal shadow-[0_0_8px_rgba(0,133,116,0.55)]"
+              className="live-dot inline-block h-2 w-2 rounded-full"
               aria-hidden
             />
             <div>

@@ -24,7 +24,7 @@ function Panel({
   return (
     <section
       aria-label={title}
-      className={`border border-border bg-surface-dark p-5 ${className}`}
+      className={`panel ${className}`}
     >
       <h2 className="meta-label mb-4">{title}</h2>
       {children}
@@ -92,33 +92,33 @@ export default async function HomePage() {
               <h3 className="mt-1 text-base font-medium">
                 <Link
                   href={`/digest/${digest.digest_date}`}
-                  className="hover:text-teal-blue hover:underline"
+                  className="transition-colors hover:text-link hover:underline"
                 >
                   {digest.title}
                 </Link>
               </h3>
               {digestExcerpt ? (
-                <p className="mt-2 max-w-4xl text-sm leading-relaxed whitespace-pre-line text-text-secondary">
+                <p className="mt-2 max-w-4xl text-base leading-relaxed whitespace-pre-line text-text-secondary">
                   {digestExcerpt}
                 </p>
               ) : null}
               <Link
                 href={`/digest/${digest.digest_date}`}
-                className="mt-4 inline-block text-xs text-teal-blue hover:underline"
+                className="mt-4 inline-block text-sm link"
               >
                 Read full digest →
               </Link>
             </>
           ) : (
-            <p className="text-sm text-text-secondary">No digest published yet.</p>
+            <p className="text-base text-text-secondary">No digest published yet.</p>
           )}
         </Panel>
 
         <Panel title="Latest verified events" className="md:col-span-2 lg:col-span-8">
           {latest.length === 0 ? (
-            <p className="text-sm text-text-secondary">No published events yet.</p>
+            <p className="text-base text-text-secondary">No published events yet.</p>
           ) : (
-            <div className="-my-5 divide-y divide-border">
+            <div className="grid gap-3">
               {latest.map((event) => (
                 <EventLogEntry key={event.event_id} event={event} />
               ))}
@@ -126,14 +126,14 @@ export default async function HomePage() {
           )}
           <Link
             href="/latest"
-            className="mt-4 inline-block border-t border-border pt-4 text-xs text-teal-blue hover:underline"
+            className="mt-5 inline-block text-sm link"
           >
             View all →
           </Link>
         </Panel>
 
         <Panel title="Active exercises" className="md:col-span-2 lg:col-span-12">
-          <p className="text-sm text-text-secondary">
+          <p className="text-base text-text-secondary">
             No exercises are recorded yet.
           </p>
         </Panel>

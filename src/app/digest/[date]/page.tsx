@@ -19,7 +19,7 @@ export default async function DigestByDatePage({
     <div className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6">
       <Link
         href="/digest"
-        className="mb-6 inline-flex items-center gap-1.5 text-xs text-teal-blue hover:underline"
+        className="mb-6 inline-flex items-center gap-1.5 text-sm link"
       >
         <ArrowLeft className="size-3.5" aria-hidden />
         Latest digest

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LabelHelp } from "@/components/label-help";
 import {
   CONFIDENCE_LEVEL_LABELS,
   DIMENSION_STATUS_LABELS,
@@ -202,7 +203,7 @@ function Section({
         </span>
         {title}
       </h2>
-      <div className="mt-3 grid max-w-3xl gap-3 text-sm leading-relaxed text-text-secondary sm:text-base">
+      <div className="mt-3 grid max-w-3xl gap-3 text-base leading-relaxed text-text-secondary">
         {children}
       </div>
     </section>
@@ -231,20 +232,20 @@ export default function MethodologyPage() {
     <div className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6">
       <p className="meta-label mb-3">Open methodology</p>
       <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Methodology</h1>
-      <p className="mt-3 max-w-2xl text-sm leading-relaxed text-text-secondary sm:text-base">
+      <p className="mt-3 max-w-2xl text-base leading-relaxed text-text-secondary">
         How Northeast Flank Monitor selects, labels, reviews, and presents
         events, and what it does not claim.
       </p>
 
       <nav
         aria-label="Contents"
-        className="mt-8 border border-border bg-surface-dark p-5"
+        className="panel mt-8"
       >
         <p className="meta-label mb-3">Contents</p>
-        <ol className="grid gap-1.5 text-sm sm:grid-cols-2">
+        <ol className="grid gap-1.5 text-base sm:grid-cols-2">
           {SECTIONS.map((s, i) => (
             <li key={s.id}>
-              <a href={`#${s.id}`} className="text-teal-blue hover:underline">
+              <a href={`#${s.id}`} className="link">
                 <span className="mr-2 font-mono text-xs text-text-muted">
                   {String(i + 1).padStart(2, "0")}
                 </span>
@@ -309,7 +310,7 @@ export default function MethodologyPage() {
           <p>
             Sources are not treated equally. Each source in the registry is
             assigned a tier and a source type, both shown on the{" "}
-            <Link href="/sources" className="text-teal-blue hover:underline">
+            <Link href="/sources" className="link">
               Sources
             </Link>{" "}
             page.
@@ -333,6 +334,7 @@ export default function MethodologyPage() {
         </Section>
 
         <Section id="confidence" number={n("confidence")} title={t("confidence")}>
+          <LabelHelp className="border-l-2 border-teal-blue pl-3" />
           <p>These are two separate ratings.</p>
           <p>
             <span className="text-foreground">Source reliability</span> is a

@@ -36,7 +36,7 @@ export default async function SourcesPage() {
       <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
         Sources
       </h1>
-      <p className="mt-3 max-w-2xl text-sm leading-relaxed text-text-secondary sm:text-base">
+      <p className="mt-3 max-w-2xl text-base leading-relaxed text-text-secondary">
         Sources are not treated equally. Each is grouped by tier and labeled by
         type. Russian and Belarusian official sources are marked as state
         sources: their claims are reported with attribution and are not
@@ -45,14 +45,14 @@ export default async function SourcesPage() {
 
       {groups.length === 0 ? (
         <div className="mt-10 border border-dashed border-border bg-surface-dark px-6 py-10 text-center">
-          <p className="text-sm text-text-secondary">
+          <p className="text-base text-text-secondary">
             No sources have been added to the registry yet.
           </p>
         </div>
       ) : (
-        <div className="mt-10 grid gap-10">
+        <div className="mt-10 grid gap-6">
           {groups.map((group) => (
-            <section key={group.key} aria-labelledby={group.key}>
+            <section key={group.key} aria-labelledby={group.key} className="panel">
               <h2
                 id={group.key}
                 className="border-b border-border pb-2 text-sm font-semibold uppercase tracking-wide text-text-secondary"
@@ -71,7 +71,7 @@ export default async function SourcesPage() {
                           href={source.home_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="font-medium text-foreground hover:text-teal-blue hover:underline"
+                          className="font-medium text-foreground transition-colors hover:text-link hover:underline"
                         >
                           {source.name}
                         </a>
@@ -93,7 +93,7 @@ export default async function SourcesPage() {
                         .join(" · ") || "Country not recorded"}
                     </p>
                     {source.notes ? (
-                      <p className="mt-2 max-w-3xl text-sm text-text-secondary">
+                      <p className="mt-2 max-w-3xl text-base text-text-secondary">
                         {source.notes}
                       </p>
                     ) : null}

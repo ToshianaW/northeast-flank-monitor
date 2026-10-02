@@ -22,7 +22,7 @@ export function EventLogEntry({ event }: { event: PublicEvent }) {
   const href = `/events/${event.event_id}`;
 
   return (
-    <article className="py-5">
+    <article className="panel panel-link">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="font-mono text-xs text-text-secondary">
           {formatEventDate(event.event_date)}
@@ -33,21 +33,24 @@ export function EventLogEntry({ event }: { event: PublicEvent }) {
         ) : null}
       </div>
 
-      <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-teal-blue">
+      <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-link">
         {EVENT_TYPE_LABELS[event.event_type]}
       </p>
       <h2 className="mt-1 text-base font-medium leading-snug">
-        <Link href={href} className="hover:text-teal-blue hover:underline">
+        <Link
+          href={href}
+          className="panel-target transition-colors hover:text-link hover:underline"
+        >
           {event.headline}
         </Link>
       </h2>
       {event.summary ? (
-        <p className="mt-1 line-clamp-2 max-w-3xl text-sm text-text-secondary">
+        <p className="mt-1 line-clamp-2 max-w-3xl text-base text-text-secondary">
           {event.summary}
         </p>
       ) : null}
 
-      <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2 text-sm">
+      <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2 text-base">
         <div>
           <dt className="meta-label">Source</dt>
           <dd className="mt-0.5">{event.source_name ?? "—"}</dd>
@@ -66,7 +69,7 @@ export function EventLogEntry({ event }: { event: PublicEvent }) {
 
       <Link
         href={href}
-        className="mt-3 inline-block text-xs text-teal-blue hover:underline"
+        className="relative mt-3 inline-block text-sm link"
       >
         View event →
       </Link>

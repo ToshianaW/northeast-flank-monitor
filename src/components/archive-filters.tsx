@@ -59,7 +59,7 @@ export function ArchiveFilters({
     <form
       method="get"
       action="/archive"
-      className="border border-border bg-surface-dark p-4 sm:p-5"
+      className="panel p-4 sm:p-6"
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="grid gap-1.5">
@@ -111,7 +111,7 @@ export function ArchiveFilters({
           <Button type="submit">Apply filters</Button>
           <Link
             href="/archive"
-            className="pb-1.5 text-xs text-teal-blue hover:underline"
+            className="pb-1.5 text-sm link"
           >
             Clear filters
           </Link>

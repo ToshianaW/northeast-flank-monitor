@@ -28,7 +28,7 @@ export default async function DigestPage() {
             Northeast Flank Daily Digest
           </h1>
           <div className="mt-8 border border-dashed border-border bg-surface-dark px-6 py-10 text-center">
-            <p className="text-sm text-text-secondary">No digests published yet.</p>
+            <p className="text-base text-text-secondary">No digests published yet.</p>
           </div>
         </>
       )}
@@ -43,12 +43,12 @@ export default async function DigestPage() {
               <li key={d.id}>
                 <Link
                   href={`/digest/${d.digest_date}`}
-                  className="flex flex-wrap items-baseline gap-x-4 gap-y-1 py-3 hover:text-teal-blue"
+                  className="flex flex-wrap items-baseline gap-x-4 gap-y-1 py-3 hover:text-link transition-colors"
                 >
                   <span className="font-mono text-xs text-text-secondary">
                     {formatDigestDate(d.digest_date)}
                   </span>
-                  <span className="text-sm">{d.title}</span>
+                  <span className="text-base">{d.title}</span>
                 </Link>
               </li>
             ))}

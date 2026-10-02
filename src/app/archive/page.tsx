@@ -29,7 +29,7 @@ export default async function ArchivePage({ searchParams }: PageProps<"/archive"
     <section className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6">
       <p className="meta-label mb-3">Event archive</p>
       <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Archive</h1>
-      <p className="mt-3 max-w-2xl text-sm leading-relaxed text-text-secondary sm:text-base">
+      <p className="mt-3 max-w-2xl text-base leading-relaxed text-text-secondary">
         All published events, newest first. Filters are kept in the address, so
         any view can be bookmarked or shared.
       </p>
@@ -51,7 +51,7 @@ export default async function ArchivePage({ searchParams }: PageProps<"/archive"
             : ""}
         </p>
         {hasFilters ? (
-          <Link href="/archive" className="text-xs text-teal-blue hover:underline">
+          <Link href="/archive" className="text-sm link">
             Clear filters
           </Link>
         ) : null}
@@ -59,7 +59,7 @@ export default async function ArchivePage({ searchParams }: PageProps<"/archive"
 
       {events.length === 0 ? (
         <div className="mt-4 border border-dashed border-border bg-surface-dark px-6 py-10 text-center">
-          <p className="text-sm text-text-secondary">
+          <p className="text-base text-text-secondary">
             {total > 0
               ? "This page is past the end of the results."
               : hasFilters
@@ -69,14 +69,14 @@ export default async function ArchivePage({ searchParams }: PageProps<"/archive"
           {total > 0 ? (
             <Link
               href={`/archive${archiveQueryString(filters)}`}
-              className="mt-2 inline-block text-xs text-teal-blue hover:underline"
+              className="mt-2 inline-block text-sm link"
             >
               Go to the first page
             </Link>
           ) : null}
         </div>
       ) : (
-        <div className="mt-4 max-w-4xl divide-y divide-border border-y border-border">
+        <div className="mt-4 grid max-w-4xl gap-3">
           {events.map((event) => (
             <EventLogEntry key={event.event_id} event={event} />
           ))}
@@ -91,7 +91,7 @@ export default async function ArchivePage({ searchParams }: PageProps<"/archive"
           {page > 1 ? (
             <Link
               href={`/archive${archiveQueryString(filters, Math.min(page - 1, lastPage))}`}
-              className="text-teal-blue hover:underline"
+              className="link"
             >
               ← Previous
             </Link>
@@ -104,7 +104,7 @@ export default async function ArchivePage({ searchParams }: PageProps<"/archive"
           {page < lastPage ? (
             <Link
               href={`/archive${archiveQueryString(filters, page + 1)}`}
-              className="text-teal-blue hover:underline"
+              className="link"
             >
               Next →
             </Link>
