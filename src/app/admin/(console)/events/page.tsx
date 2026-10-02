@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { EVENT_TYPE_LABELS, REVIEW_STATUS_LABELS } from "@/lib/event-labels";
 import { listEvents } from "@/lib/events";
+import { requireAdminPage } from "@/lib/admin-session";
 
 export const metadata = { title: "Events" };
 
@@ -22,6 +23,7 @@ function formatDate(d: Date) {
 export default async function AdminEventsPage({
   searchParams,
 }: PageProps<"/admin/events">) {
+  await requireAdminPage();
   await connection();
   const [{ saved }, events] = await Promise.all([searchParams, listEvents()]);
 

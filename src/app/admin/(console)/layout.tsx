@@ -31,7 +31,7 @@ export default function AdminConsoleLayout({
             <Link href="/admin/digests" className="text-teal-blue hover:underline">
               Digests
             </Link>
-            <form action="/api/admin/logout" method="post">
+            <form action="/admin/logout" method="post">
               <button
                 type="submit"
                 className="text-text-muted hover:text-foreground"

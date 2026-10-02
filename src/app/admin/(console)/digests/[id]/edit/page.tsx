@@ -8,12 +8,14 @@ import {
   getDigest,
 } from "@/lib/digests";
 import { updateDigestAction } from "../../actions";
+import { requireAdminPage } from "@/lib/admin-session";
 
 export const metadata = { title: "Edit digest" };
 
 export default async function EditDigestPage({
   params,
 }: PageProps<"/admin/digests/[id]/edit">) {
+  await requireAdminPage();
   await connection();
   const { id } = await params;
   const digest = await getDigest(id);

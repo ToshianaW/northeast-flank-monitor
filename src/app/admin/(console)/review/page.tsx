@@ -17,6 +17,7 @@ import {
 } from "@/lib/event-labels";
 import { listReviewQueue } from "@/lib/review";
 import { RELIABILITY_LABELS } from "@/lib/source-labels";
+import { requireAdminPage } from "@/lib/admin-session";
 
 export const metadata = { title: "Review queue" };
 
@@ -29,6 +30,7 @@ const ACTION_MESSAGES = {
 } as const;
 
 export default async function ReviewQueuePage({ searchParams }: PageProps<"/admin/review">) {
+  await requireAdminPage();
   await connection();
   const flags = await searchParams;
   const items = await listReviewQueue();

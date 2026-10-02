@@ -17,12 +17,14 @@ import {
   SOURCE_TYPE_LABELS,
 } from "@/lib/source-labels";
 import { listSources } from "@/lib/sources";
+import { requireAdminPage } from "@/lib/admin-session";
 
 export const metadata = { title: "Sources" };
 
 export default async function AdminSourcesPage({
   searchParams,
 }: PageProps<"/admin/sources">) {
+  await requireAdminPage();
   await connection();
   const [params, sources] = await Promise.all([searchParams, listSources()]);
   const { saved, deleted, delete_blocked, delete_error } = params;

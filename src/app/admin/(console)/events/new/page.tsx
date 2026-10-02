@@ -4,10 +4,12 @@ import { EventForm } from "@/components/admin/event-form";
 import { emptyEventFormValues, listExerciseOptions } from "@/lib/events";
 import { listSources } from "@/lib/sources";
 import { createEventAction } from "../actions";
+import { requireAdminPage } from "@/lib/admin-session";
 
 export const metadata = { title: "Add event" };
 
 export default async function NewEventPage() {
+  await requireAdminPage();
   await connection();
   const [sources, exercises] = await Promise.all([
     listSources(),

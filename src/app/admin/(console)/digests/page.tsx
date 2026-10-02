@@ -12,12 +12,14 @@ import {
 } from "@/components/ui/table";
 import { listDigests } from "@/lib/digests";
 import { REVIEW_STATUS_LABELS } from "@/lib/event-labels";
+import { requireAdminPage } from "@/lib/admin-session";
 
 export const metadata = { title: "Digests" };
 
 export default async function AdminDigestsPage({
   searchParams,
 }: PageProps<"/admin/digests">) {
+  await requireAdminPage();
   await connection();
   const [{ saved }, digests] = await Promise.all([searchParams, listDigests()]);
 

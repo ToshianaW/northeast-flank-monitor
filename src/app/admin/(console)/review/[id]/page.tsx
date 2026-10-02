@@ -30,6 +30,7 @@ import {
   RELIABILITY_LABELS,
   SOURCE_TYPE_LABELS,
 } from "@/lib/source-labels";
+import { requireAdminPage } from "@/lib/admin-session";
 
 export const metadata = { title: "Review event" };
 
@@ -133,6 +134,7 @@ export default async function ReviewEventPage({
   params,
   searchParams,
 }: PageProps<"/admin/review/[id]">) {
+  await requireAdminPage();
   await connection();
   const { id } = await params;
   const { mergeTarget } = await searchParams;

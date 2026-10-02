@@ -3,12 +3,14 @@ import { BackLink } from "@/components/admin/back-link";
 import { SourceForm } from "@/components/admin/source-form";
 import { formValuesFromSource, getSource } from "@/lib/sources";
 import { updateSourceAction } from "../../actions";
+import { requireAdminPage } from "@/lib/admin-session";
 
 export const metadata = { title: "Edit source" };
 
 export default async function EditSourcePage({
   params,
 }: PageProps<"/admin/sources/[id]/edit">) {
+  await requireAdminPage();
   const { id } = await params;
   const source = await getSource(id);
   if (!source) notFound();

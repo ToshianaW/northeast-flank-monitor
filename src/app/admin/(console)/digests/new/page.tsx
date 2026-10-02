@@ -3,10 +3,12 @@ import { BackLink } from "@/components/admin/back-link";
 import { DigestForm } from "@/components/admin/digest-form";
 import { DIGEST_SECTIONS, emptyDigestFormValues } from "@/lib/digests";
 import { createDigestAction } from "../actions";
+import { requireAdminPage } from "@/lib/admin-session";
 
 export const metadata = { title: "Add digest" };
 
 export default async function NewDigestPage() {
+  await requireAdminPage();
   // The date defaults to today, so render per request.
   await connection();
   return (

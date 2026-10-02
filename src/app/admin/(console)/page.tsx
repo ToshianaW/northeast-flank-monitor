@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { requireAdminPage } from "@/lib/admin-session";
 
 export const metadata = { title: "Dashboard" };
 
-export default function AdminDashboardPage() {
+export default async function AdminDashboardPage() {
+  await requireAdminPage();
   return (
     <section className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6">
       <p className="meta-label mb-3">Admin · protected</p>

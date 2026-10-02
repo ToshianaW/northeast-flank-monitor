@@ -11,6 +11,7 @@ import {
 import { listSources } from "@/lib/sources";
 import { getReviewerName } from "@/lib/reviewer";
 import { updateEventAction } from "../../actions";
+import { requireAdminPage } from "@/lib/admin-session";
 
 export const metadata = { title: "Edit event" };
 
@@ -18,6 +19,7 @@ export default async function EditEventPage({
   params,
   searchParams,
 }: PageProps<"/admin/events/[id]/edit">) {
+  await requireAdminPage();
   await connection();
   const { id } = await params;
   const { fromReview } = await searchParams;

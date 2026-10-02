@@ -5,37 +5,27 @@ import {
   isValidAdminSession,
 } from "@/lib/admin-auth";
 
-export function proxy(request: NextRequest) {
+// First line of defence only: every admin page and Server Action checks the session again.
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const valid = await isValidAdminSession(
+    request.cookies.get(ADMIN_SESSION_COOKIE)?.value,
+  );
 
   if (pathname === "/admin/login") {
-    if (isValidAdminSession(request.cookies.get(ADMIN_SESSION_COOKIE)?.value)) {
-      return NextResponse.redirect(new URL("/admin", request.url));
-    }
+    return valid
+      ? NextResponse.redirect(new URL("/admin", request.url))
+      : NextResponse.next();
+  }
+
+  // Logout only clears the cookie, so it needs no session.
+  if (pathname === "/admin/logout" || valid) {
     return NextResponse.next();
   }
 
-  const isAdminPage = pathname === "/admin" || pathname.startsWith("/admin/");
-  const isAdminApi =
-    pathname.startsWith("/api/admin/") &&
-    pathname !== "/api/admin/login";
-
-  if (!isAdminPage && !isAdminApi) {
-    return NextResponse.next();
-  }
-
-  if (!isValidAdminSession(request.cookies.get(ADMIN_SESSION_COOKIE)?.value)) {
-    if (isAdminApi) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const login = new URL("/admin/login", request.url);
-    login.searchParams.set("next", pathname);
-    return NextResponse.redirect(login);
-  }
-
-  return NextResponse.next();
+  return NextResponse.redirect(new URL("/admin/login", request.url));
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*"],
+  matcher: ["/admin/:path*"],
 };
