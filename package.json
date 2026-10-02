@@ -2,6 +2,9 @@
   "name": "northeast-flank-monitor",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1 --port 43127",
     "build": "next build",

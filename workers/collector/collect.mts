@@ -1,11 +1,14 @@
 /**
  * Source collector (roadmap step 2.1).
  * Fetches the last lookback window from configured feeds, listings, and GDELT into raw_documents.
- * Usage: npm run collect
+ * Usage: npm run collect -- [--ci]
+ * --ci writes GitHub Actions step outputs (counts only).
  */
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 import pg from "pg";
+import { setOutput } from "../lib/ci.mjs";
 import {
   collectFeed,
   makeCreditExtractor,
@@ -46,6 +49,10 @@ type Summary = {
 };
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
+
+const { values: args } = parseArgs({
+  options: { ci: { type: "boolean", default: false } },
+});
 
 // DATABASE_URL may already be set (CI); otherwise read .env.local. Values are never printed.
 const envFile = `${repoRoot}.env.local`;
@@ -196,7 +203,7 @@ for (const s of summaries) {
     s.outcomes.duplicate ? `${s.outcomes.duplicate} duplicate content` : "",
     s.outcomes.filtered ? `${s.outcomes.filtered} filtered out (keyword/region)` : "",
     s.note ?? "",
-    s.error ?? "",
+    s.error ? (args.ci ? shortReason(s.error) : s.error) : "",
   ]
     .filter(Boolean)
     .join("; ");
@@ -212,4 +219,37 @@ console.log(
   `${pad("TOTAL", 35)}${pad(total.fetched, 9)}${pad(total.new, 6)}${pad(total.skipped, 9)}${total.failed}`,
 );
 
-if (summaries.some((s) => s.error)) process.exitCode = 1;
+// A few failing sources are warnings; the run fails only when more than half fail.
+// (A database or config failure throws earlier and exits non-zero.)
+const failedSources = summaries.filter((s) => s.error);
+const tooManyFailed = failedSources.length > summaries.length / 2;
+if (failedSources.length > 0) {
+  console.log(
+    `\n${failedSources.length} of ${summaries.length} sources failed${tooManyFailed ? ": more than half, failing the run" : " (warning only)"}`,
+  );
+}
+
+// Reached only when every source was tried, so a partial failure still lets the extractor run.
+if (args.ci) {
+  if (!tooManyFailed) {
+    for (const s of failedSources) console.log(`::warning title=Collector source failed::${s.key}: ${shortReason(s.error!)}`);
+  }
+  setOutput("completed", "true");
+  setOutput("new_rows", total.new);
+  setOutput("failed_sources", failedSources.length);
+  setOutput("total_sources", summaries.length);
+  setOutput("warned_sources", failedSources.map((s) => `${s.key} (${shortReason(s.error!)})`).join(", "));
+}
+if (tooManyFailed) process.exitCode = 1;
+
+/**
+ * A short, log-safe reason for public CI output: fixed labels where an error message can carry
+ * response text, URLs removed, one line, at most 80 characters.
+ */
+function shortReason(error: string): string {
+  if (error.startsWith("GDELT did not return JSON")) return "GDELT did not return JSON";
+  return error
+    .replace(/https?:\/\/\S+/g, "<url>")
+    .replace(/[\r\n%,]+/g, " ")
+    .slice(0, 80);
+}

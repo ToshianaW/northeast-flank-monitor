@@ -3,9 +3,10 @@
  * Sends eligible raw_documents rows to Claude and writes validated candidate events as
  * DRAFT events for human review. No deduplication, contradiction detection, or publishing.
  *
- * Usage: npm run extract -- [--dry-run] [--limit N] [--max-usd X] [--model ID]
+ * Usage: npm run extract -- [--dry-run] [--limit N] [--max-usd X] [--model ID] [--ci]
  * --dry-run calls the API on a fixed sample and writes only the extraction_runs row and a
  * local review file (workers/extractor/review/, gitignored: it contains private source text).
+ * --ci writes GitHub Actions step outputs (counts only) and never writes the review file.
  */
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -15,6 +16,7 @@ import type { PoolClient } from "pg";
 import { getPool } from "@/lib/db";
 import { insertEvent, type EventWritePayload } from "@/lib/events";
 import type { Reliability, SourceType } from "@/lib/source-labels";
+import { setOutput } from "../lib/ci.mjs";
 import {
   buildUserMessage,
   OUTPUT_SCHEMA,
@@ -40,9 +42,11 @@ const { values: args } = parseArgs({
     limit: { type: "string", default: "100" },
     "max-usd": { type: "string", default: "2.00" },
     model: { type: "string", default: "claude-sonnet-5-5" },
+    ci: { type: "boolean", default: false },
   },
 });
 const dryRun = args["dry-run"]!;
+const ci = args.ci!;
 const rowLimit = Number(args.limit);
 const maxUsd = Number(args["max-usd"]);
 const model = args.model!;
@@ -419,7 +423,7 @@ await pool.query(
 );
 
 let reviewPath: string | null = null;
-if (dryRun) {
+if (dryRun && !ci) {
   const dir = `${repoRoot}workers/extractor/review`;
   mkdirSync(dir, { recursive: true });
   reviewPath = `${dir}/${runId}.md`;
@@ -441,6 +445,13 @@ console.log(
 );
 for (const e of errors) console.log(`error ${e.raw_document_id}: ${e.error}`);
 if (reviewPath) console.log(`review file: ${reviewPath}`);
+if (ci) {
+  setOutput("completed", "true");
+  setOutput("stop_reason", stopReason);
+  setOutput("drafts_created", totals.eventsCreated);
+  setOutput("drafts_would_create", dryRun ? totals.eventsProposed - totals.eventsRejected : 0);
+  setOutput("cost_usd", totals.costUsd.toFixed(4));
+}
 if (errors.length > 0) process.exitCode = 1;
 
 function reviewMarkdown(): string {

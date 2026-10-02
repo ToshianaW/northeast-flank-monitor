@@ -1,0 +1,124 @@
+# Daily pipeline (roadmap step 2.6): collect → extract → dedup, filling the review queue.
+# Nothing is published: extracted events are DRAFTs for human review.
+# The repository is public, so every step logs counts only and no artifacts are uploaded.
+name: Daily pipeline
+
+on:
+  schedule:
+    # Both times are UTC. GitHub cron does not follow daylight saving, so the
+    # local time of each run shifts by an hour when the clocks change.
+    - cron: "0 6 * * *"
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: extractor --dry-run, dedup --no-model (the collector still runs for real)"
+        type: boolean
+        default: false
+
+# Runs never overlap: a run that starts while another is in progress waits for it.
+concurrency:
+  group: daily-pipeline
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DRY_RUN: ${{ inputs.dry_run == true }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+          cache: npm
+
+      # Secrets are passed only to the worker steps, never to the install.
+      - run: npm ci
+
+      - name: Collect
+        id: collect
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run collect -- --ci
+
+      # Runs when the collector tried every source, even if some failed (fewer than half:
+      # warnings and exit 0; more than half: the run is marked failed, but this still runs).
+      - name: Extract
+        id: extract
+        if: ${{ !cancelled() && steps.collect.outputs.completed == 'true' }}
+        env:
+          # The extractor reads the pooled variable (src/lib/db.ts); the direct URL works for it.
+          DATABASE_URL_POOLED: ${{ secrets.DATABASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          args=(--limit 80 --max-usd 0.75 --ci)
+          if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          npm run extract -- "${args[@]}"
+
+      # Rows are committed one at a time, so a partial extraction is safe to dedup.
+      # Skipped if the extractor crashed or stopped on an authentication error.
+      - name: Dedup
+        id: dedup
+        if: ${{ !cancelled() && steps.extract.outputs.completed == 'true' && steps.extract.outputs.stop_reason != 'ERROR' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          args=(--ci)
+          if [ "$DRY_RUN" = "true" ]; then args+=(--no-model); fi
+          npm run dedup -- "${args[@]}"
+
+      - name: Job summary
+        if: ${{ always() }}
+        env:
+          EVENT: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+          COLLECT_OUTCOME: ${{ steps.collect.outcome }}
+          EXTRACT_OUTCOME: ${{ steps.extract.outcome }}
+          DEDUP_OUTCOME: ${{ steps.dedup.outcome }}
+          NEW_ROWS: ${{ steps.collect.outputs.new_rows }}
+          FAILED_SOURCES: ${{ steps.collect.outputs.failed_sources }}
+          TOTAL_SOURCES: ${{ steps.collect.outputs.total_sources }}
+          WARNED_SOURCES: ${{ steps.collect.outputs.warned_sources }}
+          DRAFTS: ${{ steps.extract.outputs.drafts_created }}
+          WOULD_CREATE: ${{ steps.extract.outputs.drafts_would_create }}
+          STOP_REASON: ${{ steps.extract.outputs.stop_reason }}
+          EXTRACT_COST: ${{ steps.extract.outputs.cost_usd }}
+          CANDIDATES: ${{ steps.dedup.outputs.candidates }}
+          DEDUP_COST: ${{ steps.dedup.outputs.cost_usd }}
+        run: |
+          case "$EVENT:$SCHEDULE" in
+            "schedule:0 6 * * *") run="Scheduled 06:00 UTC" ;;
+            "schedule:0 18 * * *") run="Scheduled 18:00 UTC" ;;
+            schedule:*) run="Scheduled ($SCHEDULE UTC)" ;;
+            *) run="Manual" ;;
+          esac
+          if [ "$DRY_RUN" = "true" ]; then run="$run · dry run"; fi
+
+          drafts="${DRAFTS:-–}"
+          if [ "$DRY_RUN" = "true" ] && [ -n "$WOULD_CREATE" ]; then drafts="0 (dry run: $WOULD_CREATE would be created)"; fi
+          cost=$(awk -v a="${EXTRACT_COST:-0}" -v b="${DEDUP_COST:-0}" 'BEGIN { printf "$%.4f", a + b }')
+
+          {
+            echo "## Daily pipeline: $run"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Rows collected | ${NEW_ROWS:-–} |"
+            echo "| Sources failed | ${FAILED_SOURCES:-–} of ${TOTAL_SOURCES:-–} |"
+            echo "| Drafts created | $drafts |"
+            echo "| Duplicate candidates found | ${CANDIDATES:-–} |"
+            echo "| Cost (extract + dedup) | $cost |"
+            echo
+            if [ -n "$WARNED_SOURCES" ]; then
+              echo "Collector warnings: $WARNED_SOURCES"
+              echo
+            fi
+            echo "Steps: collect ${COLLECT_OUTCOME:-not run} · extract ${EXTRACT_OUTCOME:-not run} (stop: ${STOP_REASON:-–}) · dedup ${DEDUP_OUTCOME:-not run}"
+          } >> "$GITHUB_STEP_SUMMARY"

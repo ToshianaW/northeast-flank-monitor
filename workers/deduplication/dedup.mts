@@ -5,12 +5,14 @@
  * Usage: npm run dedup -- [--dry-run] [--no-model] [--max-usd X] [--max-calls N] [--subjects pending|all]
  * --dry-run writes only the dedup_runs row and prints the pairs.
  * --subjects all also treats PUBLISHED events as subjects (for testing).
+ * --ci prints counts only (no headlines or model reasons) and writes GitHub Actions step outputs.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import Anthropic from "@anthropic-ai/sdk";
 import pg from "pg";
+import { setOutput } from "../lib/ci.mjs";
 import { ESTIMATED_CALL_USD, JUDGE_MODEL, judgePair, type Verdict } from "./judge.mjs";
 import { classifyPair, findPairs, isNoAiOnly, type ModelSkip } from "./pairs.mjs";
 
@@ -25,9 +27,11 @@ const { values: args } = parseArgs({
     "max-usd": { type: "string", default: "0.25" },
     "max-calls": { type: "string", default: "200" },
     subjects: { type: "string", default: "pending" },
+    ci: { type: "boolean", default: false },
   },
 });
 const dryRun = args["dry-run"]!;
+const ci = args.ci!;
 const noModel = args["no-model"]!;
 const maxUsd = Number(args["max-usd"]);
 const maxCalls = Number(args["max-calls"]);
@@ -161,6 +165,12 @@ console.log(`\nDedup run ${runId}${dryRun ? " (DRY RUN: no candidates written)" 
 console.log(
   `pairs: ${pairs.length} considered, ${totals.likely} likely, ${totals.borderline} borderline · model calls ${totals.calls} · cost $${totals.costUsd.toFixed(4)} (cap $${maxUsd.toFixed(2)})`,
 );
-for (const line of lines) console.log(line);
+// Pair lines carry headlines of unreviewed events: kept out of public CI logs.
+if (!ci) for (const line of lines) console.log(line);
 for (const e of errors) console.log(`error ${e.pair}: ${e.error}`);
+if (ci) {
+  setOutput("completed", "true");
+  setOutput("candidates", totals.likely + totals.borderline);
+  setOutput("cost_usd", totals.costUsd.toFixed(4));
+}
 if (errors.length > 0) process.exitCode = 1;
