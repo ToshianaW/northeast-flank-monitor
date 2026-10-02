@@ -13,6 +13,7 @@ import {
   collectFeed,
   makeCreditExtractor,
   makeKeywordMatcher,
+  makePolishMatcher,
   type FeedConfig,
   type FeedMatchers,
 } from "./feeds.mjs";
@@ -31,6 +32,8 @@ type CollectorConfig = {
   lead_only_sources: string[];
   keywords: string[];
   region_terms: string[];
+  keyword_stems_pl: string[];
+  keyword_whole_words_pl: string[];
   known_outlets: string[];
   feeds: FeedConfig[];
   listings: ListingConfig[];
@@ -43,6 +46,8 @@ type Summary = {
   fetched: number;
   outcomes: Record<StoreOutcome, number>;
   failedItems: number;
+  /** Items the feed marks Paid: stored as title and link only. */
+  paid: number;
   error?: string;
   /** Not an error: e.g. the feed was not read because of its read limit. */
   note?: string;
@@ -65,6 +70,13 @@ if (!process.env.DATABASE_URL) {
 const config = JSON.parse(
   readFileSync(`${repoRoot}data/sources/collector.json`, "utf8"),
 ) as CollectorConfig;
+
+// The Polish filter is only for feeds tagged Polish; anything else is a config error.
+for (const feed of config.feeds) {
+  if (feed.polish_filter && feed.language !== "Polish") {
+    throw new Error(`feed "${feed.key}": polish_filter needs language "Polish" (got "${feed.language}")`);
+  }
+}
 
 if (config.fetch_full_text) {
   console.warn("fetch_full_text is true, but full-text fetching is not implemented; storing feed text and metadata only.");
@@ -105,6 +117,7 @@ for (const s of registry) {
 
 const matchers: FeedMatchers = {
   keyword: makeKeywordMatcher(config.keywords),
+  polish: makePolishMatcher(config.keyword_stems_pl, config.keyword_whole_words_pl),
   region: makeKeywordMatcher(config.region_terms),
   credits: makeCreditExtractor([...new Set([...config.known_outlets, ...registry.map((s) => s.name)])]),
 };
@@ -131,6 +144,7 @@ async function run(key: string, method: string, collect: () => Promise<Collected
     fetched: 0,
     outcomes: { new: 0, filtered: 0, duplicate: 0, existing: 0 },
     failedItems: 0,
+    paid: 0,
   };
   let docs: CollectedDoc[];
   try {
@@ -141,6 +155,7 @@ async function run(key: string, method: string, collect: () => Promise<Collected
     return summary;
   }
   summary.fetched = docs.length;
+  summary.paid = docs.filter((d) => d.metadata.pay_status === "Paid").length;
   for (const doc of docs) {
     try {
       summary.outcomes[await storeDocument(client, doc)]++;
@@ -163,6 +178,7 @@ for (const feed of config.feeds) {
         fetched: 0,
         outcomes: { new: 0, filtered: 0, duplicate: 0, existing: 0 },
         failedItems: 0,
+        paid: 0,
         note: `not read: last read ${hours.toFixed(1)}h ago (limit: once per ${feed.min_hours_between_reads}h)`,
       });
       continue;
@@ -202,6 +218,7 @@ for (const s of summaries) {
     s.outcomes.existing ? `${s.outcomes.existing} already stored` : "",
     s.outcomes.duplicate ? `${s.outcomes.duplicate} duplicate content` : "",
     s.outcomes.filtered ? `${s.outcomes.filtered} filtered out (keyword/region)` : "",
+    s.paid ? `${s.paid} paid (title and link only)` : "",
     s.note ?? "",
     s.error ? (args.ci ? shortReason(s.error) : s.error) : "",
   ]

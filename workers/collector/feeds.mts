@@ -20,10 +20,14 @@ export type FeedConfig = {
   extract_credits?: boolean;
   /** Skip the feed when it was read less than this many hours ago (checked in collect.mts). */
   min_hours_between_reads?: number;
+  /** Polish feeds only: filter with keyword_stems_pl / keyword_whole_words_pl instead of keywords. */
+  polish_filter?: boolean;
 };
 
 export type FeedMatchers = {
   keyword: (text: string) => boolean;
+  /** Polish stem filter, used by feeds with polish_filter. */
+  polish: (text: string) => boolean;
   region: (text: string) => boolean;
   credits: (text: string) => string[];
 };
@@ -36,10 +40,12 @@ type FeedItem = {
   contentSnippet?: string;
   summary?: string;
   "content:encoded"?: string;
+  /** rp.pl: Free, Preview, or Paid. */
+  pay_status?: string;
 };
 
 const parser = new Parser<Record<string, unknown>, FeedItem>({
-  customFields: { item: ["content:encoded", "summary"] },
+  customFields: { item: ["content:encoded", "summary", "pay_status"] },
 });
 
 /** Case-insensitive match at a word start, so "mobili" would match "mobilization". */
@@ -47,6 +53,23 @@ export function makeKeywordMatcher(keywords: string[]): (text: string) => boolea
   const escaped = keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const re = new RegExp(`(?<![\\p{L}\\p{N}])(?:${escaped.join("|")})`, "iu");
   return (text) => re.test(text);
+}
+
+/** Lowercase and drop diacritics: "Białoruś" → "bialorus". ł has no decomposition, so it is mapped by hand. */
+export function foldDiacritics(text: string): string {
+  return text.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").replace(/ł/g, "l");
+}
+
+/**
+ * Polish filter: stems match at a word start after folding diacritics on both sides, so
+ * "bialorus" matches Białoruś, Białorusi, and białoruski. Whole words match case-sensitively
+ * without folding, for short terms that would otherwise start common words (NATO, Zapad).
+ */
+export function makePolishMatcher(stems: string[], wholeWords: string[]): (text: string) => boolean {
+  const stem = makeKeywordMatcher(stems.map(foldDiacritics));
+  const escaped = wholeWords.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const whole = new RegExp(`(?<![\\p{L}\\p{N}])(?:${escaped.join("|")})(?![\\p{L}\\p{N}])`, "u");
+  return (text) => stem(foldDiacritics(text)) || (wholeWords.length > 0 && whole.test(text));
 }
 
 const CREDIT_VERBS = "according to|reported by|reporting by|citing|cited by|per|via|told|said to|reports from";
@@ -90,7 +113,10 @@ export async function collectFeed(
     if (validDate && validDate < since) continue;
 
     const title = item.title ? htmlToText(item.title) : null;
-    const textSource = feed.metadata_only
+    const payStatus = item.pay_status?.trim() || null;
+    // Paid items keep title and link only, so they are METADATA_ONLY and never reach the extractor.
+    const paid = payStatus === "Paid";
+    const textSource = feed.metadata_only || paid
       ? ""
       : (item["content:encoded"] ?? item.contentSnippet ?? item.summary ?? "");
     const rawText = htmlToText(textSource) || null;
@@ -98,6 +124,7 @@ export async function collectFeed(
 
     let skipReason: string | undefined;
     if (feed.keyword_filter && !match.keyword(matchText)) skipReason = "no_keyword_match";
+    else if (feed.polish_filter && !match.polish(matchText)) skipReason = "no_keyword_match";
     else if (feed.region_filter && !match.region(matchText)) skipReason = "no_region_match";
 
     const credited = feed.extract_credits ? match.credits(matchText) : [];
@@ -119,6 +146,7 @@ export async function collectFeed(
         ...(feed.no_ai_processing ? { no_ai_processing: true } : {}),
         ...(feed.lead_only ? { lead_only: true } : {}),
         ...(feed.metadata_only ? { metadata_only_by_terms: true } : {}),
+        ...(payStatus ? { pay_status: payStatus } : {}),
         ...(feed.extract_credits
           ? { credited_publishers: credited, credit_found: credited.length > 0 }
           : {}),

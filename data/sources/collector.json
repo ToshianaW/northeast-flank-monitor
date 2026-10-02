@@ -83,6 +83,51 @@
     "Suwalki",
     "eastern flank"
   ],
+  "_keyword_stems_pl": "Used instead of keywords by Polish feeds with polish_filter. Diacritics are folded on both sides (ł→l, ż→z, ...), then each stem must match at a word start, so bialorus matches Białoruś, Białorusi and białoruski. Write stems without diacritics.",
+  "keyword_stems_pl": [
+    "wojsk",
+    "zolnierz",
+    "armi",
+    "cwicze",
+    "manewr",
+    "mobiliz",
+    "rezerwis",
+    "dron",
+    "przestrzen powietrzn",
+    "przestrzeni powietrzn",
+    "granic",
+    "bialorus",
+    "lukaszenk",
+    "kaliningrad",
+    "krolewiec",
+    "krolewc",
+    "krolewieck",
+    "litw",
+    "litew",
+    "lotw",
+    "lotew",
+    "estoni",
+    "estons",
+    "suwalk",
+    "suwalsk",
+    "przesmyk",
+    "flank",
+    "rakiet",
+    "iskander",
+    "dywersj",
+    "sabotaz",
+    "hybrydow",
+    "baltyk",
+    "baltyc",
+    "zatoka gdansk",
+    "zatoce gdansk",
+    "zatoki gdansk"
+  ],
+  "_keyword_whole_words_pl": "Also used by polish_filter: whole words, case-sensitive, no folding. As stems these would match common words (nato → natomiast, zapad → zapadła).",
+  "keyword_whole_words_pl": [
+    "NATO",
+    "Zapad"
+  ],
   "_known_outlets": "Used by feeds with extract_credits: outlet names recognized in phrases like \"according to Reuters\" or \"Reuters reported\". Registry source names are added automatically.",
   "known_outlets": [
     "Reuters",
@@ -245,6 +290,40 @@
       "lead_only": true,
       "extract_credits": true,
       "min_hours_between_reads": 11
+    },
+    {
+      "key": "rp-wojsko",
+      "source": "Rzeczpospolita (rp.pl)",
+      "url": "https://www.rp.pl/rss/71-wojsko",
+      "language": "Polish",
+      "keyword_filter": false,
+      "no_ai_processing": false
+    },
+    {
+      "key": "rp-radar-zbrojeniowy",
+      "source": "Rzeczpospolita (rp.pl)",
+      "url": "https://radar.rp.pl/rss/4991-przemysl-zbrojeniowy",
+      "language": "Polish",
+      "keyword_filter": false,
+      "no_ai_processing": false
+    },
+    {
+      "key": "rp-konflikty",
+      "source": "Rzeczpospolita (rp.pl)",
+      "url": "https://www.rp.pl/rss/201-konflikty-zbrojne",
+      "language": "Polish",
+      "keyword_filter": false,
+      "polish_filter": true,
+      "no_ai_processing": false
+    },
+    {
+      "key": "rp-swiat",
+      "source": "Rzeczpospolita (rp.pl)",
+      "url": "https://www.rp.pl/rss/141-swiat",
+      "language": "Polish",
+      "keyword_filter": false,
+      "polish_filter": true,
+      "no_ai_processing": false
     }
   ],
   "listings": [
