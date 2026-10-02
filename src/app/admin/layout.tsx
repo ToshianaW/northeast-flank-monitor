@@ -3,6 +3,7 @@ export const metadata = {
     default: "Admin",
     template: "%s · Admin · Northeast Flank Monitor",
   },
+  robots: { index: false, follow: false },
 };
 
 export default function AdminRootLayout({
