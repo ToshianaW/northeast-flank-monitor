@@ -36,7 +36,7 @@ export default async function HomePage() {
   await connection();
   const [counts, latest, digest] = await Promise.all([
     getSnapshotCounts(),
-    listPublishedEvents(5),
+    listPublishedEvents(3),
     getLatestPublishedDigest(),
   ]);
   // First paragraph of the Executive Summary as the homepage excerpt.

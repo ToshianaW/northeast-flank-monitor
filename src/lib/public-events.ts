@@ -94,6 +94,28 @@ export async function listPublishedEvents(
   return rows;
 }
 
+export const LATEST_WINDOW_HOURS = 48;
+
+/**
+ * /latest feed: published events from the last LATEST_WINDOW_HOURS. event_date has no
+ * time, so this means dated on or after the UTC day the window starts (as in getSnapshotCounts).
+ * Older events are browsed in the archive.
+ */
+export async function listRecentPublishedEvents(
+  hours: number = LATEST_WINDOW_HOURS,
+): Promise<PublicEvent[]> {
+  const { rows } = await getPool().query<PublicEvent>(
+    `SELECT ${PUBLIC_EVENT_COLUMNS}
+     FROM events
+     WHERE review_status = 'PUBLISHED'
+       AND event_date >= ((now() AT TIME ZONE 'UTC') - make_interval(hours => $1))::date
+     ORDER BY event_date DESC, first_reported DESC NULLS LAST, created_at DESC
+     LIMIT $2`,
+    [hours, FEED_LIMIT],
+  );
+  return rows;
+}
+
 /** Header "LAST UPDATE": newest updated_at among PUBLISHED events. */
 export async function getLastPublishedUpdate(): Promise<Date | null> {
   const { rows } = await getPool().query<{ last: Date | null }>(
