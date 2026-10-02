@@ -20,9 +20,21 @@ import { RELIABILITY_LABELS } from "@/lib/source-labels";
 
 export const metadata = { title: "Review queue" };
 
-export default async function ReviewQueuePage() {
+// Confirmation shown after an action on /admin/review/[id] redirects back here.
+const ACTION_MESSAGES = {
+  submitted: "Submitted for review.",
+  approved: "Event published.",
+  rejected: "Event rejected.",
+  merged: "Event merged away; source links moved to the target.",
+} as const;
+
+export default async function ReviewQueuePage({ searchParams }: PageProps<"/admin/review">) {
   await connection();
+  const flags = await searchParams;
   const items = await listReviewQueue();
+  const message = (Object.keys(ACTION_MESSAGES) as Array<keyof typeof ACTION_MESSAGES>).find(
+    (key) => flags[key],
+  );
 
   return (
     <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
@@ -33,6 +45,15 @@ export default async function ReviewQueuePage() {
           Draft and pending events, oldest first.
         </p>
       </div>
+
+      {message ? (
+        <p
+          role="status"
+          className="mt-4 border border-operational-teal/40 bg-operational-teal/10 px-3 py-2 text-sm"
+        >
+          {ACTION_MESSAGES[message]}
+        </p>
+      ) : null}
 
       {items.length === 0 ? (
         <div className="mt-8 border border-dashed border-border bg-surface-dark px-6 py-10 text-center">

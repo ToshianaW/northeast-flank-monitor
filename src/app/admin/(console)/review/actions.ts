@@ -50,7 +50,7 @@ export async function submitForReviewAction(
   await persistReviewer(reviewer.name);
   revalidatePath("/admin/review");
   revalidatePath(`/admin/review/${eventId}`);
-  redirect(`/admin/review/${eventId}?submitted=1`);
+  redirect("/admin/review?submitted=1");
 }
 
 export async function approveEventAction(
@@ -68,7 +68,7 @@ export async function approveEventAction(
   await persistReviewer(reviewer.name);
   revalidatePath("/admin/review");
   revalidatePath(`/admin/review/${eventId}`);
-  redirect(`/admin/review/${eventId}?approved=1`);
+  redirect("/admin/review?approved=1");
 }
 
 export async function rejectEventAction(
@@ -87,7 +87,7 @@ export async function rejectEventAction(
   await persistReviewer(reviewer.name);
   revalidatePath("/admin/review");
   revalidatePath(`/admin/review/${eventId}`);
-  redirect(`/admin/review/${eventId}?rejected=1`);
+  redirect("/admin/review?rejected=1");
 }
 
 export async function mergeEventAction(
@@ -106,5 +106,5 @@ export async function mergeEventAction(
   await persistReviewer(reviewer.name);
   revalidatePath("/admin/review");
   revalidatePath(`/admin/review/${eventId}`);
-  redirect(`/admin/review/${eventId}?merged=1`);
+  redirect("/admin/review?merged=1");
 }

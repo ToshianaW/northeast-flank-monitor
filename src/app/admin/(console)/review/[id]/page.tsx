@@ -115,13 +115,9 @@ function PrimarySourceBox({ source }: { source: ReviewEventSource | undefined })
   );
 }
 
-export default async function ReviewEventPage({
-  params,
-  searchParams,
-}: PageProps<"/admin/review/[id]">) {
+export default async function ReviewEventPage({ params }: PageProps<"/admin/review/[id]">) {
   await connection();
   const { id } = await params;
-  const flags = await searchParams;
 
   const [event, detail, history, mergeTargets, reviewerDefault] = await Promise.all([
     getEvent(id),
@@ -176,27 +172,6 @@ export default async function ReviewEventPage({
           </div>
         </div>
       </header>
-
-      {flags.submitted ? (
-        <p role="status" className="mb-4 border border-operational-teal/40 bg-operational-teal/10 px-3 py-2 text-sm">
-          Submitted for review.
-        </p>
-      ) : null}
-      {flags.approved ? (
-        <p role="status" className="mb-4 border border-operational-teal/40 bg-operational-teal/10 px-3 py-2 text-sm">
-          Event published.
-        </p>
-      ) : null}
-      {flags.rejected ? (
-        <p role="status" className="mb-4 border border-operational-teal/40 bg-operational-teal/10 px-3 py-2 text-sm">
-          Event rejected.
-        </p>
-      ) : null}
-      {flags.merged ? (
-        <p role="status" className="mb-4 border border-operational-teal/40 bg-operational-teal/10 px-3 py-2 text-sm">
-          Event merged away; source links moved to the target.
-        </p>
-      ) : null}
 
       <div className="grid gap-8">
         {/* 2. Primary source */}
