@@ -1,8 +1,14 @@
 import "server-only";
 import { getPool } from "@/lib/db";
-import type { SourceRelationship } from "@/lib/event-labels";
+import {
+  CONFIDENCE_LEVEL_VALUES,
+  EVENT_TYPE_VALUES,
+  type ConfidenceLevel,
+  type EventType,
+  type SourceRelationship,
+} from "@/lib/event-labels";
 import type { Event } from "@/lib/events";
-import type { SourceType } from "@/lib/source-labels";
+import { SOURCE_TYPE_VALUES, type SourceType } from "@/lib/source-labels";
 
 /**
  * Public read path for events. Every query here is restricted to PUBLISHED
@@ -160,4 +166,140 @@ export async function listPublicEventSources(
     [eventId],
   );
   return rows;
+}
+
+// ---------------------------------------------------------------------------
+// Archive (step 1.9)
+// ---------------------------------------------------------------------------
+
+export const ARCHIVE_PAGE_SIZE = 25;
+
+export type ArchiveFilters = {
+  from?: string;
+  to?: string;
+  country?: string;
+  actor?: string;
+  type?: EventType;
+  confidence?: ConfidenceLevel;
+  source_type?: SourceType;
+};
+
+type SearchParams = Record<string, string | string[] | undefined>;
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function isRealDate(value: string): boolean {
+  if (!DATE_RE.test(value)) return false;
+  const d = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
+}
+
+function firstParam(params: SearchParams, key: string): string {
+  const raw = params[key];
+  return (Array.isArray(raw) ? raw[0] : raw ?? "").trim();
+}
+
+function oneOf<T extends string>(value: string, allowed: readonly T[]): T | undefined {
+  return allowed.includes(value as T) ? (value as T) : undefined;
+}
+
+/** Reads archive filters from the query string; unknown or malformed values are ignored. */
+export function parseArchiveFilters(params: SearchParams): {
+  filters: ArchiveFilters;
+  page: number;
+} {
+  const from = firstParam(params, "from");
+  const to = firstParam(params, "to");
+  const country = firstParam(params, "country");
+  const actor = firstParam(params, "actor");
+  const pageRaw = Number.parseInt(firstParam(params, "page"), 10);
+
+  return {
+    filters: {
+      from: isRealDate(from) ? from : undefined,
+      to: isRealDate(to) ? to : undefined,
+      country: country || undefined,
+      actor: actor || undefined,
+      type: oneOf(firstParam(params, "type"), EVENT_TYPE_VALUES),
+      confidence: oneOf(firstParam(params, "confidence"), CONFIDENCE_LEVEL_VALUES),
+      source_type: oneOf(firstParam(params, "source_type"), SOURCE_TYPE_VALUES),
+    },
+    page: Number.isInteger(pageRaw) && pageRaw >= 1 ? pageRaw : 1,
+  };
+}
+
+/** Query string for the given filters (and page, when past the first). */
+export function archiveQueryString(filters: ArchiveFilters, page = 1): string {
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value) qs.set(key, value);
+  }
+  if (page > 1) qs.set("page", String(page));
+  const s = qs.toString();
+  return s ? `?${s}` : "";
+}
+
+function archiveWhere(filters: ArchiveFilters): { sql: string; values: unknown[] } {
+  const clauses = ["review_status = 'PUBLISHED'"];
+  const values: unknown[] = [];
+  const add = (clause: string, value: unknown) => {
+    values.push(value);
+    clauses.push(clause.replace("?", `$${values.length}`));
+  };
+
+  if (filters.from) add("event_date >= ?::date", filters.from);
+  if (filters.to) add("event_date <= ?::date", filters.to);
+  if (filters.country) add("country = ?", filters.country);
+  if (filters.actor) add("actor = ?", filters.actor);
+  if (filters.type) add("event_type = ?", filters.type);
+  if (filters.confidence) add("confidence_level = ?", filters.confidence);
+  if (filters.source_type) add("source_type = ?", filters.source_type);
+
+  return { sql: clauses.join(" AND "), values };
+}
+
+export async function listArchiveEvents(
+  filters: ArchiveFilters,
+  page: number,
+): Promise<{ events: PublicEvent[]; total: number }> {
+  const where = archiveWhere(filters);
+  const pool = getPool();
+  const offset = (page - 1) * ARCHIVE_PAGE_SIZE;
+
+  const [list, count] = await Promise.all([
+    pool.query<PublicEvent>(
+      `SELECT ${PUBLIC_EVENT_COLUMNS}
+       FROM events
+       WHERE ${where.sql}
+       ORDER BY event_date DESC, first_reported DESC NULLS LAST, created_at DESC
+       LIMIT ${ARCHIVE_PAGE_SIZE} OFFSET $${where.values.length + 1}`,
+      [...where.values, offset],
+    ),
+    pool.query<{ total: number }>(
+      `SELECT count(*)::int AS total FROM events WHERE ${where.sql}`,
+      where.values,
+    ),
+  ]);
+
+  return { events: list.rows, total: count.rows[0].total };
+}
+
+/** Distinct country and actor values among published events, for the filter dropdowns. */
+export async function listArchiveFilterOptions(): Promise<{
+  countries: string[];
+  actors: string[];
+}> {
+  const pool = getPool();
+  const distinct = (column: "country" | "actor") =>
+    pool.query<{ value: string }>(
+      `SELECT DISTINCT ${column} AS value
+       FROM events
+       WHERE review_status = 'PUBLISHED' AND ${column} IS NOT NULL AND ${column} <> ''
+       ORDER BY value`,
+    );
+  const [countries, actors] = await Promise.all([distinct("country"), distinct("actor")]);
+  return {
+    countries: countries.rows.map((r) => r.value),
+    actors: actors.rows.map((r) => r.value),
+  };
 }
