@@ -27,6 +27,8 @@ type Props = {
   reviewerDefault: string | null;
   mergeTargets: MergeTarget[];
   editHref: string;
+  /** Pre-selects the merge target (from a "Possible duplicate" link). Merging still needs a click. */
+  defaultMergeTarget?: string;
 };
 
 function ActionForm({
@@ -74,6 +76,7 @@ export function ReviewEventActions({
   reviewerDefault,
   mergeTargets,
   editHref,
+  defaultMergeTarget,
 }: Props) {
   const canModerate =
     reviewStatus === "DRAFT" || reviewStatus === "PENDING_REVIEW";
@@ -125,29 +128,33 @@ export function ReviewEventActions({
             </div>
           </ActionForm>
 
-          <ActionForm
-            action={mergeEventAction}
-            eventId={eventId}
-            reviewerDefault={reviewerDefault}
-            submitLabel="Merge into target"
-          >
-            <div className="grid gap-2">
-              <Label htmlFor="target_event_id">Target event</Label>
-              <NativeSelect
-                id="target_event_id"
-                name="target_event_id"
-                required
-                className="w-full"
-              >
-                <NativeSelectOption value="">Choose…</NativeSelectOption>
-                {mergeTargets.map((target) => (
-                  <NativeSelectOption key={target.event_id} value={target.event_id}>
-                    {target.event_date} — {target.headline}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
-            </div>
-          </ActionForm>
+          <div id="merge" className="grid">
+            <ActionForm
+              action={mergeEventAction}
+              eventId={eventId}
+              reviewerDefault={reviewerDefault}
+              submitLabel="Merge into target"
+            >
+              <div className="grid gap-2">
+                <Label htmlFor="target_event_id">Target event</Label>
+                <NativeSelect
+                  key={defaultMergeTarget ?? ""}
+                  id="target_event_id"
+                  name="target_event_id"
+                  required
+                  defaultValue={defaultMergeTarget ?? ""}
+                  className="w-full"
+                >
+                  <NativeSelectOption value="">Choose…</NativeSelectOption>
+                  {mergeTargets.map((target) => (
+                    <NativeSelectOption key={target.event_id} value={target.event_id}>
+                      {target.event_date} — {target.headline}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </div>
+            </ActionForm>
+          </div>
         </div>
       ) : (
         <p className="text-sm text-text-secondary">

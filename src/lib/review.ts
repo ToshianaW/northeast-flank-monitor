@@ -209,6 +209,45 @@ export async function getReviewEventDetail(eventId: string): Promise<{
   return { extraction_run_id: run.rows[0]?.extraction_run_id ?? null, sources: sources.rows };
 }
 
+export type DuplicateCandidate = {
+  other_event_id: string;
+  other_headline: string;
+  other_event_date: Date;
+  other_review_status: Event["review_status"];
+  basis: "SAME_ARTICLE" | "TRIGRAM" | "MODEL";
+  headline_similarity: number;
+  model_verdict: "SAME" | "UNSURE" | null;
+  model_reason: string | null;
+  model_skipped: "NO_AI_SOURCE" | "NO_MODEL" | "SPEND_CAP" | null;
+};
+
+/**
+ * Possible duplicates of an event (step 2.3), excluding pairs the model judged DIFFERENT and
+ * events already merged away or rejected. Returns [] if migration 0005 is not applied yet.
+ */
+export async function listDuplicateCandidates(eventId: string): Promise<DuplicateCandidate[]> {
+  if (!UUID_RE.test(eventId)) return [];
+  try {
+    const { rows } = await getPool().query<DuplicateCandidate>(
+      `SELECT o.event_id AS other_event_id, o.headline AS other_headline, o.event_date AS other_event_date,
+              o.review_status AS other_review_status, dc.basis, dc.headline_similarity,
+              dc.model_verdict, dc.model_reason, dc.model_skipped
+       FROM duplicate_candidates dc
+       JOIN events o
+         ON o.event_id = CASE WHEN dc.event_id = $1 THEN dc.candidate_event_id ELSE dc.event_id END
+       WHERE $1 IN (dc.event_id, dc.candidate_event_id)
+         AND dc.model_verdict IS DISTINCT FROM 'DIFFERENT'
+         AND o.review_status NOT IN ('MERGED', 'REJECTED')
+       ORDER BY (dc.basis = 'SAME_ARTICLE') DESC, dc.headline_similarity DESC`,
+      [eventId],
+    );
+    return rows;
+  } catch (error) {
+    if ((error as { code?: string }).code === "42P01") return []; // undefined_table
+    throw error;
+  }
+}
+
 export async function listReviewActions(eventId: string): Promise<ReviewActionRow[]> {
   if (!UUID_RE.test(eventId)) return [];
   const { rows } = await getPool().query<ReviewActionRow>(

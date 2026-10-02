@@ -16,8 +16,10 @@ import {
 import { getEvent } from "@/lib/events";
 import {
   getReviewEventDetail,
+  listDuplicateCandidates,
   listMergeTargetOptions,
   listReviewActions,
+  type DuplicateCandidate,
   type ReviewActionRow,
   type ReviewEventSource,
 } from "@/lib/review";
@@ -53,6 +55,18 @@ function summarizePreviousValues(action: ReviewActionRow): string {
     return `snapshot: ${o.headline ?? "event row"} (${o.review_status ?? "?"})`;
   }
   return JSON.stringify(prev);
+}
+
+function duplicateBasisLabel(d: DuplicateCandidate): string {
+  const similarity = `headline similarity ${Math.round(d.headline_similarity * 100)}%`;
+  if (d.basis === "SAME_ARTICLE") return "cites the same article";
+  if (d.basis === "MODEL") return `${similarity} · model: ${d.model_verdict === "SAME" ? "same event" : "unsure"}`;
+  const skipped = {
+    NO_AI_SOURCE: " · not sent to model (no-AI source)",
+    NO_MODEL: " · model not used",
+    SPEND_CAP: " · model not used (spend cap)",
+  };
+  return `${similarity}${d.model_skipped ? skipped[d.model_skipped] : ""}`;
 }
 
 function tierLabel(tier: number | null): string {
@@ -115,13 +129,18 @@ function PrimarySourceBox({ source }: { source: ReviewEventSource | undefined })
   );
 }
 
-export default async function ReviewEventPage({ params }: PageProps<"/admin/review/[id]">) {
+export default async function ReviewEventPage({
+  params,
+  searchParams,
+}: PageProps<"/admin/review/[id]">) {
   await connection();
   const { id } = await params;
+  const { mergeTarget } = await searchParams;
 
-  const [event, detail, history, mergeTargets, reviewerDefault] = await Promise.all([
+  const [event, detail, duplicates, history, mergeTargets, reviewerDefault] = await Promise.all([
     getEvent(id),
     getReviewEventDetail(id),
+    listDuplicateCandidates(id),
     listReviewActions(id),
     listMergeTargetOptions(id),
     getReviewerName(),
@@ -130,6 +149,7 @@ export default async function ReviewEventPage({ params }: PageProps<"/admin/revi
   if (!event) notFound();
 
   const editHref = `/admin/events/${id}/edit?fromReview=1`;
+  const canModerate = event.review_status === "DRAFT" || event.review_status === "PENDING_REVIEW";
   const { sources, extraction_run_id } = detail;
   const isAiDraft = extraction_run_id !== null;
   const primary = sources.find((s) => s.is_primary) ?? sources.find((s) => s.relationship === "SUPPORTS");
@@ -184,6 +204,43 @@ export default async function ReviewEventPage({ params }: PageProps<"/admin/revi
               <li key={w}>{w}</li>
             ))}
           </ul>
+        ) : null}
+
+        {/* Possible duplicates (step 2.3): suggestions only; merging uses the merge form below. */}
+        {duplicates.length > 0 ? (
+          <section className="border border-border px-4 py-3">
+            <h2 className="meta-label mb-2">Possible duplicates</h2>
+            <ul className="grid gap-3">
+              {duplicates.map((d) => (
+                <li key={d.other_event_id} className="text-sm">
+                  <p>
+                    Possible duplicate of{" "}
+                    <Link
+                      href={`/admin/review/${d.other_event_id}`}
+                      className="font-medium text-teal-blue hover:underline"
+                    >
+                      {d.other_headline}
+                    </Link>
+                  </p>
+                  <p className="mt-0.5 font-mono text-xs text-text-muted">
+                    {formatDay(d.other_event_date)} · {REVIEW_STATUS_LABELS[d.other_review_status]} ·{" "}
+                    {duplicateBasisLabel(d)}
+                  </p>
+                  {d.model_reason ? (
+                    <p className="mt-0.5 text-xs text-text-secondary">Model: {d.model_reason}</p>
+                  ) : null}
+                  {canModerate ? (
+                    <Link
+                      href={`/admin/review/${id}?mergeTarget=${d.other_event_id}#merge`}
+                      className="mt-1 inline-block text-xs text-teal-blue hover:underline"
+                    >
+                      Merge this event into it →
+                    </Link>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </section>
         ) : null}
 
         {/* 4. Event details */}
@@ -311,6 +368,11 @@ export default async function ReviewEventPage({ params }: PageProps<"/admin/revi
               event_date: t.event_date.toISOString().slice(0, 10),
             }))}
             editHref={editHref}
+            defaultMergeTarget={
+              typeof mergeTarget === "string" && mergeTargets.some((t) => t.event_id === mergeTarget)
+                ? mergeTarget
+                : undefined
+            }
           />
         </section>
 
