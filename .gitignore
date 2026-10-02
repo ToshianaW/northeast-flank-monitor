@@ -25,6 +25,9 @@
 /scripts/patch-source-urls.mts
 /scripts/seed-two-events.mts
 
+# extractor dry-run review files (contain private source text)
+/workers/extractor/review/
+
 # misc
 .DS_Store
 *.pem
