@@ -9,6 +9,10 @@
   "no_ai_processing_sources": [
     "The Atlantic"
   ],
+  "_lead_only_sources": "Registry sources whose rows (for example GDELT results from their domain) must carry lead_only. Feeds flagged with lead_only are added to this set automatically.",
+  "lead_only_sources": [
+    "OSINT613"
+  ],
   "keywords": [
     "military",
     "army",
@@ -274,7 +278,7 @@
         "query": "(Belarus OR Belarusian) (troops OR \"military exercise\" OR mobilization OR \"border guard\" OR Wagner OR Zapad)"
       }
     ],
-    "_lead_only": "GDELT rows whose domain is not in the registry carry metadata.lead_only = true; later steps skip them by default."
+    "_lead_only": "GDELT rows whose domain is not in the registry, or belongs to a lead_only_sources entry, carry metadata.lead_only = true; later steps skip them by default."
   },
   "_no_ai_processing": "Sources with no_ai_processing: true are stored as usual, but their rows carry metadata.no_ai_processing so later steps treat them as leads only and never send their text to an AI model. Set for sources whose robots.txt blocks AI crawlers when chosen."
 }

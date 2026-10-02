@@ -25,6 +25,7 @@ type CollectorConfig = {
   per_host_interval_ms: number;
   fetch_full_text: boolean;
   no_ai_processing_sources: string[];
+  lead_only_sources: string[];
   keywords: string[];
   region_terms: string[];
   known_outlets: string[];
@@ -78,10 +79,20 @@ const noAiSources = new Set([
   ...config.feeds.filter((f) => f.no_ai_processing).map((f) => f.source),
   ...config.listings.filter((l) => l.no_ai_processing).map((l) => l.source),
 ]);
-const registryByDomain = new Map<string, { id: string; name: string; noAi: boolean }>();
+// Sources whose rows are leads only, however they were collected.
+const leadOnlySources = new Set([
+  ...config.lead_only_sources,
+  ...config.feeds.filter((f) => f.lead_only).map((f) => f.source),
+]);
+const registryByDomain = new Map<string, { id: string; name: string; noAi: boolean; leadOnly: boolean }>();
 for (const s of registry) {
   if (s.home_url) {
-    registryByDomain.set(domainOf(s.home_url), { id: s.id, name: s.name, noAi: noAiSources.has(s.name) });
+    registryByDomain.set(domainOf(s.home_url), {
+      id: s.id,
+      name: s.name,
+      noAi: noAiSources.has(s.name),
+      leadOnly: leadOnlySources.has(s.name),
+    });
   }
 }
 
