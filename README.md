@@ -39,9 +39,26 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f src/db/migrations/0001_initial_schema
 
 Each migration runs in a single transaction, so a failure leaves the database unchanged.
 
-## Current milestone
+## Progress
 
-**Step 1.1** — app scaffold, design tokens (spec §§47–51), shell navigation with stub routes, `/admin` auth gate stub, folder layout for workers/data/docs.
+Roadmap: `docs/mvp-plan.md` §4. Decisions that override the plan: `docs/decisions.md`.
+
+**Phase 1 — Foundation: complete**
+
+| Step | What exists |
+| --- | --- |
+| 1.1 | App scaffold, design tokens (spec §§47–51), navigation, `/admin` auth gate, `workers/` `data/` `docs/` layout |
+| 1.2 | Initial schema migration: enums, sources, events, event sources, exercises, review log, daily digests; PostGIS enabled |
+| 1.3 | Source registry: admin list/create/edit/delete; public `/sources` grouped by tier with state-source labels |
+| 1.4 | Admin manual event create/edit with all spec §24 fields and attached sources |
+| 1.5 | Review queue: approve, reject, merge, edit; append-only review log; only published events are public |
+| 1.6 | Public `/latest` feed and stable `/events/[id]` pages |
+| 1.7 | Homepage: last update, Regional Activity placeholder (no score), 24-hour snapshot, latest events |
+| 1.8 | Manually written daily digest: admin editor, public `/digest` and `/digest/[date]`, homepage panel |
+| 1.9 | Public `/archive` with date, country, actor, type, confidence, and source-type filters |
+| 1.10 | Public `/methodology` and `/about` pages |
+
+**Next: Phase 2 — Initial automation** (step 2.1: wire 5–10 sources into `workers/collector`).
 
 ## License
 
