@@ -18,6 +18,7 @@ type CollectorConfig = {
   request_timeout_ms: number;
   per_host_interval_ms: number;
   fetch_full_text: boolean;
+  no_ai_processing_sources: string[];
   keywords: string[];
   feeds: FeedConfig[];
   listings: ListingConfig[];
@@ -62,9 +63,17 @@ const { rows: registry } = await client.query<{ id: string; name: string; home_u
   "SELECT id, name, home_url FROM sources",
 );
 const registryByName = new Map(registry.map((s) => [s.name, s.id]));
-const registryByDomain = new Map<string, { id: string; name: string }>();
+// Sources whose rows must never be sent to an AI model, however they were collected.
+const noAiSources = new Set([
+  ...config.no_ai_processing_sources,
+  ...config.feeds.filter((f) => f.no_ai_processing).map((f) => f.source),
+  ...config.listings.filter((l) => l.no_ai_processing).map((l) => l.source),
+]);
+const registryByDomain = new Map<string, { id: string; name: string; noAi: boolean }>();
 for (const s of registry) {
-  if (s.home_url) registryByDomain.set(domainOf(s.home_url), { id: s.id, name: s.name });
+  if (s.home_url) {
+    registryByDomain.set(domainOf(s.home_url), { id: s.id, name: s.name, noAi: noAiSources.has(s.name) });
+  }
 }
 
 function sourceIdFor(name: string): string {

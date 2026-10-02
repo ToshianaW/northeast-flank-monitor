@@ -35,7 +35,7 @@ export async function collectGdelt(
   config: GdeltConfig,
   query: { key: string; query: string },
   lookbackHours: number,
-  registryByDomain: Map<string, { id: string; name: string }>,
+  registryByDomain: Map<string, { id: string; name: string; noAi: boolean }>,
 ): Promise<CollectedDoc[]> {
   const params = new URLSearchParams({
     query: query.query,
@@ -84,6 +84,7 @@ export async function collectGdelt(
           sourcecountry: a.sourcecountry ?? null,
           // Publisher not in the registry: a lead only, skipped by later steps by default.
           ...(registry ? {} : { lead_only: true }),
+          ...(registry?.noAi ? { no_ai_processing: true } : {}),
           url_mobile: a.url_mobile ?? null,
           socialimage: a.socialimage ?? null,
         },

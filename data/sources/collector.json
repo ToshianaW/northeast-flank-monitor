@@ -5,6 +5,10 @@
   "request_timeout_ms": 20000,
   "per_host_interval_ms": 3000,
   "fetch_full_text": false,
+  "_no_ai_processing_sources": "Registry sources that are not collected directly but whose rows (for example GDELT results from their domain) must carry no_ai_processing. Feeds flagged with no_ai_processing are added to this set automatically.",
+  "no_ai_processing_sources": [
+    "The Atlantic"
+  ],
   "keywords": [
     "military",
     "army",
