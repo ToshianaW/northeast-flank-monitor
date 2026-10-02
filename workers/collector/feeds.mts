@@ -10,6 +10,22 @@ export type FeedConfig = {
   keyword_filter: boolean;
   /** Stored as usual, but marked so later steps never send the text to an AI model. */
   no_ai_processing: boolean;
+  /** Store title and link only (no feed text); keyword matching then uses the title alone. */
+  metadata_only?: boolean;
+  /** Also require a region term; items missing one are stored as SKIPPED. */
+  region_filter?: boolean;
+  /** Rows are leads only; later steps skip them by default. */
+  lead_only?: boolean;
+  /** Record which outlets the item credits (metadata.credited_publishers / credit_found). */
+  extract_credits?: boolean;
+  /** Skip the feed when it was read less than this many hours ago (checked in collect.mts). */
+  min_hours_between_reads?: number;
+};
+
+export type FeedMatchers = {
+  keyword: (text: string) => boolean;
+  region: (text: string) => boolean;
+  credits: (text: string) => string[];
 };
 
 type FeedItem = {
@@ -33,12 +49,32 @@ export function makeKeywordMatcher(keywords: string[]): (text: string) => boolea
   return (text) => re.test(text);
 }
 
+const CREDIT_VERBS = "according to|reported by|reporting by|citing|cited by|per|via|told|said to|reports from";
+
+/**
+ * Outlets an item credits, from a fixed list: "according to Reuters", "citing the WSJ",
+ * or "Reuters reported". Names not on the list are not guessed.
+ */
+export function makeCreditExtractor(outlets: string[]): (text: string) => string[] {
+  const patterns = outlets.map((name) => {
+    const n = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return {
+      name,
+      re: new RegExp(
+        `(?:(?:${CREDIT_VERBS})\\s+(?:the\\s+)?${n}|${n}\\s+(?:reported|reports|said|says|cited))(?![\\p{L}\\p{N}])`,
+        "iu",
+      ),
+    };
+  });
+  return (text) => patterns.filter((p) => p.re.test(text)).map((p) => p.name);
+}
+
 export async function collectFeed(
   http: HttpClient,
   feed: FeedConfig,
   sourceId: string,
   since: Date,
-  matchesKeyword: (text: string) => boolean,
+  match: FeedMatchers,
 ): Promise<CollectedDoc[]> {
   const res = await http.get(feed.url);
   if (res.status < 200 || res.status >= 300) throw new Error(`feed returned HTTP ${res.status}`);
@@ -54,9 +90,17 @@ export async function collectFeed(
     if (validDate && validDate < since) continue;
 
     const title = item.title ? htmlToText(item.title) : null;
-    const textSource = item["content:encoded"] ?? item.contentSnippet ?? item.summary ?? "";
+    const textSource = feed.metadata_only
+      ? ""
+      : (item["content:encoded"] ?? item.contentSnippet ?? item.summary ?? "");
     const rawText = htmlToText(textSource) || null;
-    const noMatch = feed.keyword_filter && !matchesKeyword(`${title ?? ""} ${rawText ?? ""}`);
+    const matchText = `${title ?? ""} ${rawText ?? ""}`;
+
+    let skipReason: string | undefined;
+    if (feed.keyword_filter && !match.keyword(matchText)) skipReason = "no_keyword_match";
+    else if (feed.region_filter && !match.region(matchText)) skipReason = "no_region_match";
+
+    const credited = feed.extract_credits ? match.credits(matchText) : [];
 
     docs.push({
       sourceId,
@@ -73,8 +117,13 @@ export async function collectFeed(
         feed_url: feed.url,
         ...(validDate ? {} : { date_missing: true }),
         ...(feed.no_ai_processing ? { no_ai_processing: true } : {}),
+        ...(feed.lead_only ? { lead_only: true } : {}),
+        ...(feed.metadata_only ? { metadata_only_by_terms: true } : {}),
+        ...(feed.extract_credits
+          ? { credited_publishers: credited, credit_found: credited.length > 0 }
+          : {}),
       },
-      skipReason: noMatch ? "no_keyword_match" : undefined,
+      skipReason,
     });
   }
   return docs;

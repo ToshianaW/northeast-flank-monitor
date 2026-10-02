@@ -6,7 +6,13 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
-import { collectFeed, makeKeywordMatcher, type FeedConfig } from "./feeds.mjs";
+import {
+  collectFeed,
+  makeCreditExtractor,
+  makeKeywordMatcher,
+  type FeedConfig,
+  type FeedMatchers,
+} from "./feeds.mjs";
 import { errorMessage, HttpClient, RobotsDisallowedError } from "./fetch.mjs";
 import { collectGdelt, type GdeltConfig } from "./gdelt.mjs";
 import { collectListing, type ListingConfig } from "./listing.mjs";
@@ -20,6 +26,8 @@ type CollectorConfig = {
   fetch_full_text: boolean;
   no_ai_processing_sources: string[];
   keywords: string[];
+  region_terms: string[];
+  known_outlets: string[];
   feeds: FeedConfig[];
   listings: ListingConfig[];
   gdelt: GdeltConfig;
@@ -32,6 +40,8 @@ type Summary = {
   outcomes: Record<StoreOutcome, number>;
   failedItems: number;
   error?: string;
+  /** Not an error: e.g. the feed was not read because of its read limit. */
+  note?: string;
 };
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -53,7 +63,6 @@ if (config.fetch_full_text) {
 }
 
 const http = new HttpClient(config.user_agent, config.request_timeout_ms, config.per_host_interval_ms);
-const matchesKeyword = makeKeywordMatcher(config.keywords);
 const since = new Date(Date.now() - config.lookback_hours * 3600_000);
 
 const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
@@ -74,6 +83,21 @@ for (const s of registry) {
   if (s.home_url) {
     registryByDomain.set(domainOf(s.home_url), { id: s.id, name: s.name, noAi: noAiSources.has(s.name) });
   }
+}
+
+const matchers: FeedMatchers = {
+  keyword: makeKeywordMatcher(config.keywords),
+  region: makeKeywordMatcher(config.region_terms),
+  credits: makeCreditExtractor([...new Set([...config.known_outlets, ...registry.map((s) => s.name)])]),
+};
+
+/** Hours since this collector key last stored a row, or null if it never has. */
+async function hoursSinceLastRead(key: string): Promise<number | null> {
+  const { rows } = await client.query<{ last: Date | null }>(
+    "SELECT max(fetched_at) AS last FROM raw_documents WHERE collector_key = $1",
+    [key],
+  );
+  return rows[0].last ? (Date.now() - rows[0].last.getTime()) / 3600_000 : null;
 }
 
 function sourceIdFor(name: string): string {
@@ -112,10 +136,22 @@ async function run(key: string, method: string, collect: () => Promise<Collected
 
 const summaries: Summary[] = [];
 for (const feed of config.feeds) {
+  if (feed.min_hours_between_reads) {
+    const hours = await hoursSinceLastRead(feed.key);
+    if (hours !== null && hours < feed.min_hours_between_reads) {
+      summaries.push({
+        key: feed.key,
+        method: "FEED",
+        fetched: 0,
+        outcomes: { new: 0, filtered: 0, duplicate: 0, existing: 0 },
+        failedItems: 0,
+        note: `not read: last read ${hours.toFixed(1)}h ago (limit: once per ${feed.min_hours_between_reads}h)`,
+      });
+      continue;
+    }
+  }
   summaries.push(
-    await run(feed.key, "FEED", () =>
-      collectFeed(http, feed, sourceIdFor(feed.source), since, matchesKeyword),
-    ),
+    await run(feed.key, "FEED", () => collectFeed(http, feed, sourceIdFor(feed.source), since, matchers)),
   );
 }
 for (const listing of config.listings) {
@@ -147,7 +183,8 @@ for (const s of summaries) {
   const detail = [
     s.outcomes.existing ? `${s.outcomes.existing} already stored` : "",
     s.outcomes.duplicate ? `${s.outcomes.duplicate} duplicate content` : "",
-    s.outcomes.filtered ? `${s.outcomes.filtered} no keyword match` : "",
+    s.outcomes.filtered ? `${s.outcomes.filtered} filtered out (keyword/region)` : "",
+    s.note ?? "",
     s.error ?? "",
   ]
     .filter(Boolean)
