@@ -640,13 +640,21 @@ export async function validateEventForm(
   return { ok: true, payload };
 }
 
+/**
+ * DATE columns are sent as 'YYYY-MM-DD' text. Passing a Date lets pg serialize it in the
+ * process's local time zone, which shifts the stored day west of UTC.
+ */
+export function toDateParam(date: Date | null): string | null {
+  return date ? date.toISOString().slice(0, 10) : null;
+}
+
 function eventInsertParams(
   event: EventWritePayload["event"],
   review_status: ReviewStatus,
 ) {
   return [
-    event.event_date,
-    event.reported_date,
+    toDateParam(event.event_date),
+    toDateParam(event.reported_date),
     event.headline,
     event.summary,
     event.actor,
@@ -677,10 +685,10 @@ function eventInsertParams(
     event.confidence_level,
     event.first_reported,
     event.last_updated,
-    event.announced_start_date,
-    event.announced_end_date,
-    event.observed_start_date,
-    event.observed_end_date,
+    toDateParam(event.announced_start_date),
+    toDateParam(event.announced_end_date),
+    toDateParam(event.observed_start_date),
+    toDateParam(event.observed_end_date),
     event.personnel_return_status,
     event.equipment_return_status,
     event.infrastructure_status,
@@ -759,30 +767,38 @@ export async function listEventSources(eventId: string): Promise<EventSourceRow[
   return rows;
 }
 
+/** Inserts the events row only (no sources); the caller owns the transaction. */
+export async function insertEvent(
+  client: import("pg").PoolClient,
+  event: EventWritePayload["event"],
+): Promise<string> {
+  const { rows } = await client.query<{ event_id: string }>(
+    `INSERT INTO events (
+       event_date, reported_date, headline, summary, actor, country, region,
+       location_name, location_precision, latitude, longitude, event_type, event_subtype,
+       exercise_id, exercise_name, exercise_status, unit_name, unit_type, unit_home_location,
+       personnel_estimate, equipment_type, equipment_quantity, activity_description,
+       source_name, source_url, source_type, source_country, source_language, source_reliability,
+       confidence_level, first_reported, last_updated, announced_start_date, announced_end_date,
+       observed_start_date, observed_end_date, personnel_return_status, equipment_return_status,
+       infrastructure_status, follow_on_activity, overall_reset_status, historical_analogue,
+       historical_notes, ai_generated_summary, internal_notes, human_reviewed, review_status,
+       contradiction_flag, contradiction_notes
+     ) VALUES (
+       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,
+       $24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49
+     )
+     RETURNING event_id`,
+    eventInsertParams(event, "DRAFT"),
+  );
+  return rows[0].event_id;
+}
+
 export async function createEvent(payload: EventWritePayload): Promise<string> {
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
-    const { rows } = await client.query<{ event_id: string }>(
-      `INSERT INTO events (
-         event_date, reported_date, headline, summary, actor, country, region,
-         location_name, location_precision, latitude, longitude, event_type, event_subtype,
-         exercise_id, exercise_name, exercise_status, unit_name, unit_type, unit_home_location,
-         personnel_estimate, equipment_type, equipment_quantity, activity_description,
-         source_name, source_url, source_type, source_country, source_language, source_reliability,
-         confidence_level, first_reported, last_updated, announced_start_date, announced_end_date,
-         observed_start_date, observed_end_date, personnel_return_status, equipment_return_status,
-         infrastructure_status, follow_on_activity, overall_reset_status, historical_analogue,
-         historical_notes, ai_generated_summary, internal_notes, human_reviewed, review_status,
-         contradiction_flag, contradiction_notes
-       ) VALUES (
-         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,
-         $24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49
-       )
-       RETURNING event_id`,
-      eventInsertParams(payload.event, "DRAFT"),
-    );
-    const eventId = rows[0].event_id;
+    const eventId = await insertEvent(client, payload.event);
     await replaceEventSources(client, eventId, payload.sources);
     await client.query("COMMIT");
     return eventId;

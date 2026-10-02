@@ -1,5 +1,9 @@
 import "server-only";
-import { Pool } from "pg";
+import { Pool, types } from "pg";
+
+// DATE columns (OID 1082) come back as UTC midnight rather than local midnight, so
+// date.toISOString().slice(0, 10) gives the stored day in any server time zone.
+types.setTypeParser(1082, (value: string) => new Date(`${value}T00:00:00Z`));
 
 declare global {
   var __nfmPool: Pool | undefined;
