@@ -1,0 +1,173 @@
+{
+  "_comment": "Collector configuration (roadmap step 2.1). Feed and listing 'source' values must match a registry source name exactly. Verified 2026-10-02. Sites that block automated access (kam.lt, kariuomene.lt, reuters.com) and sources with no feed (NATO) are intentionally absent.",
+  "user_agent": "NortheastFlankMonitor-collector/0.1",
+  "lookback_hours": 48,
+  "request_timeout_ms": 20000,
+  "per_host_interval_ms": 3000,
+  "fetch_full_text": false,
+  "keywords": [
+    "military",
+    "army",
+    "armed forces",
+    "troops",
+    "soldier",
+    "defence",
+    "defense",
+    "NATO",
+    "alliance",
+    "exercise",
+    "drill",
+    "manoeuvre",
+    "maneuver",
+    "mobilisation",
+    "mobilization",
+    "reservist",
+    "conscript",
+    "readiness",
+    "brigade",
+    "battalion",
+    "battlegroup",
+    "deploy",
+    "garrison",
+    "border guard",
+    "border",
+    "airspace",
+    "air policing",
+    "fighter jet",
+    "warplane",
+    "drone",
+    "UAV",
+    "air defence",
+    "air defense",
+    "missile",
+    "Iskander",
+    "navy",
+    "naval",
+    "warship",
+    "submarine",
+    "Baltic Fleet",
+    "electronic warfare",
+    "GPS jamming",
+    "jamming",
+    "sabotage",
+    "hybrid",
+    "Kaliningrad",
+    "Belarus",
+    "Belarusian",
+    "Lukashenko",
+    "Suwałki",
+    "Suwalki",
+    "Zapad",
+    "Wagner",
+    "Russian forces",
+    "Russian troops"
+  ],
+  "feeds": [
+    {
+      "key": "milby-news",
+      "source": "Belarus Ministry of Defence",
+      "url": "https://www.mil.by/ru/rss/news/",
+      "language": "Russian",
+      "keyword_filter": false,
+      "no_ai_processing": false
+    },
+    {
+      "key": "osw-en",
+      "source": "OSW (Centre for Eastern Studies)",
+      "url": "https://www.osw.waw.pl/en/rss.xml",
+      "language": "English",
+      "keyword_filter": false,
+      "no_ai_processing": false
+    },
+    {
+      "key": "isans",
+      "source": "iSANS",
+      "url": "https://isans.org/feed",
+      "language": "English",
+      "keyword_filter": false,
+      "no_ai_processing": false
+    },
+    {
+      "key": "err-news",
+      "source": "ERR",
+      "url": "https://news.err.ee/rss",
+      "language": "English",
+      "keyword_filter": true,
+      "no_ai_processing": false
+    },
+    {
+      "key": "euronews",
+      "source": "Euronews",
+      "url": "https://www.euronews.com/rss",
+      "language": "English",
+      "keyword_filter": true,
+      "no_ai_processing": false
+    },
+    {
+      "key": "lrt-en",
+      "source": "LRT",
+      "url": "https://www.lrt.lt/en/news-in-english?rss",
+      "language": "English",
+      "keyword_filter": true,
+      "no_ai_processing": true
+    },
+    {
+      "key": "npr-world",
+      "source": "NPR",
+      "url": "https://feeds.npr.org/1004/rss.xml",
+      "language": "English",
+      "keyword_filter": true,
+      "no_ai_processing": true
+    },
+    {
+      "key": "stripes-europe",
+      "source": "Stars and Stripes",
+      "url": "https://subscribe.stripes.com/rss/europe.xml",
+      "language": "English",
+      "keyword_filter": false,
+      "no_ai_processing": true
+    },
+    {
+      "key": "mezha-en",
+      "source": "mezha.net",
+      "url": "https://mezha.net/eng/rss/",
+      "language": "English",
+      "keyword_filter": false,
+      "no_ai_processing": false
+    }
+  ],
+  "listings": [
+    {
+      "key": "govpl-mon",
+      "source": "Polish Ministry of National Defence",
+      "url": "https://www.gov.pl/web/obrona-narodowa",
+      "_comment": "Reads only the 'Aktualnosci' (news) section of the MoD's own page; /web/obrona-narodowa/wiadomosci shows a gov.pl-wide carousel with almost no MoD items.",
+      "parser": "govpl",
+      "section_id": "Aktualnosci",
+      "link_prefix": "/web/obrona-narodowa/",
+      "language": "Polish",
+      "time_zone": "Europe/Warsaw",
+      "no_ai_processing": false
+    }
+  ],
+  "gdelt": {
+    "_comment": "GDELT DOC 2.0 API. Free, no key. Terms require citing the GDELT Project with a link to https://www.gdeltproject.org/ on any use or redistribution. Results are leads (metadata only), not verified events.",
+    "endpoint": "https://api.gdeltproject.org/api/v2/doc/doc",
+    "_rate_limit": "GDELT's 429 message: 'Please limit requests to one every 5 seconds'. The gap is counted from when each response finishes.",
+    "min_interval_ms": 6000,
+    "retry_after_429_ms": 30000,
+    "max_records": 250,
+    "queries": [
+      {
+        "key": "gdelt-baltic-theater",
+        "query": "(Kaliningrad OR Suwalki OR \"Baltic Fleet\" OR \"air policing\") (military OR army OR troops OR exercise OR missile OR navy OR NATO OR drone)"
+      },
+      {
+        "key": "gdelt-belarus",
+        "query": "(Belarus OR Belarusian) (troops OR \"military exercise\" OR mobilization OR \"border guard\" OR Wagner OR Zapad)"
+      }
+    ],
+    "_lead_only": "GDELT rows whose domain is not in the registry carry metadata.lead_only = true; later steps skip them by default."
+  },
+  "_no_ai_processing": "Sources with no_ai_processing: true are stored as usual, but their rows carry metadata.no_ai_processing so later steps treat them as leads only and never send their text to an AI model. Set for sources whose robots.txt blocks AI crawlers when chosen."
+}

@@ -39,6 +39,20 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f src/db/migrations/0001_initial_schema
 
 Each migration runs in a single transaction, so a failure leaves the database unchanged.
 
+## Collector
+
+Fetches the last 48 hours from configured feeds, the Polish MoD news listing, and the GDELT DOC API into the private `raw_documents` table (migration 0003). Nothing in `raw_documents` is shown on the site.
+
+```bash
+npm run collect
+```
+
+- Configuration: `data/sources/collector.json` (feeds, listing, GDELT queries, keyword filter, rate limits).
+- Needs `DATABASE_URL` (the direct connection) in `.env.local` or the environment.
+- Honors robots.txt, identifies itself as `NortheastFlankMonitor-collector/0.1`, and waits between requests to the same host (GDELT: at least 6 s after each response).
+- Prints one summary line per source; exits with code 1 if any source failed.
+- GDELT data is used under its terms, which require citing the GDELT Project with a link to https://www.gdeltproject.org/.
+
 ## Progress
 
 Roadmap: `docs/mvp-plan.md` §4. Decisions that override the plan: `docs/decisions.md`.
@@ -58,7 +72,13 @@ Roadmap: `docs/mvp-plan.md` §4. Decisions that override the plan: `docs/decisio
 | 1.9 | Public `/archive` with date, country, actor, type, confidence, and source-type filters |
 | 1.10 | Public `/methodology` and `/about` pages |
 
-**Next: Phase 2 — Initial automation** (step 2.1: wire 5–10 sources into `workers/collector`).
+**Phase 2 — Initial automation: in progress**
+
+| Step | What exists |
+| --- | --- |
+| 2.1 | Source collector (`npm run collect`): 9 feeds, the Polish MoD news listing, and GDELT into the private `raw_documents` table (migration 0003); robots.txt, rate limits, URL and content dedup, keyword filter for broad feeds, `no_ai_processing` and `lead_only` flags |
+
+**Next:** step 2.2, Claude extraction of candidate events from `raw_documents` into the review queue.
 
 ## License
 

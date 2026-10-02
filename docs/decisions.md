@@ -9,3 +9,4 @@
    approve/edit/reject with source and event type so accuracy can be measured. Revisit
    auto-publishing for structured official sources once there is data.
 7. Taxonomy: 24 types as listed in spec section 25.
+8. Workers language: TypeScript, not Python (overrides spec section 43). Workers live under workers/ and run with tsx, sharing Node, pg, and tooling with the web app. Decided at step 2.1; Python was not installed and one toolchain is simpler to maintain.
