@@ -1,7 +1,12 @@
 import "server-only";
 import { getPool } from "@/lib/db";
-import type { EventType } from "@/lib/event-labels";
-import type { Reliability } from "@/lib/source-labels";
+import type { EventType, SourceRelationship } from "@/lib/event-labels";
+import {
+  isTier4OnlySupport,
+  TIER4_ONLY_MESSAGE,
+  type Reliability,
+  type SourceType,
+} from "@/lib/source-labels";
 import {
   getEvent,
   listEventSources,
@@ -168,6 +173,42 @@ export async function listReviewQueue(): Promise<ReviewQueueItem[]> {
   return rows;
 }
 
+export type ReviewEventSource = {
+  name: string;
+  tier: number | null;
+  reliability: Reliability;
+  source_type: SourceType;
+  source_country: string | null;
+  article_url: string;
+  excerpt: string | null;
+  relationship: SourceRelationship;
+  is_primary: boolean;
+};
+
+/** Admin review page: the event's sources joined to the registry, plus the extraction run that proposed it. */
+export async function getReviewEventDetail(eventId: string): Promise<{
+  extraction_run_id: string | null;
+  sources: ReviewEventSource[];
+}> {
+  if (!UUID_RE.test(eventId)) return { extraction_run_id: null, sources: [] };
+  const [run, sources] = await Promise.all([
+    getPool().query<{ extraction_run_id: string | null }>(
+      `SELECT extraction_run_id FROM events WHERE event_id = $1`,
+      [eventId],
+    ),
+    getPool().query<ReviewEventSource>(
+      `SELECT s.name, s.tier, s.reliability, s.source_type, s.source_country,
+              es.article_url, es.excerpt, es.relationship, es.is_primary
+       FROM event_sources es
+       JOIN sources s ON s.id = es.source_id
+       WHERE es.event_id = $1
+       ORDER BY es.is_primary DESC, es.relationship ASC, s.tier ASC NULLS LAST, lower(s.name) ASC`,
+      [eventId],
+    ),
+  ]);
+  return { extraction_run_id: run.rows[0]?.extraction_run_id ?? null, sources: sources.rows };
+}
+
 export async function listReviewActions(eventId: string): Promise<ReviewActionRow[]> {
   if (!UUID_RE.test(eventId)) return [];
   const { rows } = await getPool().query<ReviewActionRow>(
@@ -238,6 +279,18 @@ export async function approveEvent(
         error:
           "Cannot publish: this event has no supporting source. Attach at least one source with relationship SUPPORTS.",
       };
+    }
+
+    const { rows: tierRows } = await client.query<{ tier: number | null }>(
+      `SELECT s.tier
+       FROM event_sources es
+       JOIN sources s ON s.id = es.source_id
+       WHERE es.event_id = $1 AND es.relationship = 'SUPPORTS'`,
+      [eventId],
+    );
+    if (isTier4OnlySupport(tierRows.map((r) => r.tier))) {
+      await client.query("ROLLBACK");
+      return { ok: false, error: TIER4_ONLY_MESSAGE };
     }
 
     const sourceIds = await listSourceIdsForEvent(eventId);

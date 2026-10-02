@@ -52,6 +52,21 @@ export const COUNTRY_SUGGESTIONS = [
   "International",
 ];
 
+/**
+ * Decision #10: an event needs at least one Tier 1-3 SUPPORTS source to be published.
+ * True when there is supporting evidence but none of it is Tier 1-3 (only Tier 4).
+ * An empty list is false: "no supporting source" is a separate check.
+ */
+export function isTier4OnlySupport(supportTiers: ReadonlyArray<number | null>): boolean {
+  return (
+    supportTiers.length > 0 &&
+    !supportTiers.some((tier) => tier !== null && tier >= 1 && tier <= 3)
+  );
+}
+
+export const TIER4_ONLY_MESSAGE =
+  "Cannot publish: this event is supported only by Tier 4 sources. Attach at least one Tier 1-3 supporting source first (decision #10).";
+
 // source_country is free text, so match common spellings and ISO codes.
 const STATE_SOURCE_COUNTRIES = new Set([
   "russia",

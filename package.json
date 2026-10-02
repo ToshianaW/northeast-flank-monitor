@@ -9,7 +9,7 @@
     "lint": "eslint",
     "collect": "tsx workers/collector/collect.mts",
     "extract": "tsx --conditions=react-server workers/extractor/extract.mts",
-    "test": "tsx --conditions=react-server --test src/lib/events.date.test.mts"
+    "test": "tsx --conditions=react-server --test src/lib/events.date.test.mts src/lib/review.tier4.test.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
