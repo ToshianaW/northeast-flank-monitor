@@ -32,7 +32,9 @@ export const DEFAULT_MAP_WINDOW: MapWindow = 30;
 
 export const MAP_LAYERS = ["activity", "statements", "all"] as const;
 export type MapLayer = (typeof MAP_LAYERS)[number];
-export const DEFAULT_MAP_LAYER: MapLayer = "activity";
+/** /map opens on All; the dashboard thumbnail shows Activity. */
+export const DEFAULT_MAP_LAYER: MapLayer = "all";
+export const DASHBOARD_MAP_LAYER: MapLayer = "activity";
 
 /** Tier 4-only items this recent are left off the map entirely (decision 11). */
 export const TIER4_HOLD_HOURS = 72;

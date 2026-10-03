@@ -73,10 +73,10 @@ test("steps: none, 1, 2-3, 4+", () => {
   assert.deepEqual([0, 1, 2, 3, 4, 9].map(shadeStep), [0, 1, 2, 2, 3, 3]);
 });
 
-test("params default to 30 days and Activity; unknown values fall back", () => {
-  assert.deepEqual(parseMapParams({}), { days: 30, layer: "activity" });
+test("params default to 30 days and All; unknown values fall back", () => {
+  assert.deepEqual(parseMapParams({}), { days: 30, layer: "all" });
   assert.deepEqual(parseMapParams({ days: "7", layer: "statements" }), { days: 7, layer: "statements" });
-  assert.deepEqual(parseMapParams({ days: "365", layer: "<x>" }), { days: 30, layer: "activity" });
+  assert.deepEqual(parseMapParams({ days: "365", layer: "<x>" }), { days: 30, layer: "all" });
 });
 
 test("window: by event date; region count adds into its unit", () => {
