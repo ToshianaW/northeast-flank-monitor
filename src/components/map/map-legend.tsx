@@ -1,5 +1,13 @@
 import type { MapLayer, MapWindow } from "@/lib/map-data";
-import { LAYER_LABELS, legendTitle, REPORTING_NOTE, SHADE_COLORS, SHADE_LABELS } from "@/lib/map-style";
+import {
+  DOT_NOTE,
+  DOT_RADIUS,
+  heatColor,
+  LAYER_LABELS,
+  legendTitle,
+  REPORTING_NOTE,
+  STEP_LABELS,
+} from "@/lib/map-style";
 
 const LAYER_SCOPE: Record<MapLayer, string> = {
   activity: "exercises, movements, air, naval, border incidents, deployments and other activity",
@@ -23,19 +31,26 @@ export function MapLegend({
         Layer shown: <span className="text-foreground">{LAYER_LABELS[layer]}</span>
         {compact ? null : <> ({LAYER_SCOPE[layer]})</>}
       </p>
-      <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1" aria-label="Shading steps">
-        {SHADE_LABELS.map((label, i) => (
-          <li key={label} className="flex items-center gap-1.5 text-xs text-text-secondary">
-            <span
-              aria-hidden
-              className="inline-block size-3.5 rounded-sm border border-border"
-              style={{ backgroundColor: SHADE_COLORS[i] }}
-            />
-            {label}
+      <ul className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1" aria-label="Dot sizes">
+        {[1, 2, 3].map((step) => (
+          <li key={step} className="flex items-center gap-1.5 text-xs text-text-secondary">
+            <span aria-hidden className="inline-flex size-6 items-center justify-center">
+              <span
+                className="rounded-full"
+                style={{
+                  width: DOT_RADIUS[step] * 2,
+                  height: DOT_RADIUS[step] * 2,
+                  backgroundColor: heatColor(step),
+                  boxShadow: `0 0 ${DOT_RADIUS[step] * 1.6}px ${heatColor(step)}`,
+                }}
+              />
+            </span>
+            {STEP_LABELS[step]}
           </li>
         ))}
       </ul>
-      <p className="mt-2 text-xs text-text-muted">{REPORTING_NOTE}</p>
+      <p className="mt-2 text-xs text-text-secondary">{DOT_NOTE}</p>
+      <p className="mt-0.5 text-xs text-text-muted">{REPORTING_NOTE}</p>
     </div>
   );
 }

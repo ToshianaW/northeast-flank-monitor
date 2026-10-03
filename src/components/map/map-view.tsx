@@ -1,17 +1,14 @@
 "use client";
 
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { ExpressionSpecification, Map as MapLibreMap } from "maplibre-gl";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { GeoJSONSource, Map as MapLibreMap, MapGeoJSONFeature } from "maplibre-gl";
 import type { MapData } from "@/lib/map-data";
+import { dotFeatures } from "@/lib/map-dots";
+import { dotRadii, DOTS_SOURCE, mapLayers, OUTLINES_SOURCE } from "@/lib/map-layers";
+import { MAP_BACKGROUND, REGION_DOT_SCALE, SEA_AREAS, STEP_LABELS, THEATER_WIDE_ID } from "@/lib/map-style";
 import type { RegionFeatureCollection } from "@/lib/placement";
-import {
-  MAP_BACKGROUND,
-  OUTLINE_COLOR,
-  SELECTED_OUTLINE_COLOR,
-  SHADE_COLORS,
-  SHADE_LABELS,
-} from "@/lib/map-style";
+import { OutsideCards } from "./outside-cards";
 import { RegionPanel, type MapSelection } from "./region-panel";
 
 type Bounds = [number, number, number, number];
@@ -21,6 +18,8 @@ const WORKER_URL = "/maplibre/maplibre-gl-worker.mjs";
 // Admin-1 is the finest unit shown, so there is nothing to see past this (spec §60).
 const MAX_ZOOM = 8;
 
+const EMPTY: Bounds = [Infinity, Infinity, -Infinity, -Infinity];
+
 function extend(b: Bounds, coords: unknown): Bounds {
   if (typeof (coords as number[])[0] === "number") {
     const [x, y] = coords as [number, number];
@@ -29,39 +28,34 @@ function extend(b: Bounds, coords: unknown): Bounds {
   return (coords as unknown[]).reduce<Bounds>((acc, c) => extend(acc, c), b);
 }
 
-const EMPTY: Bounds = [Infinity, Infinity, -Infinity, -Infinity];
-
 function boundsIndex(geo: RegionFeatureCollection) {
   const regions = new Map<string, Bounds>();
   const units = new Map<string, Bounds>();
-  let theater = EMPTY;
+  let land = EMPTY;
   for (const f of geo.features) {
     const b = extend(EMPTY, f.geometry.coordinates);
-    regions.set(f.properties.id, b);
-    units.set(f.properties.unit, extend(units.get(f.properties.unit) ?? EMPTY, [[b[0], b[1]], [b[2], b[3]]]));
-    theater = extend(theater, [[b[0], b[1]], [b[2], b[3]]]);
+    if (f.properties.level === "unit") {
+      units.set(f.properties.id, b);
+      if (!(SEA_AREAS as readonly string[]).includes(f.properties.id)) land = extend(land, [[b[0], b[1]], [b[2], b[3]]]);
+    } else {
+      regions.set(f.properties.id, b);
+    }
   }
-  return { regions, units, theater };
+  return { regions, units, land };
 }
 
-const FILL_COLOR: ExpressionSpecification = [
-  "match",
-  ["coalesce", ["feature-state", "step"], 0],
-  1, SHADE_COLORS[1],
-  2, SHADE_COLORS[2],
-  3, SHADE_COLORS[3],
-  SHADE_COLORS[0],
-];
-
-function stepLabel(step: number): string {
-  return step === 0 ? "none" : SHADE_LABELS[step];
+/** Width / height of a lon-lat box in Web Mercator, so the frame matches the theater. */
+function mercatorAspect([x1, y1, x2, y2]: Bounds): number {
+  const y = (lat: number) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
+  return ((x2 - x1) * Math.PI) / 180 / (y(y2) - y(y1));
 }
 
 /**
- * Region heat map. Overview shades whole areas (countries, Kaliningrad, western Russia,
- * the seas); selecting one zooms to it and shades its admin-1 regions. Polygons only: no
- * markers, no labels, no coordinates from events. The region buttons below the map are the
- * keyboard route to the same selection; the table under the map repeats every count.
+ * Region map with dots (decision 14). Overview: calm land, country outlines, faint seas, and
+ * one dot per area with activity at its fixed anchor. Selecting an area fits to it, shows
+ * its admin-1 outlines faintly and one dot per region with activity. Dots are aggregates at
+ * hand-set anchors; no event coordinates reach this component. The area buttons and the
+ * table under the map give the same information without the canvas.
  */
 export function MapView({ data }: { data: MapData }) {
   const container = useRef<HTMLDivElement>(null);
@@ -69,11 +63,21 @@ export function MapView({ data }: { data: MapData }) {
   const boundsRef = useRef<ReturnType<typeof boundsIndex> | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
+  const selectionRef = useRef<MapSelection>(null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [aspect, setAspect] = useState(1.1);
   const [selection, setSelection] = useState<MapSelection>(null);
 
-  const padding = useCallback(() => ((container.current?.clientWidth ?? 0) < 640 ? 16 : 40), []);
+  const onMapUnit = useCallback(
+    (id: string | undefined) => data.units.find((u) => u.id === id && u.onMap),
+    [data.units],
+  );
+  // The selected map area, if any (cards and Theater-wide leave the map in overview).
+  const zoomedUnit = selection && onMapUnit(selection.unit) ? selection.unit : null;
+  const dots = useMemo(() => dotFeatures(data.units, zoomedUnit), [data.units, zoomedUnit]);
+
+  const padding = useCallback(() => ((container.current?.clientWidth ?? 0) < 640 ? 12 : 24), []);
 
   // Create the map once.
   useEffect(() => {
@@ -92,15 +96,14 @@ export function MapView({ data }: { data: MapData }) {
         ml.setWorkerUrl(WORKER_URL);
         const index = boundsIndex(geo);
         boundsRef.current = index;
+        setAspect(mercatorAspect(index.land));
+        const [x1, y1, x2, y2] = index.land;
         map = new ml.Map({
           container: container.current,
-          style: {
-            version: 8,
-            sources: {},
-            layers: [{ id: "background", type: "background", paint: { "background-color": MAP_BACKGROUND } }],
-          },
-          bounds: index.theater,
+          style: { version: 8, sources: {}, layers: [] },
+          bounds: index.land,
           fitBoundsOptions: { padding: padding() },
+          maxBounds: [x1 - 6, y1 - 3, x2 + 6, y2 + 3],
           attributionControl: false,
           dragRotate: false,
           pitchWithRotate: false,
@@ -114,43 +117,50 @@ export function MapView({ data }: { data: MapData }) {
         map.addControl(new ml.NavigationControl({ showCompass: false }), "top-right");
         map.on("load", () => {
           if (!map) return;
-          map.addSource("regions", { type: "geojson", data: geo, promoteId: "id" });
-          map.addLayer({
-            id: "regions-fill",
-            type: "fill",
-            source: "regions",
-            paint: {
-              "fill-color": FILL_COLOR,
-              "fill-opacity": ["case", ["boolean", ["feature-state", "dim"], false], 0.4, 1],
-            },
-          });
-          map.addLayer({
-            id: "regions-line",
-            type: "line",
-            source: "regions",
-            paint: { "line-color": OUTLINE_COLOR, "line-width": 0.6 },
-          });
-          map.addLayer({
-            id: "regions-selected",
-            type: "line",
-            source: "regions",
-            filter: ["==", ["get", "id"], ""],
-            paint: { "line-color": SELECTED_OUTLINE_COLOR, "line-width": 1.8 },
-          });
+          map.addSource(OUTLINES_SOURCE, { type: "geojson", data: geo });
+          map.addSource(DOTS_SOURCE, { type: "geojson", data: { type: "FeatureCollection", features: [] }, promoteId: "id" });
+          for (const layer of mapLayers()) map.addLayer(layer);
+          map.resize();
+          map.fitBounds(index.land, { padding: padding(), duration: 0 });
           setReady(true);
         });
-        map.on("click", "regions-fill", (e) => {
-          const props = e.features?.[0]?.properties as { id: string; unit: string } | undefined;
-          if (!props) return;
-          triggerRef.current = null;
-          setSelection((prev) =>
-            prev?.unit === props.unit
-              ? { unit: props.unit, region: props.id }
-              : { unit: props.unit, region: null },
-          );
+
+        // Dots first: a click on a dot never falls through to the polygon under it.
+        let hoveredDot: string | null = null;
+        const setHover = (id: string | null) => {
+          if (!map) return;
+          if (hoveredDot) map.setFeatureState({ source: DOTS_SOURCE, id: hoveredDot }, { hover: false });
+          hoveredDot = id;
+          if (id) map.setFeatureState({ source: DOTS_SOURCE, id }, { hover: true });
+        };
+        map.on("mousemove", (e) => {
+          if (!map) return;
+          const dot = map.queryRenderedFeatures(e.point, { layers: ["dots-hit"] })[0];
+          setHover(dot ? String(dot.properties.id) : null);
+          const area = map.queryRenderedFeatures(e.point, { layers: ["areas-fill", "regions-hit"] })[0];
+          map.getCanvas().style.cursor = dot || area ? "pointer" : "";
         });
-        map.on("mouseenter", "regions-fill", () => map && (map.getCanvas().style.cursor = "pointer"));
-        map.on("mouseleave", "regions-fill", () => map && (map.getCanvas().style.cursor = ""));
+        map.on("mouseout", () => setHover(null));
+        map.on("click", (e) => {
+          if (!map) return;
+          const current = selectionRef.current;
+          const dot = map.queryRenderedFeatures(e.point, { layers: ["dots-hit"] })[0];
+          const region = map.queryRenderedFeatures(e.point, { layers: ["regions-hit"] })[0];
+          const area = map.queryRenderedFeatures(e.point, { layers: ["areas-fill"] })[0];
+          const pick = (f: MapGeoJSONFeature | undefined) => (f ? String(f.properties.id) : null);
+          triggerRef.current = null;
+          const zoomed = current && boundsRef.current?.units.has(current.unit) ? current.unit : null;
+          if (zoomed) {
+            // Zoomed in: a dot or polygon of this area picks its region; elsewhere picks that area.
+            const regionId = pick(dot) ?? pick(region);
+            if (regionId && region && String(region.properties.unit) === zoomed) {
+              setSelection({ unit: zoomed, region: regionId });
+              return;
+            }
+          }
+          const areaId = (!zoomed && pick(dot)) || pick(area);
+          if (areaId) setSelection({ unit: areaId, region: null });
+        });
         map.on("error", (e) => console.error("Map error", e.error));
       } catch (error) {
         console.error("Map failed to load", error);
@@ -164,43 +174,53 @@ export function MapView({ data }: { data: MapData }) {
     };
   }, [padding]);
 
-  // Shading for the current selection.
+  useEffect(() => {
+    selectionRef.current = selection;
+  }, [selection]);
+
+  // Keep the frame matched to the theater when its shape is known.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !boundsRef.current) return;
+    map.resize();
+    if (!zoomedUnit) map.fitBounds(boundsRef.current.land, { padding: padding(), duration: 0 });
+    // Only when the frame changes shape, not on every selection.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aspect, ready]);
+
+  // Dots, region outlines and the selected outline follow the selection.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
-    for (const unit of data.units) {
-      const zoomedIn = selection?.unit === unit.id;
-      for (const region of unit.regions) {
-        map.setFeatureState(
-          { source: "regions", id: region.id },
-          {
-            step: zoomedIn ? region.step : unit.step,
-            dim: selection !== null && !zoomedIn,
-          },
-        );
-      }
+    (map.getSource(DOTS_SOURCE) as GeoJSONSource | undefined)?.setData(dots);
+    // Region dots inside a zoomed area are smaller than the overview's area dots.
+    for (const [layer, value] of Object.entries(dotRadii(zoomedUnit ? REGION_DOT_SCALE : 1))) {
+      map.setPaintProperty(layer, "circle-radius", value);
     }
-    const outlined = selection
-      ? selection.region
-        ? [selection.region]
-        : (data.units.find((u) => u.id === selection.unit)?.regions.map((r) => r.id) ?? [])
-      : [];
-    map.setFilter("regions-selected", ["in", ["get", "id"], ["literal", outlined]]);
-  }, [data, ready, selection]);
+    const inUnit: ["==", ["get", "unit"], string] = ["==", ["get", "unit"], zoomedUnit ?? ""];
+    map.setFilter("regions-line", ["all", ["==", ["get", "level"], "region"], inUnit]);
+    map.setFilter("regions-hit", ["all", ["==", ["get", "level"], "region"], inUnit]);
+    const outlined = selection?.region && zoomedUnit ? selection.region : zoomedUnit ?? "";
+    map.setFilter("selected-line", [
+      "all",
+      ["==", ["get", "id"], outlined],
+      ["==", ["get", "level"], selection?.region && zoomedUnit ? "region" : "unit"],
+    ]);
+  }, [ready, dots, zoomedUnit, selection]);
 
-  // Camera follows the selection; zooming out by hand returns to the overview.
+  // Camera: fit to the selected area or region; zooming out by hand returns to the overview.
   useEffect(() => {
     const map = mapRef.current;
     const index = boundsRef.current;
     if (!map || !ready || !index) return;
-    const target = !selection
-      ? index.theater
-      : selection.region
+    const target = !zoomedUnit
+      ? index.land
+      : selection?.region
         ? index.regions.get(selection.region)
-        : index.units.get(selection.unit);
-    if (target) map.fitBounds(target, { padding: padding(), maxZoom: MAX_ZOOM - 1 });
-    if (!selection) return;
-    const overviewZoom = map.cameraForBounds(index.theater, { padding: padding() })?.zoom ?? 0;
+        : index.units.get(zoomedUnit);
+    if (target) map.fitBounds(target, { padding: padding() * 2, maxZoom: MAX_ZOOM - 1 });
+    if (!zoomedUnit) return;
+    const overviewZoom = map.cameraForBounds(index.land, { padding: padding() })?.zoom ?? 0;
     const onZoomEnd = (e: { originalEvent?: unknown }) => {
       if (e.originalEvent && map.getZoom() <= overviewZoom + 0.15) setSelection(null);
     };
@@ -208,7 +228,7 @@ export function MapView({ data }: { data: MapData }) {
     return () => {
       map.off("zoomend", onZoomEnd);
     };
-  }, [ready, selection, padding]);
+  }, [ready, zoomedUnit, selection, padding]);
 
   const close = useCallback(() => {
     setSelection(null);
@@ -231,7 +251,13 @@ export function MapView({ data }: { data: MapData }) {
     setSelection(next);
   }
 
-  const selectedUnit = selection ? data.units.find((u) => u.id === selection.unit) : undefined;
+  const mapAreas = data.units.filter((u) => u.onMap);
+  const zoomed = zoomedUnit ? data.units.find((u) => u.id === zoomedUnit) : undefined;
+  const pill = (active: boolean, small = false) =>
+    `rounded-full border px-3 py-1 ${small ? "text-xs" : "text-sm"} transition-colors ${
+      active ? "border-foam text-foreground" : "border-border text-text-secondary hover:text-foreground"
+    }`;
+  const stepText = (step: number) => (step === 0 ? "no dot" : `dot size ${STEP_LABELS[step]}`);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
@@ -239,16 +265,13 @@ export function MapView({ data }: { data: MapData }) {
         <div className="relative overflow-hidden rounded-xl border border-border" style={{ background: MAP_BACKGROUND }}>
           <div
             ref={container}
-            className="h-[60vh] max-h-[620px] min-h-[320px] w-full"
+            className="w-full"
+            style={{ aspectRatio: String(aspect), maxHeight: "78vh", minHeight: 300 }}
             role="region"
-            aria-label="Region heat map. Use the area buttons below the map or the table for the same information."
+            aria-label="Map of the theater with one dot per area with activity. Use the area buttons below the map or the table for the same information."
           />
-          {selection ? (
-            <button
-              type="button"
-              onClick={close}
-              className="btn-pill absolute top-3 left-3 shadow-lg"
-            >
+          {zoomedUnit ? (
+            <button type="button" onClick={close} className="btn-pill absolute top-3 left-3 shadow-lg">
               Back to overview
             </button>
           ) : null}
@@ -260,44 +283,47 @@ export function MapView({ data }: { data: MapData }) {
         </div>
 
         <nav aria-label="Map areas" className="mt-4">
-          <p className="meta-label mb-2">Areas</p>
+          <p className="meta-label mb-2">Areas on the map</p>
           <ul className="flex flex-wrap gap-2">
-            {data.units.map((u) => (
+            {mapAreas.map((u) => (
               <li key={u.id}>
                 <button
                   type="button"
                   aria-pressed={selection?.unit === u.id}
                   onClick={(e) => choose({ unit: u.id, region: null }, e.currentTarget)}
-                  className={`rounded-full border px-3 py-1 text-sm transition-colors ${
-                    selection?.unit === u.id
-                      ? "border-foam text-foreground"
-                      : "border-border text-text-secondary hover:text-foreground"
-                  }`}
+                  className={pill(selection?.unit === u.id)}
                 >
                   {u.name}
-                  <span className="sr-only">, shading step {stepLabel(u.step)}</span>
+                  <span className="sr-only">, {u.count} published, {stepText(u.step)}</span>
                 </button>
               </li>
             ))}
+            <li>
+              <button
+                type="button"
+                aria-pressed={selection?.unit === THEATER_WIDE_ID}
+                onClick={(e) => choose({ unit: THEATER_WIDE_ID, region: null }, e.currentTarget)}
+                className={pill(selection?.unit === THEATER_WIDE_ID)}
+              >
+                Theater-wide
+                <span className="sr-only">, {data.theaterWide.count} published</span>
+              </button>
+            </li>
           </ul>
-          {selectedUnit && selectedUnit.regions.length > 1 ? (
+          {zoomed && zoomed.regions.length > 1 ? (
             <>
-              <p className="meta-label mt-4 mb-2">Regions of {selectedUnit.name}</p>
+              <p className="meta-label mt-4 mb-2">Regions of {zoomed.name}</p>
               <ul className="flex flex-wrap gap-2">
-                {selectedUnit.regions.map((r) => (
+                {zoomed.regions.map((r) => (
                   <li key={r.id}>
                     <button
                       type="button"
                       aria-pressed={selection?.region === r.id}
-                      onClick={(e) => choose({ unit: selectedUnit.id, region: r.id }, e.currentTarget)}
-                      className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                        selection?.region === r.id
-                          ? "border-foam text-foreground"
-                          : "border-border text-text-secondary hover:text-foreground"
-                      }`}
+                      onClick={(e) => choose({ unit: zoomed.id, region: r.id }, e.currentTarget)}
+                      className={pill(selection?.region === r.id, true)}
                     >
                       {r.name}
-                      <span className="sr-only">, shading step {stepLabel(r.step)}</span>
+                      <span className="sr-only">, {r.count} published, {stepText(r.step)}</span>
                     </button>
                   </li>
                 ))}
@@ -305,21 +331,21 @@ export function MapView({ data }: { data: MapData }) {
             </>
           ) : null}
         </nav>
+
+        <OutsideCards
+          units={data.units.filter((u) => !u.onMap)}
+          selected={selection?.unit ?? null}
+          onChoose={(id, trigger) => choose({ unit: id, region: null }, trigger)}
+        />
       </div>
 
       <div className="min-w-0">
         {selection ? (
-          <RegionPanel
-            data={data}
-            selection={selection}
-            headingRef={headingRef}
-            onSelect={setSelection}
-            onClose={close}
-          />
+          <RegionPanel data={data} selection={selection} headingRef={headingRef} onSelect={setSelection} />
         ) : (
           <div className="panel text-sm text-text-secondary">
-            Select an area on the map or with the buttons below it to list its published events
-            and exercises.
+            Select a dot, an area on the map, or a button or card below the map to list its published
+            events and exercises.
           </div>
         )}
       </div>

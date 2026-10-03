@@ -20,9 +20,10 @@ export default async function MapPage({ searchParams }: PageProps<"/map">) {
       intro={
         <p>
           Published events and exercises per area across Kaliningrad, Belarus, Poland, the
-          Baltic states, the Baltic Sea and western Russia. Shading is by region only: no
-          markers and no precise or current positions. Each item is placed where it concerns,
-          not where it was said.
+          Baltic states, the Baltic Sea and western Russia. Each dot marks an area, not a
+          location: it sits at a fixed point chosen for that area, and only its size changes
+          with the count. No precise or current positions are shown. Each item is placed
+          where it concerns, not where it was said.
         </p>
       }
     >

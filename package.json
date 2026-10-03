@@ -14,7 +14,7 @@
     "extract": "tsx --conditions=react-server workers/extractor/extract.mts",
     "dedup": "tsx workers/deduplication/dedup.mts",
     "digest": "tsx --conditions=react-server workers/digest/generate.mts",
-    "test": "tsx --conditions=react-server --test src/lib/admin-auth.test.mts src/lib/login-rate-limit.test.mts src/lib/events.date.test.mts src/lib/review.tier4.test.mts src/lib/review.approve.test.mts src/lib/exercise-rules.test.mts src/lib/confidence-suggestion.test.mts src/lib/exercises.evidence.test.mts src/lib/placement.test.mts src/lib/map-data.test.mts src/lib/geo.test.mts src/lib/map-dots.test.mts workers/digest/check.test.mts workers/digest/draft.test.mts workers/deduplication/pairs.test.mts workers/collector/feeds.test.mts"
+    "test": "tsx --conditions=react-server --test src/lib/admin-auth.test.mts src/lib/login-rate-limit.test.mts src/lib/events.date.test.mts src/lib/review.tier4.test.mts src/lib/review.approve.test.mts src/lib/exercise-rules.test.mts src/lib/confidence-suggestion.test.mts src/lib/exercises.evidence.test.mts src/lib/placement.test.mts src/lib/map-data.test.mts src/lib/geo.test.mts src/lib/map-dots.test.mts src/lib/map-layers.test.mts workers/digest/check.test.mts workers/digest/draft.test.mts workers/deduplication/pairs.test.mts workers/collector/feeds.test.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",

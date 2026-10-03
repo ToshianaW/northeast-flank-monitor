@@ -14,7 +14,10 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     id: "overview",
     label: "Overview",
-    items: [{ href: "/", label: "Dashboard" }],
+    items: [
+      { href: "/", label: "Dashboard" },
+      { href: "/map", label: "Map" },
+    ],
   },
   {
     id: "reporting",
@@ -53,8 +56,6 @@ export function isActivePath(pathname: string, href: string): boolean {
 /** Top-bar title for a public path. Detail pages fall back to their section. */
 export function pageTitleFor(pathname: string): string {
   if (pathname.startsWith("/events/")) return "Event";
-  // Not in the sidebar (the map belongs on the dashboard), but the route still exists.
-  if (pathname === "/map") return "Map";
   for (const group of NAV_GROUPS) {
     for (const item of group.items) {
       if (isActivePath(pathname, item.href)) return item.label;
