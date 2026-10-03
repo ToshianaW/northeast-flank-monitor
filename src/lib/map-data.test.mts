@@ -149,6 +149,31 @@ test("exercises: overlap with the window; no end date means start day unless und
   assert.equal(count(buildMapData(rows, { days: 7, layer: "activity", now: NOW }), "BY"), 2);
 });
 
+test("outside cards and Theater-wide are counted per layer and window; cards are not on the map", () => {
+  const rows = {
+    events: [
+      event({ location_name: "Russia", country: "Russia", event_type: "MOBILIZATION" }),
+      event({ location_name: "Russia", country: "Russia", event_type: "POLITICAL_SIGNALING" }),
+      event({ location_name: "NATO", country: "Ukraine", event_type: "POLITICAL_SIGNALING" }),
+      event({ location_name: "Baltic states", country: null }),
+      event({ location_name: "Ukraine", country: "Ukraine", event_date: new Date("2026-08-01T00:00:00Z") }),
+    ],
+    exercises: [],
+  };
+  const activity = buildMapData(rows, { days: 30, layer: "activity", now: NOW });
+  assert.equal(count(activity, "RU-ELSE"), 1);
+  assert.equal(count(activity, "WEST-EU"), 0);
+  assert.equal(count(activity, "UA"), 0);
+  assert.equal(activity.theaterWide.count, 1);
+  const all90 = buildMapData(rows, { days: 90, layer: "all", now: NOW });
+  assert.equal(count(all90, "RU-ELSE"), 2);
+  assert.equal(count(all90, "WEST-EU"), 1);
+  assert.equal(count(all90, "UA"), 1);
+  const cards = all90.units.filter((u) => !u.onMap).map((u) => u.id);
+  assert.deepEqual(cards, ["RU-ELSE", "UA", "WEST-EU", "NORTH-AM"]);
+  assert.ok(all90.units.filter((u) => !u.onMap).every((u) => u.regions.length === 0));
+});
+
 test("output carries no coordinates or article text", () => {
   const rows = {
     events: [event({ summary: "SECRET-SUMMARY", activity_description: "SECRET-ACTIVITY", latitude: 54.5, longitude: 25.5 })],

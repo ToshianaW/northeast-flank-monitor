@@ -17,6 +17,7 @@ import {
   type Placement,
   type RegionFeatureCollection,
 } from "@/lib/placement";
+import { THEATER_WIDE_ID } from "@/lib/map-style";
 import { isTier4OnlySupport } from "@/lib/source-labels";
 
 /**
@@ -114,11 +115,18 @@ export type MapData = {
   days: MapWindow;
   layer: MapLayer;
   windowStart: string;
-  /** Every unit, in gazetteer order, counted for the selected layer. */
-  units: (AreaCount & { regions: AreaCount[] })[];
-  /** Window items, both layers, newest first. */
+  /**
+   * Every unit, in gazetteer order, counted for the selected layer: the nine map areas
+   * (onMap) and the four "Outside the theater" cards (onMap false, no regions).
+   */
+  units: (AreaCount & { onMap: boolean; regions: AreaCount[] })[];
+  /** Items about the whole flank: listed and counted, never drawn. */
+  theaterWide: AreaCount;
+  /** Window items, both layers, newest first. Unplaced ones are shown as "Location unclear". */
   items: MapItem[];
 };
+
+export { THEATER_WIDE_ID };
 
 const DAY_MS = 86_400_000;
 
@@ -191,8 +199,11 @@ export function buildMapData(
   const items = [...events, ...exercises].sort((a, b) => b.date.localeCompare(a.date));
   const unitCounts = new Map<string, number>();
   const regionCounts = new Map<string, number>();
+  let theaterWide = 0;
   for (const item of items) {
-    if (!item.counted || !inLayer(options.layer, item.layer) || item.placement.kind !== "placed") continue;
+    if (!item.counted || !inLayer(options.layer, item.layer)) continue;
+    if (item.placement.kind === "theater-wide") theaterWide++;
+    if (item.placement.kind !== "placed") continue;
     const { unit, region } = item.placement;
     unitCounts.set(unit, (unitCounts.get(unit) ?? 0) + 1);
     if (region) regionCounts.set(region, (regionCounts.get(region) ?? 0) + 1);
@@ -205,8 +216,10 @@ export function buildMapData(
     windowStart,
     units: UNITS.map((u) => ({
       ...area(u.id, u.name, unitCounts.get(u.id) ?? 0),
+      onMap: u.onMap !== false,
       regions: REGIONS.filter((r) => r.unit === u.id).map((r) => area(r.id, r.name, regionCounts.get(r.id) ?? 0)),
     })),
+    theaterWide: area(THEATER_WIDE_ID, "Theater-wide", theaterWide),
     items,
   };
 }

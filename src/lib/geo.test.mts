@@ -16,14 +16,27 @@ test("file is within the 200 KB budget", () => {
   assert.ok(statSync(PATH).size <= 200 * 1024);
 });
 
-test("every gazetteer region has exactly one feature, with its unit and name", () => {
-  const ids = geo.features.map((f) => f.properties.id).sort();
+const regionFeatures = geo.features.filter((f) => f.properties.level === "region");
+const areaFeatures = geo.features.filter((f) => f.properties.level === "unit");
+
+test("every gazetteer region has exactly one region feature, with its unit and name", () => {
+  const ids = regionFeatures.map((f) => f.properties.id).sort();
   assert.deepEqual(ids, REGIONS.map((r) => r.id).sort());
   for (const r of REGIONS) {
-    const f = geo.features.find((x) => x.properties.id === r.id)!;
+    const f = regionFeatures.find((x) => x.properties.id === r.id)!;
     assert.equal(f.properties.unit, r.unit);
     assert.equal(f.properties.name, r.name);
     assert.ok(f.geometry.coordinates.length > 0, `${r.id} has geometry`);
+  }
+});
+
+test("every on-map area has one merged area feature; the outside cards have none", () => {
+  const onMap = UNITS.filter((u) => u.onMap !== false);
+  assert.deepEqual(areaFeatures.map((f) => f.properties.id).sort(), onMap.map((u) => u.id).sort());
+  for (const u of onMap) {
+    const f = areaFeatures.find((x) => x.properties.id === u.id)!;
+    assert.equal(f.properties.name, u.name);
+    assert.ok(f.geometry.coordinates.length > 0, `${u.id} has geometry`);
   }
 });
 
@@ -32,7 +45,9 @@ test("every region and place points at a known unit or region", () => {
   const regions = new Set(REGIONS.map((r) => r.id));
   for (const r of REGIONS) assert.ok(units.has(r.unit), r.id);
   for (const p of gazetteer.places) assert.ok(regions.has(p.region), p.name);
-  for (const u of UNITS) assert.ok(REGIONS.some((r) => r.unit === u.id), `${u.id} has regions`);
+  for (const u of UNITS) {
+    assert.equal(REGIONS.some((r) => r.unit === u.id), u.onMap !== false, `${u.id}: regions only for map areas`);
+  }
 });
 
 test("known points fall in the expected region; outside the theater is null", () => {

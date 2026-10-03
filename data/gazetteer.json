@@ -1,15 +1,19 @@
 {
   "$comment": "Display-time placement only (src/lib/placement.ts); nothing here is written into events. Region ids match public/geo/theater.geojson (scripts/build-theater-geo.mts). Names are matched as whole words after folding case and diacritics; the longest match wins. ambiguous: the name also exists outside the theater, so it needs the event's country field or the theater country named in the text.",
   "units": [
-    { "id": "PL", "name": "Poland", "country": "Poland", "names": ["Poland", "Polska", "Polish"] },
-    { "id": "LT", "name": "Lithuania", "country": "Lithuania", "names": ["Lithuania", "Lietuva", "Lithuanian"] },
-    { "id": "LV", "name": "Latvia", "country": "Latvia", "names": ["Latvia", "Latvija", "Latvian"] },
-    { "id": "EE", "name": "Estonia", "country": "Estonia", "names": ["Estonia", "Eesti", "Estonian"] },
-    { "id": "BY", "name": "Belarus", "country": "Belarus", "names": ["Belarus", "Belarusian", "Belarussian", "Byelorussia"] },
+    { "id": "PL", "name": "Poland", "country": "Poland", "adjectives": ["Polish"], "names": ["Poland", "Polska"] },
+    { "id": "LT", "name": "Lithuania", "country": "Lithuania", "adjectives": ["Lithuanian"], "names": ["Lithuania", "Lietuva"] },
+    { "id": "LV", "name": "Latvia", "country": "Latvia", "adjectives": ["Latvian"], "names": ["Latvia", "Latvija"] },
+    { "id": "EE", "name": "Estonia", "country": "Estonia", "adjectives": ["Estonian"], "names": ["Estonia", "Eesti"] },
+    { "id": "BY", "name": "Belarus", "country": "Belarus", "adjectives": ["Belarusian", "Belarussian"], "names": ["Belarus", "Byelorussia"] },
     { "id": "RU-KGD", "name": "Kaliningrad Oblast", "country": "Russia", "names": [] },
     { "id": "RU-W", "name": "Western Russia", "country": "Russia", "names": ["Western Russia", "Leningrad Military District", "Western Military District"] },
     { "id": "BALTIC-SEA", "name": "Baltic Sea", "country": null, "names": [] },
-    { "id": "GULF-OF-FINLAND", "name": "Gulf of Finland", "country": null, "names": [] }
+    { "id": "GULF-OF-FINLAND", "name": "Gulf of Finland", "country": null, "names": [] },
+    { "id": "RU-ELSE", "name": "Russia (elsewhere)", "country": "Russia", "onMap": false, "countryFallback": true, "adjectives": ["Russian"], "names": ["Russia", "Russian Federation", "Murmansk", "Kola Peninsula", "Karelia", "Kursk", "Belgorod", "Bryansk", "Voronezh", "Rostov", "Krasnodar", "Tver", "Nizhny Novgorod", "Moscow Military District", "Moscow Oblast"] },
+    { "id": "UA", "name": "Ukraine", "country": "Ukraine", "onMap": false, "adjectives": ["Ukrainian"], "names": ["Ukraine", "Kharkiv", "Odesa", "Odessa", "Donbas", "Donetsk", "Luhansk", "Zaporizhzhia", "Kherson", "Crimea", "Dnipro", "Lviv"] },
+    { "id": "WEST-EU", "name": "Western Europe (incl. EU/NATO institutions)", "country": null, "onMap": false, "adjectives": ["German", "French", "British", "Dutch", "Danish", "Swedish", "Finnish", "Norwegian"], "names": ["Western Europe", "European Union", "EU", "European Commission", "European Council", "NATO", "Germany", "France", "United Kingdom", "UK", "Britain", "Netherlands", "Belgium", "Denmark", "Sweden", "Finland", "Norway", "Spain", "Italy", "Portugal", "Luxembourg", "Austria", "Ireland", "Iceland"] },
+    { "id": "NORTH-AM", "name": "North America", "country": null, "onMap": false, "adjectives": ["American", "Canadian"], "names": ["United States", "USA", "U.S.", "US", "America", "Canada", "North America"] }
   ],
   "regions": [
     { "id": "PL-DS", "unit": "PL", "name": "Lower Silesian Voivodeship", "names": ["Lower Silesia", "Lower Silesian", "Dolnośląskie"] },
@@ -274,9 +278,25 @@
     "Union State"
   ],
   "outside": [
-    "Nizhny Novgorod",
     "Gulf of Bothnia",
-    "Brest France",
-    "Moscow Military District"
+    "Brest France"
+  ],
+  "$venues": "Where something was said, not what it concerns: matched and then ignored.",
+  "venues": [
+    "Moscow",
+    "Kremlin",
+    "Kyiv",
+    "Kiev",
+    "Brussels",
+    "Washington",
+    "White House",
+    "Pentagon",
+    "European Parliament",
+    "United Nations",
+    "UN",
+    "UN General Assembly",
+    "UN Security Council",
+    "NATO headquarters",
+    "NATO summit"
   ]
 }

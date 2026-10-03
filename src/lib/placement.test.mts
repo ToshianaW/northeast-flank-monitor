@@ -20,14 +20,14 @@ function where(p: Placement): string {
 const S: EventType = "POLITICAL_SIGNALING";
 
 const PUBLISHED_EVENTS: [headline: string, type: EventType, location: string, country: string, expected: string][] = [
-  ["Russia begins autumn conscription, plans to induct 120,000 conscripts, Defence24 reports", "MOBILIZATION", "Russia", "Russia", "unplaced"],
+  ["Russia begins autumn conscription, plans to induct 120,000 conscripts, Defence24 reports", "MOBILIZATION", "Russia", "Russia", "RU-ELSE/*"],
   ["Polish defence minister says FA-50GF aircraft have entered combat duty", "AIR_DEFENSE", "Poland", "Poland", "PL/*"],
-  ["Putin decree raises Russian army size to 1.56 million, Rzeczpospolita reports", "MOBILIZATION", "Russia", "Russia", "unplaced"],
+  ["Putin decree raises Russian army size to 1.56 million, Rzeczpospolita reports", "MOBILIZATION", "Russia", "Russia", "RU-ELSE/*"],
   ["Polish general tells European Parliament Russia cannot invade NATO states, describes 'shadow war'", S, "European Parliament", "Poland", "unplaced"],
   ["Trump comments on possible permanent US military base in Poland", S, "Poland", "Poland", "PL/*"],
   ["Estonian Defense Forces say Russia repeated war aims at UN", S, "Estonia", "Estonia", "EE/*"],
   ["US Marines redirected to Baltic Sea region for NATO's Baltic Sentry", "NATO_REINFORCEMENT", "Baltic Sea region", "United States", "theater-wide"],
-  ["Ukrainian military intelligence warns of Russian hybrid operations in EU and NATO countries", S, "European Union and NATO countries", "Ukraine", "unplaced"],
+  ["Ukrainian military intelligence warns of Russian hybrid operations in EU and NATO countries", S, "European Union and NATO countries", "Ukraine", "WEST-EU/*"],
   ["Ninth F-35A arrives at Łask base in Poland", "AIRFIELD_ACTIVITY", "Łask", "Poland", "PL/PL-LD"],
   ["Estonian PM says Estonia not invited to U.S.-led meeting on NATO's future", S, "Poland", "Estonia", "PL/*"],
   ["Russian border guard detains Estonia-bound cargo ship in Gulf of Finland", "NAVAL_ACTIVITY", "Gulf of Finland", "Russia", "GULF-OF-FINLAND/GULF-OF-FINLAND"],
@@ -85,7 +85,7 @@ test("Brest needs Belarus from the country field or the text", () => {
 test("longest match wins: Gulf of Riga, Nizhny Novgorod, Mińsk Mazowiecki, Minsk Oblast", () => {
   assert.equal(where(place({ headline: "x", location_name: "Gulf of Riga", country: null })), "BALTIC-SEA/BALTIC-SEA");
   assert.equal(where(place({ headline: "x", location_name: "Gulf of Gdańsk", country: "Poland" })), "BALTIC-SEA/BALTIC-SEA");
-  assert.equal(where(place({ headline: "x", location_name: "Nizhny Novgorod", country: "Russia" })), "unplaced");
+  assert.equal(where(place({ headline: "x", location_name: "Nizhny Novgorod", country: "Russia" })), "RU-ELSE/*");
   assert.equal(where(place({ headline: "x", location_name: "Mińsk Mazowiecki", country: "Poland" })), "PL/PL-MZ");
   assert.equal(where(place({ headline: "x", location_name: "Minsk Oblast", country: "Belarus" })), "BY/BY-MI");
   assert.equal(where(place({ headline: "x", location_name: "Minsk", country: "Belarus" })), "BY/BY-HM");
@@ -105,10 +105,11 @@ test("several areas: two without a border are Unplaced, three or more are Theate
   assert.equal(where(place({ headline: "x", location_name: "Baltic states", country: "Estonia" })), "theater-wide");
 });
 
-test("text step: regions and places only, never country adjectives; falls back to country", () => {
+test("text step: no country adjectives; Activity falls back to the country field", () => {
   assert.equal(where(place({ headline: "Polish and Lithuanian ministers meet", location_name: null, country: "Lithuania" })), "LT/*");
   assert.equal(where(place({ headline: "Drills near Tapa and Narva", location_name: null, country: null })), "EE/*");
-  assert.equal(where(place({ headline: "Statement on NATO", location_name: null, country: "Russia" })), "unplaced");
+  assert.equal(where(place({ headline: "Statement on NATO", location_name: null, country: "Russia" })), "RU-ELSE/*");
+  assert.equal(where(place({ headline: "Statement on NATO", event_type: S, location_name: null, country: "Russia" })), "unplaced");
 });
 
 test("stored coordinates: used when consistent, Unplaced when they contradict the location", () => {
@@ -132,8 +133,34 @@ test("stored coordinates: used when consistent, Unplaced when they contradict th
 test("exercises: location first, else countries", () => {
   assert.equal(where(placeExercise({ exercise_name: "x", countries: ["Russia", "Belarus"], location: null })), "theater-wide");
   assert.equal(where(placeExercise({ exercise_name: "x", countries: ["Poland", "United States"], location: null })), "PL/*");
-  assert.equal(where(placeExercise({ exercise_name: "x", countries: ["Russia"], location: null })), "unplaced");
+  assert.equal(where(placeExercise({ exercise_name: "x", countries: ["Russia"], location: null })), "RU-ELSE/*");
   assert.equal(where(placeExercise({ exercise_name: "x", countries: ["Russia", "Belarus"], location: "Hrodna" })), "BY/BY-HR");
+});
+
+test("outside cards: venues ignored, on-map beats a card, US/Canada only themselves", () => {
+  // The speaker and the venue never count.
+  assert.equal(where(place({ headline: "Minister urges EU sanctions", event_type: S, location_name: "Kyiv", country: "Ukraine" })), "unplaced");
+  assert.equal(where(place({ headline: "General speaks", event_type: S, location_name: "European Parliament", country: "Poland" })), "unplaced");
+  assert.equal(where(place({ headline: "US says it will send troops to Poland", event_type: S, location_name: "Washington", country: "United States" })), "PL/*");
+  assert.equal(where(place({ headline: "x", event_type: S, location_name: "US military base in Poland", country: "United States" })), "PL/*");
+  assert.equal(where(place({ headline: "x", event_type: S, location_name: "United States", country: "United States" })), "NORTH-AM/*");
+  assert.equal(where(place({ headline: "x", event_type: S, location_name: "Canada", country: null })), "NORTH-AM/*");
+  // EU and NATO institutions, and Western European countries.
+  assert.equal(where(place({ headline: "x", event_type: S, location_name: "NATO", country: "Ukraine" })), "WEST-EU/*");
+  assert.equal(where(place({ headline: "x", location_name: "Germany", country: "Germany" })), "WEST-EU/*");
+  assert.equal(where(place({ headline: "x", location_name: "NATO's eastern flank", country: null })), "theater-wide");
+  // Russia elsewhere; a card in location_name gives way to one on-map area in the text.
+  assert.equal(where(place({ headline: "x", location_name: "Murmansk", country: "Russia" })), "RU-ELSE/*");
+  assert.equal(where(place({ headline: "Kremlin on Kaliningrad transit", event_type: S, location_name: "Russia", country: "Russia" })), "RU-KGD/RU-KGD");
+  assert.equal(where(place({ headline: "Russian officials comment", event_type: S, location_name: "Moscow", country: "Russia" })), "unplaced");
+  assert.equal(where(place({ headline: "Drone strike", location_name: "Moscow", country: "Russia" })), "RU-ELSE/*");
+  assert.equal(where(place({ headline: "x", location_name: "Kharkiv", country: "Ukraine" })), "UA/*");
+  assert.equal(where(place({ headline: "x", location_name: "Latvian-Russian border", country: "Latvia" })), "LV/*");
+});
+
+test("prose never places by nationality adjective (usually the speaker)", () => {
+  assert.equal(where(place({ headline: "Polish general says Russia cannot invade NATO", event_type: S, location_name: null, country: "Poland" })), "unplaced");
+  assert.equal(where(place({ headline: "Polish general warns about Belarus", event_type: S, location_name: null, country: "Poland" })), "BY/*");
 });
 
 test("fold strips diacritics including ł", () => {
