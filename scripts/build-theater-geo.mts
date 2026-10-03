@@ -1,5 +1,7 @@
 /**
- * Builds public/geo/theater.geojson: the map's admin-1 regions and sea regions.
+ * Builds public/geo/theater.geojson: the map's admin-1 regions and sea regions (level
+ * "region"), plus each area merged from its regions (level "unit": a country, Kaliningrad,
+ * western Russia, a sea), which the overview outlines.
  * Source: Natural Earth 10m (public domain), pinned to a release tag. Simplified with
  * mapshaper via npx (not a project dependency). Region ids and names come from
  * data/gazetteer.json, so the map and placement share one list.
@@ -26,6 +28,7 @@ type Feature = { type: "Feature"; properties: Record<string, unknown>; geometry:
 type FeatureCollection = { type: "FeatureCollection"; features: Feature[] };
 
 const gazetteer = JSON.parse(readFileSync("data/gazetteer.json", "utf8")) as {
+  units: { id: string; name: string; onMap?: boolean }[];
   regions: { id: string; unit: string; name: string }[];
 };
 const regionById = new Map(gazetteer.regions.map((r) => [r.id, r]));
@@ -77,8 +80,6 @@ function mapshaper(dir: string, input: string, output: string, extra: string[]):
   const args = [
     "-i", join(dir, input),
     ...extra,
-    "-dissolve", "id", "copy-fields=unit,name",
-    "-simplify", SIMPLIFY, "keep-shapes",
     "-o", join(dir, output), "format=geojson", "precision=0.001",
   ];
   // Every argument is a constant or a temp path, quoted here.
@@ -113,13 +114,30 @@ try {
 
   writeFileSync(join(dir, "land.json"), JSON.stringify({ type: "FeatureCollection", features: land }));
   writeFileSync(join(dir, "sea.json"), JSON.stringify({ type: "FeatureCollection", features: sea }));
-  mapshaper(dir, "land.json", "land-out.json", []);
-  mapshaper(dir, "sea.json", "sea-out.json", ["-clip", `bbox=${SEA_CLIP_BBOX}`]);
+  const byId = ["-dissolve", "id", "copy-fields=unit,name", "-simplify", SIMPLIFY, "keep-shapes"];
+  mapshaper(dir, "land.json", "land-out.json", byId);
+  mapshaper(dir, "sea.json", "sea-out.json", ["-clip", `bbox=${SEA_CLIP_BBOX}`, ...byId]);
+  // Areas are merged from the already simplified regions, so their edges line up exactly.
+  mapshaper(dir, "land-out.json", "units-out.json", ["-dissolve", "unit"]);
 
-  const features = [
-    ...(JSON.parse(readFileSync(join(dir, "land-out.json"), "utf8")) as FeatureCollection).features,
-    ...(JSON.parse(readFileSync(join(dir, "sea-out.json"), "utf8")) as FeatureCollection).features,
-  ].sort((a, b) => String(a.properties.id).localeCompare(String(b.properties.id)));
+  const read = (file: string) =>
+    (JSON.parse(readFileSync(join(dir, file), "utf8")) as FeatureCollection).features;
+  const unitName = new Map(gazetteer.units.map((u) => [u.id, u.name]));
+  const asLevel = (f: Feature, level: "region" | "unit", id = f.properties.id as string): Feature => ({
+    ...f,
+    properties: { id, unit: level === "unit" ? id : f.properties.unit, name: level === "unit" ? unitName.get(id) ?? id : f.properties.name, level },
+  });
+  const byIdOrder = (a: Feature, b: Feature) => String(a.properties.id).localeCompare(String(b.properties.id));
+  const features = [...read("land-out.json"), ...read("sea-out.json")].map((f) => asLevel(f, "region")).sort(byIdOrder);
+  const unitFeatures = [
+    ...read("units-out.json").map((f) => asLevel(f, "unit", f.properties.unit as string)),
+    ...read("sea-out.json").map((f) => asLevel(f, "unit", f.properties.unit as string)),
+  ].sort(byIdOrder);
+  const onMapUnits = gazetteer.units.filter((u) => u.onMap !== false).map((u) => u.id);
+  const missingUnits = onMapUnits.filter((id) => !unitFeatures.some((f) => f.properties.id === id));
+  if (missingUnits.length || unitFeatures.length !== onMapUnits.length) {
+    throw new Error(`area features wrong: missing ${missingUnits.join(",")}, got ${unitFeatures.length}`);
+  }
 
   const ids = features.map((f) => f.properties.id as string);
   const missing = gazetteer.regions.map((r) => r.id).filter((id) => !ids.includes(id));
@@ -129,11 +147,11 @@ try {
     throw new Error(`missing: ${missing.join(",")} duplicated: ${duplicated.join(",")} empty: ${lost.join(",")}`);
   }
 
-  writeFileSync(OUT, JSON.stringify({ type: "FeatureCollection", features }) + "\n");
+  writeFileSync(OUT, JSON.stringify({ type: "FeatureCollection", features: [...features, ...unitFeatures] }) + "\n");
   const bytes = statSync(OUT).size;
   console.log("Natural Earth admin-1 features kept per country:", adm0Counts);
   console.log("Latvian municipalities per region field:", latviaCounts);
-  console.log(`Wrote ${OUT}: ${features.length} features, ${(bytes / 1024).toFixed(1)} KB`);
+  console.log(`Wrote ${OUT}: ${features.length} regions + ${unitFeatures.length} areas, ${(bytes / 1024).toFixed(1)} KB`);
   console.log(`Kept non-empty after simplification: ${MUST_SURVIVE.join(", ")}`);
   if (bytes > SIZE_BUDGET) throw new Error(`Over the ${SIZE_BUDGET / 1024} KB budget`);
 } finally {
