@@ -501,13 +501,31 @@ export default function MethodologyPage() {
           <Subhead>Now</Subhead>
           <ul className="list-disc pl-5">
             <li>
+              Sources are collected automatically twice a day. Every event is
+              reviewed by a person before it is published.
+            </li>
+            <li>
               Events are extracted from collected reporting with AI assistance or
-              entered manually, and a person reviews every event before publication.
+              entered manually. AI-extracted events are drafts only and are never
+              published without human review.
+            </li>
+            <li>
+              Possible duplicate events are flagged for the reviewer, who decides
+              whether to merge them. Nothing is merged automatically.
             </li>
             <li>Sources are kept in a registry with tier, type, and reliability.</li>
             <li>
+              The review form shows a rule-based confidence suggestion based on the
+              sources attached to an event. It is not AI, and the reviewer makes
+              the final choice.
+            </li>
+            <li>
               The daily digest is drafted with AI assistance from published events,
               then edited and approved by a person.
+            </li>
+            <li>
+              The exercise tracker records announced and observed exercises with
+              their post-exercise reset status, entered and reviewed by a person.
             </li>
             <li>Published events can be browsed in Latest and the Archive.</li>
           </ul>
@@ -516,9 +534,9 @@ export default function MethodologyPage() {
             <Planned />
           </Subhead>
           <ul className="list-disc pl-5">
-            <li>Automated collection from a curated set of sources</li>
             <li>Interactive regional map</li>
-            <li>Exercise tracker and air activity page</li>
+            <li>Air activity page</li>
+            <li>Historical dataset (August 2020 – February 2022)</li>
             <li>Historical comparison</li>
             <li>Northeast Flank Activity Index</li>
             <li>Open data: downloadable datasets and a read-only API</li>
