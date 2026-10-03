@@ -112,6 +112,13 @@ export function DigestForm({ action, initialValues, sections, submitLabel }: Pro
           Plain text. Separate paragraphs with a blank line. Empty sections are
           not shown publicly.
         </p>
+        <p className="-mt-2 text-xs text-text-muted">
+          AI-drafted digests: one sentence per line, ending with{" "}
+          <code className="font-mono">[ref &lt;event id&gt;, …]</code>. Edit the
+          text before the marker and leave the marker in place; it becomes the
+          numbered links to the cited events. Every marker id must be a
+          published event.
+        </p>
 
         <div className="flex items-center gap-3">
           <Button type="submit" disabled={pending}>

@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { DigestView, formatDigestDate } from "@/components/digest-view";
+import { collectDigestRefs } from "@/lib/digest-refs";
 import {
   DIGEST_SECTIONS,
   getLatestPublishedDigest,
   listPublishedDigests,
+  listPublishedEventHeadlines,
 } from "@/lib/digests";
 
 export const metadata = { title: "Daily digest" };
@@ -16,11 +18,14 @@ export default async function DigestPage() {
     listPublishedDigests(),
   ]);
   const earlier = all.filter((d) => d.id !== latest?.id);
+  const eventHeadlines = await listPublishedEventHeadlines(
+    latest ? collectDigestRefs(Object.values(latest.sections)) : [],
+  );
 
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6">
       {latest ? (
-        <DigestView digest={latest} sections={DIGEST_SECTIONS} />
+        <DigestView digest={latest} sections={DIGEST_SECTIONS} eventHeadlines={eventHeadlines} />
       ) : (
         <>
           <p className="meta-label mb-3">Daily digest</p>

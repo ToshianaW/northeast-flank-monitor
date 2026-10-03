@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { formatDigestDate } from "@/components/digest-view";
 import { EventLogEntry } from "@/components/event-log-entry";
+import { stripDigestRefs } from "@/lib/digest-refs";
 import { getLatestPublishedDigest } from "@/lib/digests";
 import {
   getSnapshotCounts,
@@ -40,9 +41,10 @@ export default async function HomePage() {
     getLatestPublishedDigest(),
   ]);
   // First paragraph of the Executive Summary as the homepage excerpt.
-  const digestExcerpt = digest?.sections.executive_summary
+  const firstParagraph = digest?.sections.executive_summary
     .split(/\n\s*\n/)
     .find((p) => p.trim() !== "");
+  const digestExcerpt = firstParagraph ? stripDigestRefs(firstParagraph) : undefined;
 
   const snapshotRows: Array<{ label: string; value: string }> = [
     { label: "Verified events", value: String(counts.verifiedEvents) },
