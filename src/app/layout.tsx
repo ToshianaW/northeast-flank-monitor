@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -28,18 +27,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="bg-grid flex min-h-full flex-col">
-        <SiteHeader />
-        <main className="flex flex-1 flex-col">{children}</main>
-        <footer className="border-t border-border bg-surface-dark/60">
-          <div className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-4 text-xs text-text-muted sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <p>
-              Similarity is not trajectory. This site does not predict intent or
-              conflict.
-            </p>
-          </div>
-        </footer>
-      </body>
+      <body className="bg-grid flex min-h-full flex-col">{children}</body>
     </html>
   );
 }

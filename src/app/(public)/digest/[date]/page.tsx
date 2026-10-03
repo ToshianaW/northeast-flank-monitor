@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { ArrowLeft } from "lucide-react";
 import { DigestView } from "@/components/digest-view";
+import { PageShell } from "@/components/page-shell";
 import { collectDigestRefs } from "@/lib/digest-refs";
 import {
   DIGEST_SECTIONS,
@@ -24,7 +25,7 @@ export default async function DigestByDatePage({
   );
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6">
+    <PageShell>
       <Link
         href="/digest"
         className="mb-6 inline-flex items-center gap-1.5 text-sm link"
@@ -32,7 +33,9 @@ export default async function DigestByDatePage({
         <ArrowLeft className="size-3.5" aria-hidden />
         Latest digest
       </Link>
-      <DigestView digest={digest} sections={DIGEST_SECTIONS} eventHeadlines={eventHeadlines} />
-    </div>
+      <div className="max-w-4xl">
+        <DigestView digest={digest} sections={DIGEST_SECTIONS} eventHeadlines={eventHeadlines} />
+      </div>
+    </PageShell>
   );
 }

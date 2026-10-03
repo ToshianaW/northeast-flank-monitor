@@ -7,7 +7,6 @@ export default function ExercisesPage() {
     <PageStub
       title="Exercise tracker"
       description="Announced and observed exercises with post-exercise reset status."
-      nextStep="3.2 — exercise tracker + admin CRUD"
     />
   );
 }

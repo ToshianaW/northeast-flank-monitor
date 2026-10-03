@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CONFIDENCE_LEVEL_LABELS, EVENT_TYPE_LABELS } from "@/lib/event-labels";
+import { CONFIDENCE_TONES, eventTypeTone } from "@/lib/event-tones";
 import type { PublicEvent } from "@/lib/public-events";
 
 const MONTHS = [
@@ -18,61 +19,66 @@ export function formatUtcTime(d: Date): string {
   return `${d.toISOString().slice(11, 16)} UTC`;
 }
 
-export function EventLogEntry({ event }: { event: PublicEvent }) {
+/**
+ * One published event. `card` is a boxed panel (Latest, Archive); `row` is an
+ * unboxed feed row with a category bar, for use inside a panel (dashboard).
+ */
+export function EventLogEntry({
+  event,
+  variant = "card",
+}: {
+  event: PublicEvent;
+  variant?: "card" | "row";
+}) {
   const href = `/events/${event.event_id}`;
+  const Heading = variant === "row" ? "h3" : "h2";
+  const typeTone = eventTypeTone(event.event_type);
 
   return (
-    <article className="panel panel-link">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <p className="font-mono text-xs text-text-secondary">
-          {formatEventDate(event.event_date)}
-          {event.first_reported ? ` · ${formatUtcTime(event.first_reported)}` : null}
-        </p>
-        {event.country ? (
-          <p className="meta-label">{event.country}</p>
+    <article
+      className={
+        variant === "row" ? `feed-item ${typeTone}` : "panel panel-link"
+      }
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`pill tint ${typeTone}`}>
+          {EVENT_TYPE_LABELS[event.event_type]}
+        </span>
+        <span className={`pill tint ${CONFIDENCE_TONES[event.confidence_level]}`}>
+          Confidence: {CONFIDENCE_LEVEL_LABELS[event.confidence_level]}
+        </span>
+        {event.contradiction_flag ? (
+          <span className="pill tint tone-neutral">Conflicting reports</span>
         ) : null}
       </div>
 
-      <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-link">
-        {EVENT_TYPE_LABELS[event.event_type]}
-      </p>
-      <h2 className="mt-1 text-base font-medium leading-snug">
+      <Heading className="mt-3 text-base font-medium leading-snug">
         <Link
           href={href}
           className="panel-target transition-colors hover:text-link hover:underline"
         >
           {event.headline}
         </Link>
-      </h2>
+      </Heading>
+      <p className="mt-1 font-mono text-xs text-text-secondary">
+        {formatEventDate(event.event_date)}
+        {event.first_reported ? ` · ${formatUtcTime(event.first_reported)}` : null}
+        {event.country ? ` · ${event.country}` : null}
+      </p>
       {event.summary ? (
-        <p className="mt-1 line-clamp-2 max-w-3xl text-base text-text-secondary">
+        <p className="mt-2 line-clamp-2 max-w-3xl text-base text-text-secondary">
           {event.summary}
         </p>
       ) : null}
 
-      <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2 text-base">
-        <div>
-          <dt className="meta-label">Source</dt>
-          <dd className="mt-0.5">{event.source_name ?? "—"}</dd>
-        </div>
-        <div>
-          <dt className="meta-label">Confidence</dt>
-          <dd className="mt-0.5">{CONFIDENCE_LEVEL_LABELS[event.confidence_level]}</dd>
-        </div>
-        {event.contradiction_flag ? (
-          <div>
-            <dt className="meta-label">Reporting</dt>
-            <dd className="mt-0.5 text-text-secondary">Conflicting reports</dd>
-          </div>
-        ) : null}
-      </dl>
-
-      <Link
-        href={href}
-        className="relative mt-3 inline-block text-sm link"
-      >
-        View event →
-      </Link>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-text-secondary">
+          <span className="text-text-muted">Source:</span> {event.source_name ?? "—"}
+        </p>
+        <Link href={href} className="btn-pill relative">
+          View event →
+        </Link>
+      </div>
     </article>
   );
 }

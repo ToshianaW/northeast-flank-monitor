@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageShell } from "@/components/page-shell";
 import { LabelHelp } from "@/components/label-help";
 import {
   CONFIDENCE_LEVEL_LABELS,
@@ -196,7 +197,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className="scroll-mt-6 border-t border-border pt-6">
+    <section id={id} className="panel scroll-mt-20">
       <h2 className="text-lg font-semibold tracking-tight">
         <span className="mr-3 font-mono text-xs text-text-muted">
           {String(number).padStart(2, "0")}
@@ -229,34 +230,38 @@ export default function MethodologyPage() {
     SECTIONS.find((s) => s.id === id)!.title;
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6">
-      <p className="meta-label mb-3">Open methodology</p>
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Methodology</h1>
-      <p className="mt-3 max-w-2xl text-base leading-relaxed text-text-secondary">
-        How Northeast Flank Monitor selects, labels, reviews, and presents
-        events, and what it does not claim.
-      </p>
-
-      <nav
-        aria-label="Contents"
-        className="panel mt-8"
-      >
-        <p className="meta-label mb-3">Contents</p>
-        <ol className="grid gap-1.5 text-base sm:grid-cols-2">
-          {SECTIONS.map((s, i) => (
-            <li key={s.id}>
-              <a href={`#${s.id}`} className="link">
-                <span className="mr-2 font-mono text-xs text-text-muted">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                {s.title}
-              </a>
-            </li>
-          ))}
-        </ol>
-      </nav>
-
-      <div className="mt-10 grid gap-10">
+    <PageShell
+      eyebrow="Open methodology"
+      title="Methodology"
+      intro={
+        <p>
+          How Northeast Flank Monitor selects, labels, reviews, and presents
+          events, and what it does not claim.
+        </p>
+      }
+      aside={
+        <nav
+          aria-label="Contents"
+          className="panel lg:sticky lg:top-20"
+        >
+          <p className="meta-label mb-3">Contents</p>
+          <ol className="grid gap-1.5 text-base sm:grid-cols-2 lg:grid-cols-1">
+            {SECTIONS.map((s, i) => (
+              <li key={s.id}>
+                <a href={`#${s.id}`} className="link">
+                  <span className="mr-2 font-mono text-xs text-text-muted">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  {s.title}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      }
+      asideFirstOnMobile
+    >
+      <div className="grid gap-6">
         <Section id="core-question" number={n("core-question")} title={t("core-question")}>
           <p className="text-lg font-medium text-foreground">
             Is the regional military baseline changing?
@@ -548,6 +553,6 @@ export default function MethodologyPage() {
           </ul>
         </Section>
       </div>
-    </div>
+    </PageShell>
   );
 }

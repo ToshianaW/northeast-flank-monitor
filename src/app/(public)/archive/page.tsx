@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { ArchiveFilters } from "@/components/archive-filters";
 import { EventLogEntry } from "@/components/event-log-entry";
+import { PageShell } from "@/components/page-shell";
 import {
   ARCHIVE_PAGE_SIZE,
   archiveQueryString,
@@ -26,15 +27,17 @@ export default async function ArchivePage({ searchParams }: PageProps<"/archive"
   const lastShown = firstShown + events.length - 1;
 
   return (
-    <section className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6">
-      <p className="meta-label mb-3">Event archive</p>
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Archive</h1>
-      <p className="mt-3 max-w-2xl text-base leading-relaxed text-text-secondary">
-        All published events, newest first. Filters are kept in the address, so
-        any view can be bookmarked or shared.
-      </p>
-
-      <div className="mt-8">
+    <PageShell
+      eyebrow="Event archive"
+      title="Archive"
+      intro={
+        <p>
+          All published events, newest first. Filters are kept in the address, so
+          any view can be bookmarked or shared.
+        </p>
+      }
+    >
+      <div>
         <ArchiveFilters
           filters={filters}
           countries={options.countries}
@@ -113,6 +116,6 @@ export default async function ArchivePage({ searchParams }: PageProps<"/archive"
           )}
         </nav>
       ) : null}
-    </section>
+    </PageShell>
   );
 }

@@ -7,7 +7,6 @@ export default function AirActivityPage() {
     <PageStub
       title="Air activity"
       description="Baltic Air Policing intercepts, Kaliningrad-related aviation, and trend charts."
-      nextStep="3.4 — Air Activity page + charts"
     />
   );
 }

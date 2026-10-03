@@ -35,6 +35,13 @@
   --link: #4cb0c7; /* teal-blue */
   --status-ok-text: #2fb3a0; /* operational teal */
   --status-alert-text: #e0827a; /* destructive */
+  --slate-indigo-text: #9aa6cc; /* slate indigo */
+  --forest-green-text: #5cbf8a; /* forest green */
+
+  /* Card surfaces: 1px foam border at rest, full foam plus teal glow on hover. */
+  --foam-border: rgba(233, 228, 212, 0.28);
+  --glow-teal: rgba(0, 133, 116, 0.2);
+  --radius-card: 1rem;
 
   --background: var(--background-dark);
   --foreground: var(--text-primary);
@@ -142,20 +149,22 @@
 }
 
 @layer components {
-  /* Static panel: foam outline on the dark surface. */
+  /* Static panel: thin foam outline, one step lighter than the page (§49). */
   .panel {
-    border: 2px solid var(--foam-muted);
-    border-radius: var(--radius-panel);
+    border: 1px solid var(--foam-border);
+    border-radius: var(--radius-card);
     background-color: var(--surface-dark);
     padding: 1.5rem;
   }
 
-  /* Clickable panel. Pair with .panel-target on the main link, whose ::after
-     covers the whole card so the card is one click target. */
-  .panel-link {
+  /* Clickable panel or feed row. Pair with .panel-target on the main link, whose
+     ::after covers the whole item so it is one click target. */
+  .panel-link,
+  .feed-item {
     position: relative;
     transition:
       border-color 180ms ease,
+      background-color 180ms ease,
       box-shadow 180ms ease,
       transform 180ms ease;
   }
@@ -168,7 +177,13 @@
   @media (hover: hover) and (pointer: fine) {
     .panel-link:hover {
       border-color: var(--foam);
-      box-shadow: 0 0 24px var(--glow);
+      background-color: var(--surface-raised);
+      box-shadow: 0 0 24px var(--glow-teal);
+      transform: translateY(-2px);
+    }
+    .feed-item:hover {
+      background-color: var(--surface-raised);
+      box-shadow: 0 0 24px var(--glow-teal);
       transform: translateY(-2px);
     }
   }
@@ -178,9 +193,73 @@
       border-color: var(--foam);
       background-color: var(--surface-raised);
     }
+    .feed-item:active {
+      background-color: var(--surface-raised);
+    }
   }
   .panel-link:focus-within {
     border-color: var(--foam);
+    box-shadow: 0 0 24px var(--glow-teal);
+  }
+  .feed-item:focus-within {
+    background-color: var(--surface-raised);
+    box-shadow: 0 0 24px var(--glow-teal);
+  }
+
+  /* Feed row: no box of its own, a 3px category bar on the left. */
+  .feed-item {
+    border-left: 3px solid var(--tone, var(--border));
+    border-radius: 0 0.5rem 0.5rem 0;
+    padding: 1rem 1rem 1rem 1.125rem;
+  }
+
+  /* Category colours (§48: colour means category or status, never alarm). */
+  .tone-teal-blue { --tone: var(--link); }
+  .tone-operational { --tone: var(--status-ok-text); }
+  .tone-slate { --tone: var(--slate-indigo-text); }
+  .tone-forest { --tone: var(--forest-green-text); }
+  .tone-foam { --tone: var(--foam); }
+  .tone-neutral { --tone: var(--text-secondary); }
+  .tint {
+    background-color: color-mix(in srgb, var(--tone) 14%, transparent);
+    color: var(--tone);
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    padding: 0.125rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+  }
+
+  /* Solid action button: teal-blue with white text (5.5:1). */
+  .btn-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 9999px;
+    background-color: var(--teal-blue);
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    padding: 0.5rem 1rem;
+    transition:
+      box-shadow 180ms ease,
+      background-color 120ms ease,
+      transform 120ms ease;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .btn-pill:hover {
+      box-shadow: 0 0 20px var(--glow);
+    }
+  }
+  .btn-pill:active {
+    background-color: color-mix(in srgb, var(--teal-blue) 80%, black);
+    transform: translateY(1px);
   }
 
   /* Text link. */
@@ -204,84 +283,54 @@
 
   @media (prefers-reduced-motion: reduce) {
     .panel-link,
+    .feed-item,
+    .btn-pill,
     .link {
       transition: none;
     }
-    .panel-link:hover {
+    .panel-link:hover,
+    .feed-item:hover,
+    .btn-pill:active {
       transform: none;
-      box-shadow: none;
     }
   }
 }
 
-/* Primary nav item. Unlayered and after .meta-label so its colors win. */
+/* Sidebar nav item. Active: tinted fill and a 3px teal bar on the left edge;
+   the keyboard focus ring (foam outline below) stays separate. */
 a.nav-item {
-  border: 2px solid transparent;
-  border-radius: var(--radius-panel);
-  padding: 0.3rem 0.65rem;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
   color: var(--text-secondary);
   transition:
-    border-color 180ms ease,
-    box-shadow 180ms ease,
-    transform 180ms ease,
+    background-color 180ms ease,
     color 180ms ease;
 }
 a.nav-item[aria-current="page"] {
-  border-color: var(--foam-muted);
-  color: var(--foam);
+  background-color: color-mix(in srgb, var(--teal-blue) 22%, transparent);
+  box-shadow: inset 3px 0 0 var(--link);
+  color: var(--text-primary);
+  font-weight: 500;
 }
 @media (hover: hover) and (pointer: fine) {
   a.nav-item:hover {
-    border-color: var(--foam);
+    background-color: var(--surface-raised);
     color: var(--foam);
-    /* Stronger and offset down: a small pill needs more glow to read the same as a card. */
-    box-shadow:
-      0 8px 24px -2px var(--nav-glow),
-      0 0 12px var(--glow);
-    transform: translateY(-2px);
+  }
+  a.nav-item[aria-current="page"]:hover {
+    background-color: color-mix(in srgb, var(--teal-blue) 30%, transparent);
   }
 }
 @media (hover: none) {
   a.nav-item:active {
-    border-color: var(--foam);
-    color: var(--foam);
     background-color: var(--surface-raised);
+    color: var(--foam);
   }
-}
-
-/* "Live" indicator: steady pulse of the operational-teal dot. */
-@keyframes live-pulse {
-  0%,
-  100% {
-    opacity: 1;
-    box-shadow:
-      0 0 6px 1px rgba(0, 133, 116, 0.9),
-      0 0 0 0 rgba(0, 133, 116, 0.55);
-  }
-  50% {
-    opacity: 0.55;
-    box-shadow:
-      0 0 12px 3px rgba(0, 133, 116, 0.75),
-      0 0 0 6px rgba(0, 133, 116, 0);
-  }
-}
-.live-dot {
-  background-color: #00a891; /* brighter operational teal so it reads as "on" */
-  animation: live-pulse 2s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
   a.nav-item {
     transition: none;
-  }
-  a.nav-item:hover {
-    transform: none;
-    box-shadow: none;
-  }
-  /* Keep a steady glow instead of pulsing. */
-  .live-dot {
-    animation: none;
-    box-shadow: 0 0 8px 2px rgba(0, 133, 116, 0.8);
   }
 }
 
@@ -291,13 +340,32 @@ a.nav-item[aria-current="page"] {
   outline-offset: 2px;
 }
 
-/* Spec §50 — faint grid, restrained */
+/* Spec §50 — faint teal glow at the top and a 1px grid that fades out. */
 .bg-grid {
-  background-color: var(--background-dark);
+  background:
+    radial-gradient(ellipse 70% 480px at 50% 0, rgba(0, 133, 116, 0.1), transparent)
+      no-repeat,
+    var(--background-dark);
+}
+.bg-grid::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background-image:
     linear-gradient(rgba(130, 160, 185, 0.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(130, 160, 185, 0.04) 1px, transparent 1px);
   background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 90% 75% at 50% 0, #000 20%, transparent 100%);
+}
+
+.status-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background-color: var(--status-ok-text);
 }
 
 .meta-label {

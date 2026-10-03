@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageShell } from "@/components/page-shell";
 
 export const metadata = { title: "About" };
 
@@ -6,7 +7,7 @@ const REPOSITORY_URL = "https://github.com/ToshianaW/northeast-flank-monitor";
 
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="border-t border-border pt-6">
+    <section className="panel">
       <h2 className="meta-label mb-3">{title}</h2>
       <div className="grid max-w-3xl gap-3 text-base leading-relaxed text-text-secondary">
         {children}
@@ -17,17 +18,17 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
 
 export default function AboutPage() {
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6">
-      <p className="meta-label mb-3">About</p>
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-        About Northeast Flank Monitor
-      </h1>
-      <p className="mt-3 max-w-2xl text-base leading-relaxed text-text-secondary">
-        Independent open-source monitoring of military activity across
-        Kaliningrad, Belarus, Poland and the Baltic states.
-      </p>
-
-      <div className="mt-10 grid gap-10">
+    <PageShell
+      eyebrow="About"
+      title="About Northeast Flank Monitor"
+      intro={
+        <p>
+          Independent open-source monitoring of military activity across
+          Kaliningrad, Belarus, Poland and the Baltic states.
+        </p>
+      }
+    >
+      <div className="grid max-w-4xl gap-6">
         <Block title="Purpose">
           <p className="text-lg font-medium text-foreground">
             Is the regional military baseline changing?
@@ -95,6 +96,6 @@ export default function AboutPage() {
           </p>
         </Block>
       </div>
-    </div>
+    </PageShell>
   );
 }

@@ -1,4 +1,5 @@
 import { connection } from "next/server";
+import { PageShell } from "@/components/page-shell";
 import { Badge } from "@/components/ui/badge";
 import {
   isStateOfficialSource,
@@ -31,26 +32,26 @@ export default async function SourcesPage() {
   const groups = groupByTier(sources);
 
   return (
-    <section className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6">
-      <p className="meta-label mb-3">Source hierarchy</p>
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-        Sources
-      </h1>
-      <p className="mt-3 max-w-2xl text-base leading-relaxed text-text-secondary">
-        Sources are not treated equally. Each is grouped by tier and labeled by
-        type. Russian and Belarusian official sources are marked as state
-        sources: their claims are reported with attribution and are not
-        treated as independently verified.
-      </p>
-
+    <PageShell
+      eyebrow="Source hierarchy"
+      title="Sources"
+      intro={
+        <p>
+          Sources are not treated equally. Each is grouped by tier and labeled by
+          type. Russian and Belarusian official sources are marked as state
+          sources: their claims are reported with attribution and are not
+          treated as independently verified.
+        </p>
+      }
+    >
       {groups.length === 0 ? (
-        <div className="mt-10 border border-dashed border-border bg-surface-dark px-6 py-10 text-center">
+        <div className="border border-dashed border-border bg-surface-dark px-6 py-10 text-center">
           <p className="text-base text-text-secondary">
             No sources have been added to the registry yet.
           </p>
         </div>
       ) : (
-        <div className="mt-10 grid gap-6">
+        <div className="grid gap-6">
           {groups.map((group) => (
             <section key={group.key} aria-labelledby={group.key} className="panel">
               <h2
@@ -104,6 +105,6 @@ export default async function SourcesPage() {
           ))}
         </div>
       )}
-    </section>
+    </PageShell>
   );
 }

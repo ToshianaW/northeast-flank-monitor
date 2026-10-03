@@ -7,7 +7,6 @@ export default function MapPage() {
     <PageStub
       title="Regional map"
       description="Interactive MapLibre map of the northeast flank with generalized event markers."
-      nextStep="3.1 — MapLibre map + markers"
     />
   );
 }

@@ -3,19 +3,62 @@ export type NavItem = {
   label: string;
 };
 
-/** Spec §8 / §52 primary navigation, plus Digest (spec §16). */
-export const PRIMARY_NAV: NavItem[] = [
-  { href: "/latest", label: "Latest" },
-  { href: "/digest", label: "Digest" },
-  { href: "/map", label: "Map" },
-  { href: "/exercises", label: "Exercises" },
-  { href: "/air-activity", label: "Air Activity" },
-  { href: "/historical-compare", label: "Historical Compare" },
-  { href: "/archive", label: "Archive" },
-  { href: "/sources", label: "Sources" },
-  { href: "/methodology", label: "Methodology" },
+export type NavGroup = {
+  id: string;
+  label: string;
+  items: NavItem[];
+};
+
+/** Public sidebar navigation, grouped (spec §8 / §52, plus Digest §16). */
+export const NAV_GROUPS: NavGroup[] = [
+  {
+    id: "overview",
+    label: "Overview",
+    items: [{ href: "/", label: "Dashboard" }],
+  },
+  {
+    id: "reporting",
+    label: "Reporting",
+    items: [
+      { href: "/latest", label: "Latest" },
+      { href: "/digest", label: "Digest" },
+      { href: "/archive", label: "Archive" },
+    ],
+  },
+  {
+    id: "activity",
+    label: "Activity",
+    items: [
+      { href: "/exercises", label: "Exercises" },
+      { href: "/air-activity", label: "Air Activity" },
+      { href: "/historical-compare", label: "Historical Compare" },
+    ],
+  },
+  {
+    id: "reference",
+    label: "Reference",
+    items: [
+      { href: "/sources", label: "Sources" },
+      { href: "/methodology", label: "Methodology" },
+      { href: "/about", label: "About" },
+    ],
+  },
 ];
 
-export const SECONDARY_NAV: NavItem[] = [
-  { href: "/about", label: "About" },
-];
+export function isActivePath(pathname: string, href: string): boolean {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/** Top-bar title for a public path. Detail pages fall back to their section. */
+export function pageTitleFor(pathname: string): string {
+  if (pathname.startsWith("/events/")) return "Event";
+  // Not in the sidebar (the map belongs on the dashboard), but the route still exists.
+  if (pathname === "/map") return "Map";
+  for (const group of NAV_GROUPS) {
+    for (const item of group.items) {
+      if (isActivePath(pathname, item.href)) return item.label;
+    }
+  }
+  return "Northeast Flank Monitor";
+}
