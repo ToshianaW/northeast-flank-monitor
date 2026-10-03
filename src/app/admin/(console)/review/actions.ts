@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin-session";
+import { CONFIDENCE_LEVEL_VALUES, type ConfidenceLevel } from "@/lib/event-labels";
 import {
   approveEvent,
   mergeEventInto,
@@ -62,7 +63,12 @@ export async function approveEventAction(
   const reviewer = reviewerOrError(formData);
   if ("error" in reviewer) return { error: reviewer.error };
 
-  const result = await approveEvent(eventId, reviewer.name);
+  const confidence = String(formData.get("confidence_level") ?? "");
+  if (!CONFIDENCE_LEVEL_VALUES.includes(confidence as ConfidenceLevel)) {
+    return { error: "Choose a confidence level." };
+  }
+
+  const result = await approveEvent(eventId, reviewer.name, confidence as ConfidenceLevel);
   if (!result.ok) return { error: result.error };
 
   await persistReviewer(reviewer.name);

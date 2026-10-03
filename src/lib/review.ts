@@ -1,6 +1,6 @@
 import "server-only";
 import { getPool } from "@/lib/db";
-import type { EventType, SourceRelationship } from "@/lib/event-labels";
+import type { ConfidenceLevel, EventType, SourceRelationship } from "@/lib/event-labels";
 import {
   isTier4OnlySupport,
   TIER4_ONLY_MESSAGE,
@@ -279,78 +279,87 @@ export async function submitForReview(eventId: string): Promise<
   return { ok: true };
 }
 
+type ApproveResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Approval checks and writes on a client whose transaction the caller owns (tests roll it back).
+ * The reviewer chooses confidence explicitly; it is set in the same update.
+ */
+export async function approveEventInTransaction(
+  client: import("pg").PoolClient,
+  eventId: string,
+  reviewer: string,
+  confidence: ConfidenceLevel,
+): Promise<ApproveResult> {
+  const { rows } = await client.query<Event>(
+    `SELECT * FROM events WHERE event_id = $1 FOR UPDATE`,
+    [eventId],
+  );
+  const event = rows[0];
+  if (!event) return { ok: false, error: "Event not found." };
+  if (
+    event.review_status !== "DRAFT" &&
+    event.review_status !== "PENDING_REVIEW"
+  ) {
+    return { ok: false, error: "Only draft or pending events can be approved." };
+  }
+
+  const { rows: sourceRows } = await client.query<{
+    source_id: string;
+    relationship: SourceRelationship;
+    tier: number | null;
+  }>(
+    `SELECT es.source_id, es.relationship, s.tier
+     FROM event_sources es
+     JOIN sources s ON s.id = es.source_id
+     WHERE es.event_id = $1
+     ORDER BY es.is_primary DESC, es.created_at ASC`,
+    [eventId],
+  );
+  const supports = sourceRows.filter((r) => r.relationship === "SUPPORTS");
+  if (supports.length === 0) {
+    return {
+      ok: false,
+      error:
+        "Cannot publish: this event has no supporting source. Attach at least one source with relationship SUPPORTS.",
+    };
+  }
+  if (isTier4OnlySupport(supports.map((r) => r.tier))) {
+    return { ok: false, error: TIER4_ONLY_MESSAGE };
+  }
+
+  await client.query(
+    `UPDATE events SET review_status = 'PUBLISHED', human_reviewed = true, confidence_level = $2
+     WHERE event_id = $1`,
+    [eventId, confidence],
+  );
+
+  await insertReviewAction(client, {
+    event_id: eventId,
+    action: "APPROVE",
+    reviewer,
+    event_type: event.event_type,
+    source_ids: sourceRows.map((r) => r.source_id),
+    previous_values:
+      event.confidence_level === confidence
+        ? { review_status: event.review_status }
+        : { review_status: event.review_status, confidence_level: event.confidence_level },
+  });
+  return { ok: true };
+}
+
 export async function approveEvent(
   eventId: string,
   reviewer: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+  confidence: ConfidenceLevel,
+): Promise<ApproveResult> {
   if (!UUID_RE.test(eventId)) return { ok: false, error: "Event not found." };
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
-    const { rows } = await client.query<Event>(
-      `SELECT * FROM events WHERE event_id = $1 FOR UPDATE`,
-      [eventId],
-    );
-    const event = rows[0];
-    if (!event) {
-      await client.query("ROLLBACK");
-      return { ok: false, error: "Event not found." };
-    }
-    if (
-      event.review_status !== "DRAFT" &&
-      event.review_status !== "PENDING_REVIEW"
-    ) {
-      await client.query("ROLLBACK");
-      return { ok: false, error: "Only draft or pending events can be approved." };
-    }
-
-    const { rows: supportRows } = await client.query<{ ok: boolean }>(
-      `SELECT EXISTS (
-         SELECT 1 FROM event_sources
-         WHERE event_id = $1 AND relationship = 'SUPPORTS'
-       ) AS ok`,
-      [eventId],
-    );
-    if (!supportRows[0]?.ok) {
-      await client.query("ROLLBACK");
-      return {
-        ok: false,
-        error:
-          "Cannot publish: this event has no supporting source. Attach at least one source with relationship SUPPORTS.",
-      };
-    }
-
-    const { rows: tierRows } = await client.query<{ tier: number | null }>(
-      `SELECT s.tier
-       FROM event_sources es
-       JOIN sources s ON s.id = es.source_id
-       WHERE es.event_id = $1 AND es.relationship = 'SUPPORTS'`,
-      [eventId],
-    );
-    if (isTier4OnlySupport(tierRows.map((r) => r.tier))) {
-      await client.query("ROLLBACK");
-      return { ok: false, error: TIER4_ONLY_MESSAGE };
-    }
-
-    const sourceIds = await listSourceIdsForEvent(eventId);
-    const priorStatus = event.review_status;
-
-    await client.query(
-      `UPDATE events SET review_status = 'PUBLISHED', human_reviewed = true WHERE event_id = $1`,
-      [eventId],
-    );
-
-    await insertReviewAction(client, {
-      event_id: eventId,
-      action: "APPROVE",
-      reviewer,
-      event_type: event.event_type,
-      source_ids: sourceIds,
-      previous_values: { review_status: priorStatus },
-    });
-
-    await client.query("COMMIT");
-    return { ok: true };
+    const result = await approveEventInTransaction(client, eventId, reviewer, confidence);
+    await client.query(result.ok ? "COMMIT" : "ROLLBACK");
+    return result;
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

@@ -47,7 +47,7 @@ test("approveEvent refuses an event whose only SUPPORTS sources are Tier 4", asy
       [eventId, tier4.id],
     );
 
-    const result = await approveEvent(eventId, "test-runner");
+    const result = await approveEvent(eventId, "test-runner", "MODERATE");
     assert.deepEqual(result, { ok: false, error: TIER4_ONLY_MESSAGE });
 
     const { rows: [after] } = await pool.query<{ review_status: string; human_reviewed: boolean; actions: number }>(

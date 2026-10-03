@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   approveEventAction,
   mergeEventAction,
@@ -17,13 +17,19 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/ui/native-select";
-import type { ReviewStatus } from "@/lib/event-labels";
+import {
+  CONFIDENCE_LEVEL_LABELS,
+  CONFIDENCE_LEVEL_VALUES,
+  type ConfidenceLevel,
+  type ReviewStatus,
+} from "@/lib/event-labels";
 
 type MergeTarget = { event_id: string; headline: string; event_date: string };
 
 type Props = {
   eventId: string;
   reviewStatus: ReviewStatus;
+  confidenceLevel: ConfidenceLevel;
   reviewerDefault: string | null;
   mergeTargets: MergeTarget[];
   editHref: string;
@@ -70,9 +76,40 @@ function ActionForm({
   );
 }
 
+/** Confidence must be chosen at approval; prefilled with the event's current value. */
+function ConfidenceField({ defaultValue }: { defaultValue: ConfidenceLevel }) {
+  const [value, setValue] = useState<ConfidenceLevel>(defaultValue);
+  return (
+    <div className="grid gap-2">
+      <Label htmlFor="confidence_level">Confidence</Label>
+      <NativeSelect
+        id="confidence_level"
+        name="confidence_level"
+        required
+        value={value}
+        onChange={(e) => setValue(e.target.value as ConfidenceLevel)}
+        className="w-full"
+      >
+        {CONFIDENCE_LEVEL_VALUES.map((level) => (
+          <NativeSelectOption key={level} value={level}>
+            {CONFIDENCE_LEVEL_LABELS[level]}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
+      {value === "UNVERIFIED" ? (
+        <p role="alert" className="border-l-2 border-teal-blue pl-3 text-xs text-foreground">
+          Unverified events appear only under Contradictions &amp; Unverified
+          Reporting in the daily digest.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function ReviewEventActions({
   eventId,
   reviewStatus,
+  confidenceLevel,
   reviewerDefault,
   mergeTargets,
   editHref,
@@ -108,7 +145,9 @@ export function ReviewEventActions({
             eventId={eventId}
             reviewerDefault={reviewerDefault}
             submitLabel="Approve and publish"
-          />
+          >
+            <ConfidenceField defaultValue={confidenceLevel} />
+          </ActionForm>
 
           <ActionForm
             action={rejectEventAction}

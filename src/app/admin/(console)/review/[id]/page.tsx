@@ -363,6 +363,7 @@ export default async function ReviewEventPage({
           <ReviewEventActions
             eventId={id}
             reviewStatus={event.review_status}
+            confidenceLevel={event.confidence_level}
             reviewerDefault={reviewerDefault}
             mergeTargets={mergeTargets.map((t) => ({
               event_id: t.event_id,
