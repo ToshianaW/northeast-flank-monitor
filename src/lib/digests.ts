@@ -5,7 +5,8 @@ import { hasMalformedMarker, hasMarker } from "@/lib/digest-refs";
 
 /** Spec §16 digest sections, in display order. */
 export const DIGEST_SECTIONS = [
-  { key: "executive_summary", label: "Executive Summary" },
+  // The short summary shown first on the digest page and on the homepage.
+  { key: "executive_summary", label: "Summary" },
   { key: "belarus", label: "Belarus" },
   { key: "kaliningrad", label: "Kaliningrad" },
   { key: "nato_northeast_flank", label: "NATO Northeast Flank" },

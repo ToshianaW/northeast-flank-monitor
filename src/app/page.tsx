@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { connection } from "next/server";
-import { formatDigestDate } from "@/components/digest-view";
+import { formatDigestDateShort } from "@/components/digest-view";
 import { EventLogEntry } from "@/components/event-log-entry";
 import { stripDigestRefs } from "@/lib/digest-refs";
 import { getLatestPublishedDigest } from "@/lib/digests";
@@ -40,11 +40,10 @@ export default async function HomePage() {
     listPublishedEvents(3),
     getLatestPublishedDigest(),
   ]);
-  // First paragraph of the Executive Summary as the homepage excerpt.
-  const firstParagraph = digest?.sections.executive_summary
-    .split(/\n\s*\n/)
-    .find((p) => p.trim() !== "");
-  const digestExcerpt = firstParagraph ? stripDigestRefs(firstParagraph) : undefined;
+  // The latest PUBLISHED digest's summary, markers stripped (drafts are never read here).
+  const digestSummary = digest
+    ? stripDigestRefs(digest.sections.executive_summary).trim()
+    : "";
 
   const snapshotRows: Array<{ label: string; value: string }> = [
     { label: "Verified events", value: String(counts.verifiedEvents) },
@@ -89,7 +88,7 @@ export default async function HomePage() {
           {digest ? (
             <>
               <p className="font-mono text-xs text-text-secondary">
-                {formatDigestDate(digest.digest_date)}
+                {formatDigestDateShort(digest.digest_date)}
               </p>
               <h3 className="mt-1 text-base font-medium">
                 <Link
@@ -99,16 +98,16 @@ export default async function HomePage() {
                   {digest.title}
                 </Link>
               </h3>
-              {digestExcerpt ? (
+              {digestSummary ? (
                 <p className="mt-2 max-w-4xl text-base leading-relaxed whitespace-pre-line text-text-secondary">
-                  {digestExcerpt}
+                  {digestSummary}
                 </p>
               ) : null}
               <Link
                 href={`/digest/${digest.digest_date}`}
                 className="mt-4 inline-block text-sm link"
               >
-                Read full digest →
+                Read the full digest
               </Link>
             </>
           ) : (

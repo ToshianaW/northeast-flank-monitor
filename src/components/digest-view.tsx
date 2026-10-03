@@ -13,6 +13,13 @@ export function formatDigestDate(date: string): string {
   return `${d} ${MONTHS[Number(m) - 1]} ${y}`;
 }
 
+/** "2026-10-01" → "1 Oct 2026" */
+export function formatDigestDateShort(date: string): string {
+  const [y, m, d] = date.split("-");
+  const month = MONTHS[Number(m) - 1];
+  return `${Number(d)} ${month[0]}${month.slice(1).toLowerCase()} ${y}`;
+}
+
 /** Digest-wide citation numbers, assigned in reading order to events that are still published. */
 type Citations = {
   numberFor: (id: string) => number | null;
