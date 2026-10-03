@@ -53,6 +53,19 @@ npm run collect
 - Prints one summary line per source; exits with code 1 if any source failed.
 - GDELT data is used under its terms, which require citing the GDELT Project with a link to https://www.gdeltproject.org/.
 
+## Daily digest
+
+Drafts the digest for one UTC day (default: yesterday) from PUBLISHED events only, and stores it as a DRAFT for review in `/admin/digests`. The model sees each event's headline, summary, date, type, actor, country, location, confidence, contradiction flag, and source names with tier and relationship; never excerpts, internal notes, URLs, or article text.
+
+```bash
+npm run digest -- --date 2026-10-01 --dry-run   # prints each sentence with the events it cites; writes nothing
+npm run digest -- --date 2026-10-01             # writes a DRAFT if no digest exists for that date
+```
+
+- `--replace-draft` replaces an unedited AI draft; add `--force` (local only) for an edited or manual draft. A published digest is never replaced.
+- `--max-usd` (default 0.25) is checked against the worst case before the call.
+- Needs `DATABASE_URL_POOLED` and `ANTHROPIC_API_KEY`.
+
 ## Progress
 
 Roadmap: `docs/mvp-plan.md` §4. Decisions that override the plan: `docs/decisions.md`.
@@ -77,8 +90,14 @@ Roadmap: `docs/mvp-plan.md` §4. Decisions that override the plan: `docs/decisio
 | Step | What exists |
 | --- | --- |
 | 2.1 | Source collector (`npm run collect`): 9 feeds, the Polish MoD news listing, and GDELT into the private `raw_documents` table (migration 0003); robots.txt, rate limits, URL and content dedup, keyword filter for broad feeds, `no_ai_processing` and `lead_only` flags |
+| 2.2 | Claude extraction (`npm run extract`): eligible `raw_documents` rows to validated DRAFT events (UNVERIFIED, one SUPPORTS source) for human review; predictive-language and excerpt checks; spend cap; `extraction_runs` log (migration 0004) |
+| 2.3 | Duplicate suggestions (`npm run dedup`): same type and country within 2 days, URL match or headline trigram similarity, one Haiku call for borderline pairs; shown on the review page with a pre-selected merge target; never merged automatically (migration 0005) |
+| 2.4 | Not built: no automated contradiction detection. `contradiction_flag`, notes, and CONTRADICTS sources are set by the reviewer |
+| 2.5 | Partly: tier, type, and reliability come from the source registry (step 1.3), and the reviewer chooses confidence explicitly at approval. No automated classification or confidence assessment |
+| 2.6 | Twice-daily pipeline on GitHub Actions (`.github/workflows/daily.yml`): collect, extract, dedup at 06:00 and 18:00 UTC; manual dry runs; counts-only logs |
+| 2.7 | Claude-drafted daily digest (`npm run digest`): PUBLISHED events for one UTC day into a DRAFT digest; every sentence cites its events (`[ref …]` markers, numbered links on the public page); code checks for unknown or missing references, banned phrases, section names, and placement of unverified events; `.github/workflows/digest.yml` at 05:00 UTC |
 
-**Next:** step 2.2, Claude extraction of candidate events from `raw_documents` into the review queue.
+**Next:** steps 2.4 and 2.5 (automated contradiction detection, source classification and confidence assessment).
 
 ## License
 

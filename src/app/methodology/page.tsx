@@ -477,9 +477,15 @@ export default function MethodologyPage() {
         <Section id="status" number={n("status")} title={t("status")}>
           <Subhead>Now</Subhead>
           <ul className="list-disc pl-5">
-            <li>Events are entered manually and reviewed by a person before publication.</li>
+            <li>
+              Events are extracted from collected reporting with AI assistance or
+              entered manually, and a person reviews every event before publication.
+            </li>
             <li>Sources are kept in a registry with tier, type, and reliability.</li>
-            <li>The daily digest is compiled manually.</li>
+            <li>
+              The daily digest is drafted with AI assistance from published events,
+              then edited and approved by a person.
+            </li>
             <li>Published events can be browsed in Latest and the Archive.</li>
           </ul>
           <Subhead>
@@ -488,7 +494,6 @@ export default function MethodologyPage() {
           </Subhead>
           <ul className="list-disc pl-5">
             <li>Automated collection from a curated set of sources</li>
-            <li>AI-assisted event extraction and daily digests, with human review before publication</li>
             <li>Interactive regional map</li>
             <li>Exercise tracker and air activity page</li>
             <li>Historical comparison</li>
@@ -496,21 +501,15 @@ export default function MethodologyPage() {
             <li>Open data: downloadable datasets and a read-only API</li>
           </ul>
           <div className="border border-border bg-surface-dark px-4 py-3">
-            <p className="meta-label mb-2">
-              Planned AI disclosure
-              <Planned />
-            </p>
-            <p className="text-xs text-text-muted">
-              AI is not used on the site today. When AI assistance is
-              introduced, this is the procedure it will follow:
-            </p>
-            <div className="mt-3 grid gap-2">
+            <p className="meta-label mb-2">AI disclosure</p>
+            <div className="grid gap-2">
               <p>
                 Digests are compiled every 24 hours with AI assistance under a
-                fixed procedure involving collection of recent reporting,
-                structured event extraction, deduplication, contradiction
-                detection, source classification, historical comparison, and
-                editorial review.
+                fixed procedure: collection of recent reporting, structured
+                event extraction, duplicate detection, a curated source registry with tier and reliability
+                labels assigned by the reviewer, and editorial review. A digest
+                is drafted only from events a reviewer has already published,
+                and each sentence links to the events it rests on.
               </p>
               <p>
                 AI does not independently determine whether claims are true.
