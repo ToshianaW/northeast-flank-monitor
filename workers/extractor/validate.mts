@@ -1,3 +1,4 @@
+import { PREDICTIVE } from "@/lib/banned-phrases";
 import type { ExtractedEvent } from "./prompt.mjs";
 
 export const MAX_EXCERPT_WORDS = 20;
@@ -16,19 +17,7 @@ function normalize(text: string): string {
     .toLowerCase();
 }
 
-// Dropped outright: predictive or intent-reading phrases (project rule: no predictive language).
-const PREDICTIVE = [
-  /\bimminent\b/i,
-  /\bwill likely\b/i,
-  /\blikely to (attack|invade|escalate|strike)\b/i,
-  /\b(could|may|might) lead to\b/i,
-  /\bprepar(e|es|ing) (to|for an?) (attack|invasion|invade|war)\b/i,
-  /\bin preparation for (an? )?(attack|invasion|war)\b/i,
-  /\bwar is coming\b/i,
-  /\binvasion is (likely|imminent|coming)\b/i,
-  /\bsignal(s|ed|led|ing|ling)? that\b/i,
-  /\bsignal(s|ed|led|ing|ling)? (an? |its |their )?intent(ion)?s?\b/i,
-];
+// Dropped outright: PREDICTIVE (src/lib/banned-phrases.ts), shared with the digest generator.
 // Any other use of "signal" is kept but flagged for the reviewer.
 const SIGNAL_WORD = /\bsignal(s|ed|led|ing|ling)?\b/i;
 // Decimal coordinate pairs, degree marks, or MGRS-style grid references.

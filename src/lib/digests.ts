@@ -1,5 +1,7 @@
 import "server-only";
+import { findBannedPhrase } from "@/lib/banned-phrases";
 import { getPool } from "@/lib/db";
+import { hasMalformedMarker, hasMarker } from "@/lib/digest-refs";
 
 /** Spec §16 digest sections, in display order. */
 export const DIGEST_SECTIONS = [
@@ -28,6 +30,18 @@ export type DigestStatus = (typeof DIGEST_STATUS_VALUES)[number];
 
 export const DEFAULT_DIGEST_TITLE = "Northeast Flank Daily Digest";
 
+/** Written by code (not the model) into every AI-drafted digest until historical comparison exists. */
+export const HISTORICAL_CONTEXT_LINE =
+  "No historical comparison is available yet. The historical dataset is still being built.";
+
+/** Stored as sections._meta on AI-drafted digests; manual digests have none. */
+export type DigestMeta = {
+  generator: "ai";
+  model: string;
+  prompt_version: string;
+  generated_at: string;
+};
+
 export type Digest = {
   id: string;
   /** YYYY-MM-DD, read as text so no time zone shifts the day. */
@@ -36,6 +50,7 @@ export type Digest = {
   sections: DigestSections;
   review_status: DigestStatus;
   updated_at: Date;
+  meta: DigestMeta | null;
 };
 
 export type DigestListItem = Pick<Digest, "id" | "digest_date" | "title" | "review_status">;
@@ -46,7 +61,7 @@ export type DigestFormValues = Record<DigestField, string>;
 
 export type DigestFormErrors = Partial<Record<DigestField, string>>;
 
-export type DigestInput = Omit<Digest, "id" | "updated_at">;
+export type DigestInput = Omit<Digest, "id" | "updated_at" | "meta">;
 
 export type DigestValidationResult =
   | { ok: true; input: DigestInput }
@@ -79,8 +94,15 @@ function normalizeSections(raw: unknown): DigestSections {
   ) as DigestSections;
 }
 
+function metaFromSections(raw: unknown): DigestMeta | null {
+  const meta = raw && typeof raw === "object" ? (raw as Record<string, unknown>)._meta : null;
+  return meta && typeof meta === "object" && (meta as DigestMeta).generator === "ai"
+    ? (meta as DigestMeta)
+    : null;
+}
+
 function rowToDigest(row: Digest): Digest {
-  return { ...row, sections: normalizeSections(row.sections) };
+  return { ...row, sections: normalizeSections(row.sections), meta: metaFromSections(row.sections) };
 }
 
 export function emptyDigestFormValues(): DigestFormValues {
@@ -137,6 +159,10 @@ export function validateDigest(values: DigestFormValues): DigestValidationResult
     if (text.length > SECTION_MAX_LENGTH) {
       errors[key] = `Keep ${label} under ${SECTION_MAX_LENGTH.toLocaleString("en-US")} characters.`;
     }
+    const damaged = text.split("\n").findIndex(hasMalformedMarker);
+    if (damaged !== -1) {
+      errors[key] = `Line ${damaged + 1} has a damaged [ref …] marker. Restore it or delete the whole sentence.`;
+    }
     sections[key] = text;
   }
 
@@ -151,6 +177,48 @@ export function validateDigest(values: DigestFormValues): DigestValidationResult
       review_status: values.review_status as DigestStatus,
     },
   };
+}
+
+/**
+ * Extra rules for AI-drafted digests: every sentence keeps a [ref …] marker (except the fixed
+ * Historical Context line) and no banned phrase is added while editing. Blank lines are allowed.
+ */
+export function checkAiDigestSections(sections: DigestSections): DigestFormErrors {
+  const errors: DigestFormErrors = {};
+  for (const { key } of DIGEST_SECTIONS) {
+    const lines = sections[key].split("\n");
+    const unreferenced = lines.findIndex(
+      (line) => line.trim() !== "" && line.trim() !== HISTORICAL_CONTEXT_LINE && !hasMarker(line),
+    );
+    if (unreferenced !== -1) {
+      errors[key] = `Line ${unreferenced + 1} has no [ref …] marker. Every sentence in an AI-drafted digest must cite its events.`;
+      continue;
+    }
+    const banned = findBannedPhrase(sections[key]);
+    if (banned) errors[key] = `Remove the predictive phrase "${banned}".`;
+  }
+  return errors;
+}
+
+/** The ids among `ids` that are not PUBLISHED events (unknown, or since unpublished). */
+export async function findUnpublishedEventIds(ids: readonly string[]): Promise<string[]> {
+  if (ids.length === 0) return [];
+  const published = await listPublishedEventHeadlines(ids);
+  return ids.filter((id) => !published.has(id));
+}
+
+/** Headlines of the PUBLISHED events among `ids`, keyed by event id. */
+export async function listPublishedEventHeadlines(
+  ids: readonly string[],
+): Promise<Map<string, string>> {
+  const valid = ids.filter((id) => UUID_RE.test(id));
+  if (valid.length === 0) return new Map();
+  const { rows } = await getPool().query<{ event_id: string; headline: string }>(
+    `SELECT event_id, headline FROM events
+     WHERE event_id = ANY($1::uuid[]) AND review_status = 'PUBLISHED'`,
+    [valid],
+  );
+  return new Map(rows.map((r) => [r.event_id, r.headline]));
 }
 
 // ---------------------------------------------------------------------------
@@ -188,8 +256,12 @@ export async function createDigest(input: DigestInput): Promise<string> {
 export async function updateDigest(id: string, input: DigestInput): Promise<boolean> {
   if (!UUID_RE.test(id)) return false;
   const { rowCount } = await getPool().query(
+    // Keeps _meta, which the edit form doesn't carry, so an AI digest stays marked as one.
     `UPDATE daily_digests
-     SET digest_date = $1, title = $2, sections = $3, review_status = $4
+     SET digest_date = $1, title = $2, review_status = $4,
+         sections = CASE WHEN sections ? '_meta'
+                         THEN jsonb_build_object('_meta', sections->'_meta') || $3::jsonb
+                         ELSE $3::jsonb END
      WHERE id = $5`,
     [input.digest_date, input.title, JSON.stringify(input.sections), input.review_status, id],
   );
