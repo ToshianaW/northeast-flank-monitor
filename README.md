@@ -85,15 +85,15 @@ Roadmap: `docs/mvp-plan.md` §4. Decisions that override the plan: `docs/decisio
 | 1.9 | Public `/archive` with date, country, actor, type, confidence, and source-type filters |
 | 1.10 | Public `/methodology` and `/about` pages |
 
-**Phase 2 — Initial automation: in progress**
+**Phase 2 — Initial automation: complete** (steps 2.4 and 2.5 are covered by human review; decisions #12 and #13)
 
 | Step | What exists |
 | --- | --- |
 | 2.1 | Source collector (`npm run collect`): 9 feeds, the Polish MoD news listing, and GDELT into the private `raw_documents` table (migration 0003); robots.txt, rate limits, URL and content dedup, keyword filter for broad feeds, `no_ai_processing` and `lead_only` flags |
 | 2.2 | Claude extraction (`npm run extract`): eligible `raw_documents` rows to validated DRAFT events (UNVERIFIED, one SUPPORTS source) for human review; predictive-language and excerpt checks; spend cap; `extraction_runs` log (migration 0004) |
 | 2.3 | Duplicate suggestions (`npm run dedup`): same type and country within 2 days, URL match or headline trigram similarity, one Haiku call for borderline pairs; shown on the review page with a pre-selected merge target; never merged automatically (migration 0005) |
-| 2.4 | Not built: no automated contradiction detection. `contradiction_flag`, notes, and CONTRADICTS sources are set by the reviewer |
-| 2.5 | Partly: tier, type, and reliability come from the source registry (step 1.3), and the reviewer chooses confidence explicitly at approval. No automated classification or confidence assessment |
+| 2.4 | Covered by human review (decision #12): `contradiction_flag`, notes, and CONTRADICTS sources are set by the reviewer; no automated contradiction detection |
+| 2.5 | Covered by human review (decision #13): tier, type, and reliability come from the source registry (step 1.3); the reviewer chooses confidence at approval, with a rule-based suggestion from the attached sources (no AI call) |
 | 2.6 | Twice-daily pipeline on GitHub Actions (`.github/workflows/daily.yml`): collect, extract, dedup at 06:00 and 18:00 UTC; manual dry runs; counts-only logs |
 | 2.7 | Claude-drafted daily digest (`npm run digest`): PUBLISHED events for one UTC day into a DRAFT digest; every sentence cites its events (`[ref …]` markers, numbered links on the public page); code checks for unknown or missing references, banned phrases, section names, and placement of unverified events; `.github/workflows/digest.yml` at 05:00 UTC. The digest opens with a short Summary (at most 2 sentences, 45 words) that leaves out unverified and contradicted events; code adds a sentence pointing to them |
 
@@ -105,7 +105,7 @@ Roadmap: `docs/mvp-plan.md` §4. Decisions that override the plan: `docs/decisio
 | 3.2 | Exercise tracker: admin list/create/edit with all spec §17 fields, attached sources, and linking published events; reviewer name on every save, logged in the append-only `exercise_actions` table (migration 0007). Public `/exercises` grouped by status and `/exercises/[id]` with announced and observed dates; only published exercises are public, and a published exercise needs a source. Dashboard panel lists active, extended, and concluding exercises. Statuses never change on their own when a date passes |
 | 3.3 | Post-exercise reset widget on the exercise page: personnel, equipment, temporary infrastructure, follow-on activity, and overall status. Unknown shows as "not enough open-source evidence" in a neutral tone. A reset status other than Unknown needs evidence (a source with an excerpt, or a linked published event dated on or after the exercise's end); FULL_RESET also needs all three dimensions returned or removed. Enforced in the form and by database triggers |
 
-**Next:** steps 2.4 and 2.5 (automated contradiction detection, source classification and confidence assessment), then step 3.1 (map).
+**Next:** step 3.1 (map).
 
 ## License
 
