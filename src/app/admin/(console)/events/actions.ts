@@ -15,11 +15,15 @@ import {
   type EventSourceFormRow,
   type EventWritePayload,
 } from "@/lib/events";
+import { exerciseConstraintMessage } from "@/lib/exercise-rules";
 import { logEditReviewAction, payloadHasSupportsSource } from "@/lib/review";
 import {
   requireReviewerName,
   reviewerFromForm,
 } from "@/lib/reviewer";
+
+const LINKED_EXERCISE_EVIDENCE_ERROR =
+  "This event is the last evidence for its linked exercise's reset status. Set those statuses back to Unknown first, or keep the exercise link and date.";
 
 export type EventFormState = {
   values?: EventFormValues;
@@ -72,6 +76,14 @@ async function saveEvent(
   try {
     await write(result.payload);
   } catch (error) {
+    // Changing the linked exercise or the date can remove an exercise's last reset
+    // evidence (migration 0007).
+    if (exerciseConstraintMessage(error)) {
+      return {
+        ...stateFromForm(formData),
+        formError: LINKED_EXERCISE_EVIDENCE_ERROR,
+      };
+    }
     console.error("Saving event failed", error);
     return {
       ...stateFromForm(formData),

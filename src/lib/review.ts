@@ -429,9 +429,10 @@ export async function rejectEvent(
 export async function logEditReviewAction(
   eventBefore: Event,
   reviewer: string,
+  db: import("pg").Pool | import("pg").PoolClient = getPool(),
 ): Promise<void> {
   const sourceIds = await listSourceIdsForEvent(eventBefore.event_id);
-  await getPool().query(
+  await db.query(
     `INSERT INTO review_actions
        (event_id, action, reviewer, event_type, source_ids, previous_values)
      VALUES ($1, 'EDIT', $2, $3, $4, $5)`,

@@ -18,3 +18,14 @@ export function requireReviewerName(name: string): string | null {
   if (name.length > 120) return "Keep the reviewer name under 120 characters.";
   return null;
 }
+
+/** Remembers the reviewer name for the next form (same cookie the review queue sets). */
+export async function rememberReviewerName(name: string): Promise<void> {
+  const store = await cookies();
+  store.set(REVIEWER_NAME_COOKIE, name, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 90,
+  });
+}

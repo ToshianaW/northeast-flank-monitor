@@ -73,7 +73,7 @@ export type PublicEventSource = {
   excerpt: string | null;
 };
 
-const PUBLIC_EVENT_COLUMNS = PUBLIC_EVENT_FIELDS.join(", ");
+export const PUBLIC_EVENT_COLUMNS = PUBLIC_EVENT_FIELDS.join(", ");
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -148,7 +148,9 @@ export async function getSnapshotCounts(): Promise<SnapshotCounts> {
          WHERE event_type IN ('RUSSIAN_DEPLOYMENT', 'BELARUSIAN_DEPLOYMENT')
        )::int AS deployments,
        count(*) FILTER (WHERE event_type = 'BORDER_INCIDENT')::int AS border,
-       (SELECT count(*)::int FROM exercises WHERE exercise_status = 'ACTIVE') AS exercises
+       (SELECT count(*)::int FROM exercises
+          WHERE review_status = 'PUBLISHED'
+            AND exercise_status IN ('ACTIVE', 'EXTENDED', 'CONCLUDING')) AS exercises
      FROM events
      WHERE review_status = 'PUBLISHED'
        AND event_date >= ((now() AT TIME ZONE 'UTC') - interval '24 hours')::date`,
