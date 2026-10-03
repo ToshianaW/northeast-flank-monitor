@@ -368,12 +368,12 @@ export function EventForm({
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="grid gap-2">
             <Label htmlFor="first_reported">First reported</Label>
-            <Input {...fieldProps("first_reported")} type="datetime-local" />
+            <Input {...fieldProps("first_reported")} type="datetime-local" step={1} />
             <FieldError id="first_reported-error" message={errors.first_reported} />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="last_updated">Last updated</Label>
-            <Input {...fieldProps("last_updated")} type="datetime-local" />
+            <Input {...fieldProps("last_updated")} type="datetime-local" step={1} />
             <FieldError id="last_updated-error" message={errors.last_updated} />
           </div>
         </div>

@@ -292,7 +292,8 @@ function formatDate(d: Date | null): string {
 function formatDateTimeLocal(d: Date | null): string {
   if (!d) return "";
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  // Seconds included (inputs use step=1) so saving the edit form doesn't truncate the stored time.
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 export function eventFormValuesFromEvent(event: Event): EventFormValues {
