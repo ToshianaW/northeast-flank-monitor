@@ -36,6 +36,9 @@ const FIX_HINTS: Record<CheckCode, string> = {
     "An event with confidence_level UNVERIFIED or contradiction_flag true is cited outside contradictions_unverified.",
   DUPLICATE_SENTENCE:
     "A sentence repeats another sentence word for word, in the same section or in another topical section.",
+  SUMMARY_MISSING:
+    "executive_summary is missing. Write it whenever at least one event is not UNVERIFIED and not contradicted.",
+  SUMMARY_LENGTH: "executive_summary is too long. Use one or two sentences and at most 45 words in total.",
   QUALIFIER:
     "A sentence quotes part of an event summary's quoted passages without the others. Put every quoted passage from that summary in the same sentence, or paraphrase the whole statement without quotation marks and keep the qualifier.",
 };

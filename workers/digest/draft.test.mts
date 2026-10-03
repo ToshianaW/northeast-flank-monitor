@@ -26,7 +26,10 @@ const unknownRef: DigestOutput = {
   sections: [{ key: "belarus", sentences: [{ text: "Belarus held an exercise.", event_refs: ["E9"] }] }],
 };
 const passing: DigestOutput = {
-  sections: [{ key: "belarus", sentences: [{ text: "Belarus held an exercise.", event_refs: ["E1"] }] }],
+  sections: [
+    { key: "executive_summary", sentences: [{ text: "Belarus held an exercise.", event_refs: ["E1"] }] },
+    { key: "belarus", sentences: [{ text: "The Belarusian Ministry of Defence said it held an exercise.", event_refs: ["E1"] }] },
+  ],
 };
 
 /** Returns the scripted replies in order and records the messages of each call. */

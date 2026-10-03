@@ -80,7 +80,6 @@ let eventCount = 0;
 let sentenceCount = 0;
 let sectionCount = 0;
 let attempts = 0;
-let droppedSummary = 0;
 /** The check code that triggered the retry, if there was one. */
 let retriedFor = "";
 
@@ -214,9 +213,6 @@ async function run(): Promise<never> {
   retriedFor = draft.failures[0]?.code ?? "";
   sectionCount = checked.sections.length;
   sentenceCount = checked.sentenceCount;
-  droppedSummary = checked.droppedSummarySentences;
-  // Dropped text is shown locally only; CI logs the count.
-  if (!ci) for (const text of checked.droppedSummaryTexts) console.log(`dropped Executive Summary sentence (repeats a topical one): ${text}`);
 
   // 6. Dry run: print each sentence with the headline and summary of every event it cites (local only).
   if (dryRun) {
@@ -228,7 +224,7 @@ async function run(): Promise<never> {
         console.log(`\n## ${labels.get(section.key)}`);
         for (const [i, sentence] of section.sentences.entries()) {
           console.log(`\n${i + 1}. ${sentence.text}`);
-          if (sentence.aliases.length === 0) console.log("   (fixed text written by code, not the model)");
+          if (sentence.byCode) console.log("   (fixed text written by code, not the model)");
           for (const alias of sentence.aliases) {
             const e = byAlias.get(alias)!;
             console.log(`   ↳ ${alias} [${e.confidence_level}${e.contradiction_flag ? ", contradicted" : ""}] ${e.headline}`);
@@ -301,7 +297,7 @@ const failed =
 
 // Counts and codes only: the repository and its Actions logs are public.
 console.log(
-  `digest ${date} · ${result.status}${result.detail ? ` (${result.detail})` : ""} · events ${eventCount} · sections ${sectionCount} · sentences ${sentenceCount} · summary sentences dropped ${droppedSummary} · attempts ${attempts}${retriedFor ? ` (retried for ${retriedFor})` : ""} · cost $${costUsd.toFixed(4)} (cap $${maxUsd.toFixed(2)}) · ${model} · ${PROMPT_VERSION}`,
+  `digest ${date} · ${result.status}${result.detail ? ` (${result.detail})` : ""} · events ${eventCount} · sections ${sectionCount} · sentences ${sentenceCount} · attempts ${attempts}${retriedFor ? ` (retried for ${retriedFor})` : ""} · cost $${costUsd.toFixed(4)} (cap $${maxUsd.toFixed(2)}) · ${model} · ${PROMPT_VERSION}`,
 );
 if (ci) {
   setOutput("completed", "true");
@@ -311,7 +307,6 @@ if (ci) {
   setOutput("events", eventCount);
   setOutput("sections", sectionCount);
   setOutput("sentences", sentenceCount);
-  setOutput("summary_sentences_dropped", droppedSummary);
   setOutput("attempts", attempts);
   setOutput("retried_for", retriedFor);
   setOutput("cost_usd", costUsd.toFixed(4));

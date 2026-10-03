@@ -15,7 +15,9 @@ export type CheckCode =
   | "BANNED_PHRASE"
   | "PLACEMENT"
   | "DUPLICATE_SENTENCE"
-  | "QUALIFIER";
+  | "QUALIFIER"
+  | "SUMMARY_MISSING"
+  | "SUMMARY_LENGTH";
 
 const SUMMARY: DigestSectionKey = "executive_summary";
 
@@ -35,30 +37,22 @@ function sentenceKey(text: string): string {
   return text.toLowerCase().replace(/\s+/g, " ").replace(/[.!?"'”’\s]+$/, "").trim();
 }
 
-// Attribution doesn't make two sentences different: "According to Euronews, ...", "ERR reported that ...".
-const ATTRIBUTION = [
-  /\b(according to|as reported by|reported by|citing)\s+[^,.;]+[,;]?/gi,
-  /^[^,.;]{1,60}?\b(reported|said|stated|announced)\s+(that\s+)?/i,
-];
+/** The summary's length limits (prompt v5). */
+export const SUMMARY_MAX_SENTENCES = 2;
+export const SUMMARY_MAX_WORDS = 45;
 
-function contentWords(text: string): Set<string> {
-  let t = foldQuotes(text);
-  for (const re of ATTRIBUTION) t = t.replace(re, " ");
-  return new Set(t.split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 3));
+function wordCount(text: string): number {
+  return text.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
 }
 
-/** Share of the shorter sentence's content words that also appear in the other one. */
-export const NEAR_DUPLICATE_OVERLAP = 0.8;
-
-export function isNearDuplicate(a: string, b: string): boolean {
-  if (sentenceKey(a) === sentenceKey(b)) return true;
-  const wa = contentWords(a);
-  const wb = contentWords(b);
-  const smaller = Math.min(wa.size, wb.size);
-  if (smaller < 4) return false;
-  let shared = 0;
-  for (const w of wa) if (wb.has(w)) shared++;
-  return shared / smaller >= NEAR_DUPLICATE_OVERLAP;
+/**
+ * Appended by code (never the model) when the day has UNVERIFIED or contradicted events, which
+ * stay out of the model-written summary. Its marker lists those events so the links work.
+ */
+export function unverifiedNote(count: number): string {
+  return count === 1
+    ? "1 other reported item is listed in the full digest under Contradictions & Unverified Reporting."
+    : `${count} other reported items are listed in the full digest under Contradictions & Unverified Reporting.`;
 }
 
 export type AliasedEvent = {
@@ -74,8 +68,8 @@ export type AliasedEvent = {
   quotes: string[];
 };
 
-/** eventIds is empty only for the code-written Historical Context line. */
-export type CheckedSentence = { text: string; eventIds: string[]; aliases: string[] };
+/** byCode marks text written by code, not the model (Historical Context, the unverified note). */
+export type CheckedSentence = { text: string; eventIds: string[]; aliases: string[]; byCode?: true };
 
 export type CheckFailure = {
   ok: false;
@@ -90,16 +84,13 @@ export type CheckResult =
       ok: true;
       /**
        * In DIGEST_SECTIONS order; model sections without sentences are absent. Always includes
-       * historical_context with the fixed HISTORICAL_CONTEXT_LINE.
+       * historical_context with the fixed HISTORICAL_CONTEXT_LINE, and the summary ends with the
+       * unverified note when the day has restricted events.
        */
       sections: Array<{ key: DigestSectionKey; sentences: CheckedSentence[] }>;
-      /** Model-written sentences kept. */
+      /** Model-written sentences. */
       sentenceCount: number;
       citedEvents: number;
-      /** Executive Summary sentences dropped as copies or near-copies of a topical sentence. */
-      droppedSummarySentences: number;
-      /** Their text. Local output only: CI logs only the count. */
-      droppedSummaryTexts: string[];
     }
   | CheckFailure;
 
@@ -108,6 +99,7 @@ export function checkDigestOutput(output: DigestOutput, events: readonly Aliased
   const seenKeys = new Set<string>();
   const checked = new Map<DigestSectionKey, CheckedSentence[]>();
   const positions = new Map<CheckedSentence, string>();
+  let summaryPosition = "output";
   const fail = (code: CheckCode, where: string, ...rejected: string[]): CheckFailure => ({
     ok: false,
     code,
@@ -126,6 +118,7 @@ export function checkDigestOutput(output: DigestOutput, events: readonly Aliased
     }
     seenKeys.add(section.key);
     const key = section.key as DigestSectionKey;
+    if (key === SUMMARY) summaryPosition = where();
 
     const sentences: CheckedSentence[] = [];
     for (const [ni, sentence] of section.sentences.entries()) {
@@ -149,7 +142,17 @@ export function checkDigestOutput(output: DigestOutput, events: readonly Aliased
     if (sentences.length > 0) checked.set(key, sentences);
   }
 
-  // 2. Exact repeats within a section, or between two topical sections, fail.
+  // 2. The summary: required whenever an allowed event exists; one or two sentences, 45 words.
+  // It may overlap topical sentences.
+  const summary = checked.get(SUMMARY) ?? [];
+  if (events.some((e) => !e.restricted) && summary.length === 0) return fail("SUMMARY_MISSING", summaryPosition);
+  const words = summary.reduce((n, s) => n + wordCount(s.text), 0);
+  if (summary.length > SUMMARY_MAX_SENTENCES || words > SUMMARY_MAX_WORDS) {
+    return fail("SUMMARY_LENGTH", summaryPosition, ...summary.map((s) => s.text));
+  }
+
+  // 3. Exact repeats within a section, or between two topical sections, fail. The summary is
+  // exempt across sections.
   const topicalSeen = new Map<string, CheckedSentence>();
   for (const [key, sentences] of checked) {
     const inSection = new Map<string, CheckedSentence>();
@@ -162,24 +165,25 @@ export function checkDigestOutput(output: DigestOutput, events: readonly Aliased
     }
   }
 
-  // 3. An Executive Summary sentence that copies or nearly copies a topical sentence is dropped.
-  let droppedSummarySentences = 0;
-  let droppedSummaryTexts: string[] = [];
-  const summary = checked.get(SUMMARY);
-  if (summary) {
-    const topical = [...checked].filter(([k]) => k !== SUMMARY).flatMap(([, s]) => s);
-    const kept = summary.filter((s) => !topical.some((t) => isNearDuplicate(s.text, t.text)));
-    droppedSummarySentences = summary.length - kept.length;
-    droppedSummaryTexts = summary.filter((s) => !kept.includes(s)).map((s) => s.text);
-    if (kept.length > 0) checked.set(SUMMARY, kept);
-    else checked.delete(SUMMARY);
-  }
-
   const cited = new Set([...checked.values()].flat().flatMap((s) => s.eventIds));
   const sentenceCount = [...checked.values()].reduce((n, s) => n + s.length, 0);
-  checked.set(CODE_SECTION, [{ text: HISTORICAL_CONTEXT_LINE, eventIds: [], aliases: [] }]);
+
+  // 4. Code-written text.
+  const restricted = events.filter((e) => e.restricted);
+  if (restricted.length > 0) {
+    checked.set(SUMMARY, [
+      ...summary,
+      {
+        text: unverifiedNote(restricted.length),
+        eventIds: restricted.map((e) => e.eventId),
+        aliases: restricted.map((e) => e.alias),
+        byCode: true,
+      },
+    ]);
+  }
+  checked.set(CODE_SECTION, [{ text: HISTORICAL_CONTEXT_LINE, eventIds: [], aliases: [], byCode: true }]);
   const sections = SECTION_KEYS.filter((k) => checked.has(k)).map((key) => ({ key, sentences: checked.get(key)! }));
-  return { ok: true, sections, sentenceCount, citedEvents: cited.size, droppedSummarySentences, droppedSummaryTexts };
+  return { ok: true, sections, sentenceCount, citedEvents: cited.size };
 }
 
 /** What may be printed about a failed check. CI gets the code and position only, never text. */
