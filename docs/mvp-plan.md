@@ -12,7 +12,7 @@ Build the complete product described in the spec: monitoring site + structured d
 
 | Area | In scope |
 | --- | --- |
-| Public site | Latest, Map, Exercises, Air Activity, Historical Compare, Archive, Sources, Methodology, About; homepage panels (regional activity, 24h snapshot, map, latest events, historical signal, active exercises, 30-day trend, post-exercise reset) |
+| Public site | Latest, Map, Exercises, Air Activity, Historical Comparison (`/historical`, with a side-by-side view at `/historical/compare`), Archive, Sources, Methodology, About; homepage panels (regional activity, 24h snapshot, map, latest events, historical signal, active exercises, 30-day trend, post-exercise reset) |
 | Data | Full event model, 25-type taxonomy, exercises + reset dimensions, source registry + M2M, historical corpus (Aug 2020–Feb 2022) |
 | Pipeline | Collect → normalize → extract → dedupe → contradict → classify → confidence → historical compare → human review → publish → daily digest |
 | Analytics | Post-exercise reset widget, Activity Index + documented scoring, indicator matrix, analogues |
@@ -272,7 +272,7 @@ Each step ≈ one sitting, ends runnable. Order within a phase is suggested; eve
 
 | Step | Runnable end state |
 | --- | --- |
-| **5.1** | Historical Compare page: default Jan–Feb 2021 vs current window |
+| **5.1** | Side-by-side view (`/historical/compare`): default Jan–Feb 2021 vs current window |
 | **5.2** | Synchronized dual timelines |
 | **5.3** | Indicator matrix (§22) |
 | **5.4** | Analogues + similarity/difference summaries; pipeline step §37 writes `historical_*` fields; disclaimer always visible |
@@ -322,7 +322,7 @@ Each step ≈ one sitting, ends runnable. Order within a phase is suggested; eve
 | Homepage monitoring panels (signal, trend, reset) | 3.6 |
 | Historical dataset Jan–Apr 2021 | 4.1 |
 | Expand Aug 2020 ↔ Feb 2022 | 4.2–4.3 |
-| Historical Compare + timelines + matrix + analogues | 5.1–5.4 |
+| Side-by-side view + timelines + matrix + analogues | 5.1–5.4 |
 | Activity Index + scoring docs | 6.1–6.2 |
 | JSON API / CSV / source export | 7.1–7.3 |
 | Contributor docs + open methodology finalize | 7.4 |

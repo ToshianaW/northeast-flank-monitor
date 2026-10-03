@@ -105,7 +105,15 @@ Roadmap: `docs/mvp-plan.md` §4. Decisions that override the plan: `docs/decisio
 | 3.2 | Exercise tracker: admin list/create/edit with all spec §17 fields, attached sources, and linking published events; reviewer name on every save, logged in the append-only `exercise_actions` table (migration 0007). Public `/exercises` grouped by status and `/exercises/[id]` with announced and observed dates; only published exercises are public, and a published exercise needs a source. Dashboard panel lists active, extended, and concluding exercises. Statuses never change on their own when a date passes |
 | 3.3 | Post-exercise reset widget on the exercise page: personnel, equipment, temporary infrastructure, follow-on activity, and overall status. Unknown shows as "not enough open-source evidence" in a neutral tone. A reset status other than Unknown needs evidence (a source with an excerpt, or a linked published event dated on or after the exercise's end); FULL_RESET also needs all three dimensions returned or removed. Enforced in the form and by database triggers |
 
-**Next:** step 3.4 (Air Activity page).
+**Phase 4 — Historical dataset: in progress**
+
+| Step | What exists |
+| --- | --- |
+| 4.0 | Separate historical tables (migration 0008: `historical_events`, `historical_event_sources`, `historical_review_actions`), so no current-facing query can return a historical row (isolation and static tests). Database rules: a published historical event needs a supporting Tier 1–3 source, excerpts are 20 words or fewer, a source's tier cannot be changed if that would leave a published historical event Tier 4-only. Admin `/admin/historical` (own queue; reviewer name on every save, approve, reject and unpublish; phase tag admin-only). Public `/historical` by month with a period filter and `/historical/[id]`, each with a coverage note. Historical-only sources are never collected, hidden from current pickers, and labelled on `/sources` |
+
+**Planned, off the sidebar:** Side-by-side view (`/historical/compare`, roadmap Phase 5: synchronized timelines and the indicator matrix), listed in `PLANNED_PAGES` (`src/lib/nav.ts`). The live page is Historical Comparison (`/historical`).
+
+**Next:** step 3.4 (Air Activity page); Phase 4 import and candidate suggester.
 
 ## License
 
