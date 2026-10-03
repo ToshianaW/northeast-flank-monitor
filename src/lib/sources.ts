@@ -1,5 +1,6 @@
 import "server-only";
 import { getPool } from "@/lib/db";
+import { countHistoricalSourceReferences } from "@/lib/historical";
 import {
   RELIABILITY_VALUES,
   SOURCE_TYPE_VALUES,
@@ -17,6 +18,8 @@ export type Source = {
   reliability: Reliability;
   tier: number | null;
   notes: string | null;
+  /** Historical-only (migration 0008): never collected, not offered for current events or exercises. */
+  historical_only: boolean;
   created_at: Date;
   updated_at: Date;
 };
@@ -32,7 +35,7 @@ export type ValidationResult =
   | { ok: false; errors: Partial<Record<SourceField, string>> };
 
 const COLUMNS =
-  "id, name, home_url, source_type, source_country, source_language, reliability, tier, notes, created_at, updated_at";
+  "id, name, home_url, source_type, source_country, source_language, reliability, tier, notes, historical_only, created_at, updated_at";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -53,6 +56,7 @@ export function formValuesFrom(formData: FormData): SourceFormValues {
     reliability: get("reliability"),
     tier: get("tier"),
     notes: get("notes"),
+    historical_only: formData.get("historical_only") === "on" ? "on" : "",
   };
 }
 
@@ -66,6 +70,7 @@ export function formValuesFromSource(source: Source): SourceFormValues {
     reliability: source.reliability,
     tier: source.tier === null ? "" : String(source.tier),
     notes: source.notes ?? "",
+    historical_only: source.historical_only ? "on" : "",
   };
 }
 
@@ -116,6 +121,7 @@ export function validateSource(values: SourceFormValues): ValidationResult {
       reliability: values.reliability as Reliability,
       tier,
       notes: optionalText(values.notes),
+      historical_only: values.historical_only === "on",
     },
   };
 }
@@ -146,14 +152,15 @@ function params(input: SourceInput) {
     input.reliability,
     input.tier,
     input.notes,
+    input.historical_only,
   ];
 }
 
 export async function createSource(input: SourceInput): Promise<string> {
   const { rows } = await getPool().query<{ id: string }>(
     `INSERT INTO sources
-       (name, home_url, source_type, source_country, source_language, reliability, tier, notes)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       (name, home_url, source_type, source_country, source_language, reliability, tier, notes, historical_only)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING id`,
     params(input),
   );
@@ -168,17 +175,35 @@ export async function updateSource(
   const { rowCount } = await getPool().query(
     `UPDATE sources SET
        name = $1, home_url = $2, source_type = $3, source_country = $4,
-       source_language = $5, reliability = $6, tier = $7, notes = $8
-     WHERE id = $9`,
+       source_language = $5, reliability = $6, tier = $7, notes = $8, historical_only = $9
+     WHERE id = $10`,
     [...params(input), id],
   );
   return rowCount === 1;
+}
+
+/**
+ * The published historical events named in a refused tier change (0008 trigger
+ * sources_keep_historical_tier), or null when the error is something else.
+ */
+export function refusedTierChangeEvents(error: unknown): string[] | null {
+  const message = error instanceof Error ? error.message : "";
+  if (!message.includes("would leave published historical events with Tier 4-only support")) return null;
+  return message.split(":").pop()!.split(",").map((s) => s.trim()).filter((s) => UUID_RE.test(s));
+}
+
+/** Current events and exercises may not cite historical-only sources. */
+export function currentSourceOptions(sources: Source[], keepIds: Iterable<string> = []): Source[] {
+  const keep = new Set(keepIds);
+  return sources.filter((s) => !s.historical_only || keep.has(s.id));
 }
 
 export type SourceReferenceCounts = {
   event_sources: number;
   exercise_sources: number;
   review_actions: number;
+  historical_sources: number;
+  historical_actions: number;
 };
 
 export async function getSourceReferenceCounts(
@@ -192,18 +217,25 @@ export async function getSourceReferenceCounts(
        (SELECT count(*)::int FROM review_actions WHERE $1 = ANY (source_ids)) AS review_actions`,
     [id],
   );
-  return rows[0] ?? null;
+  if (!rows[0]) return null;
+  return { ...rows[0], ...(await countHistoricalSourceReferences(id)) };
 }
 
 export type DeleteSourceResult =
   | { ok: true }
-  | { ok: false; reason: "not_found" | "in_use"; counts?: SourceReferenceCounts };
+  | { ok: false; reason: "not_found" | "in_use" | "historical"; counts?: SourceReferenceCounts };
 
 export async function deleteSource(id: string): Promise<DeleteSourceResult> {
   if (!UUID_RE.test(id)) return { ok: false, reason: "not_found" };
 
   const counts = await getSourceReferenceCounts(id);
   if (!counts) return { ok: false, reason: "not_found" };
+
+  // Checked first so the message names the historical record (the FK would otherwise
+  // surface as a raw database error).
+  if (counts.historical_sources > 0 || counts.historical_actions > 0) {
+    return { ok: false, reason: "historical", counts };
+  }
 
   const inUse =
     counts.event_sources > 0 ||

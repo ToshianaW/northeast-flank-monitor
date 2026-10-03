@@ -4,7 +4,7 @@ import { ExerciseForm } from "@/components/admin/exercise-form";
 import { requireAdminPage } from "@/lib/admin-session";
 import { emptyExerciseFormValues } from "@/lib/exercises";
 import { getReviewerName } from "@/lib/reviewer";
-import { listSources } from "@/lib/sources";
+import { currentSourceOptions, listSources } from "@/lib/sources";
 import { createExerciseAction } from "../actions";
 
 export const metadata = { title: "Add exercise" };
@@ -25,7 +25,7 @@ export default async function NewExercisePage() {
         initialValues={emptyExerciseFormValues()}
         initialSources={[]}
         initialPrimaryIndex={0}
-        sourceOptions={sources.map((s) => ({ id: s.id, name: s.name }))}
+        sourceOptions={currentSourceOptions(sources).map((s) => ({ id: s.id, name: s.name }))}
         reviewerDefault={reviewerDefault}
       />
     </section>

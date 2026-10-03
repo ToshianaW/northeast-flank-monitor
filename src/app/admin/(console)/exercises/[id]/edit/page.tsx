@@ -14,7 +14,7 @@ import {
   type LinkedEvent,
 } from "@/lib/exercises";
 import { getReviewerName } from "@/lib/reviewer";
-import { listSources } from "@/lib/sources";
+import { currentSourceOptions, listSources } from "@/lib/sources";
 import { updateExerciseAction, updateExerciseLinksAction } from "../../actions";
 
 export const metadata = { title: "Edit exercise" };
@@ -78,7 +78,7 @@ export default async function EditExercisePage({
             excerpt: row.excerpt ?? "",
           }))}
           initialPrimaryIndex={primaryIndex}
-          sourceOptions={sources.map((s) => ({ id: s.id, name: s.name }))}
+          sourceOptions={currentSourceOptions(sources, exerciseSources.map((r) => r.source_id)).map((s) => ({ id: s.id, name: s.name }))}
           reviewerDefault={reviewerDefault}
         />
         <ExerciseLinksForm

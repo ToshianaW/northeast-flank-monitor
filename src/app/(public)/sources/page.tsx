@@ -87,6 +87,11 @@ export default async function SourcesPage() {
                           State / official source
                         </Badge>
                       ) : null}
+                      {source.historical_only ? (
+                        <Badge variant="outline" className="text-text-secondary">
+                          Historical only
+                        </Badge>
+                      ) : null}
                     </div>
                     <p className="mt-1 font-mono text-xs text-text-muted">
                       {[source.source_country, source.source_language]

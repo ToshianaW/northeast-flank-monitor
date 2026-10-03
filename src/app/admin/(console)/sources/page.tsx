@@ -65,8 +65,9 @@ export default async function AdminSourcesPage({
           role="status"
           className="mt-6 border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-foreground"
         >
-          This source is linked to events, exercises, or review history and cannot
-          be deleted.
+          {delete_blocked === "historical"
+            ? "This source is cited by the historical record (events or their review history) and cannot be deleted."
+            : "This source is linked to events, exercises, or review history and cannot be deleted."}
         </p>
       ) : null}
       {delete_error ? (

@@ -347,8 +347,12 @@ export async function validateExerciseForm(
 
     if (!source_id || !UUID_RE.test(source_id)) {
       errors[`${prefix}_source_id`] = "Choose a source.";
-    } else if (!(await getSource(source_id))) {
-      errors[`${prefix}_source_id`] = "Source not found.";
+    } else {
+      const source = await getSource(source_id);
+      if (!source) errors[`${prefix}_source_id`] = "Source not found.";
+      else if (source.historical_only) {
+        errors[`${prefix}_source_id`] = "This source is historical-only and cannot support current exercises.";
+      }
     }
 
     if (!article_url) {

@@ -8,7 +8,7 @@ import {
   listEventSources,
   listExerciseOptions,
 } from "@/lib/events";
-import { listSources } from "@/lib/sources";
+import { currentSourceOptions, listSources } from "@/lib/sources";
 import { getReviewerName } from "@/lib/reviewer";
 import { updateEventAction } from "../../actions";
 import { requireAdminPage } from "@/lib/admin-session";
@@ -81,7 +81,7 @@ export default async function EditEventPage({
               ]
         }
         initialPrimaryIndex={primaryIndex >= 0 ? primaryIndex : 0}
-        sourceOptions={sources.map((s) => ({ id: s.id, name: s.name }))}
+        sourceOptions={currentSourceOptions(sources, eventSources.map((r) => r.source_id)).map((s) => ({ id: s.id, name: s.name }))}
         exerciseOptions={exercises}
       />
     </section>

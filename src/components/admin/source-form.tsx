@@ -67,6 +67,19 @@ export function SourceForm({ action, initialValues, submitLabel }: Props) {
           className="border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
         >
           {state.formError}
+          {state.refusedEventIds?.length ? (
+            <span className="mt-2 block">
+              Affected:{" "}
+              {state.refusedEventIds.map((id, i) => (
+                <span key={id}>
+                  {i > 0 ? ", " : null}
+                  <Link href={`/admin/historical/${id}`} className="underline">
+                    {id.slice(0, 8)}
+                  </Link>
+                </span>
+              ))}
+            </span>
+          ) : null}
         </p>
       ) : null}
 
@@ -159,6 +172,22 @@ export function SourceForm({ action, initialValues, submitLabel }: Props) {
         <p className="text-xs text-text-muted">Shown on the public Sources page.</p>
         <FieldError id="notes-error" message={errors.notes} />
       </div>
+
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          name="historical_only"
+          defaultChecked={values.historical_only === "on"}
+          className="mt-0.5 size-4 accent-teal-blue"
+        />
+        <span>
+          Historical only
+          <span className="block text-xs text-text-muted">
+            Used for the 2020–2022 historical record. Never collected, not offered for current
+            events or exercises, and labelled &ldquo;Historical only&rdquo; on the public Sources page.
+          </span>
+        </span>
+      </label>
 
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={pending}>

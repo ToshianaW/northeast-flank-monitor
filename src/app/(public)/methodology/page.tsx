@@ -31,7 +31,7 @@ const SECTIONS = [
   { id: "review", title: "Review process" },
   { id: "locations", title: "Location handling" },
   { id: "activity-index", title: "Activity Index" },
-  { id: "historical", title: "Historical comparison" },
+  { id: "historical", title: "Historical record and comparison" },
   { id: "status", title: "Current status" },
   { id: "limitations", title: "Known limitations" },
 ] as const;
@@ -483,14 +483,36 @@ export default function MethodologyPage() {
         </Section>
 
         <Section id="historical" number={n("historical")} title={t("historical")}>
+          <Subhead>Historical record</Subhead>
           <p>
-            <span className="text-foreground">Not yet built.</span>
-            <Planned />
+            The{" "}
+            <Link href="/historical" className="link">
+              historical record
+            </Link>{" "}
+            covers August 2020 – February 2022. It is kept separate from current
+            reporting: historical events never appear in Latest, the Archive, the
+            map, the dashboard or the daily digest.
           </p>
           <p>
+            Each historical event is entered and reviewed by a person before it is
+            published. It follows the same evidence rules as current events: every
+            claim is attributed to its source, each source carries a short quoted
+            excerpt (20 words or fewer) and a link, and predictive language is not
+            used. An event supported only by Tier 4 sources is not published.
+          </p>
+          <p>
+            The record is a baseline for comparison, not a prediction. Every
+            historical page states how many events and sources it holds and which
+            months have no entries yet, so a thin record is not mistaken for a
+            complete one.
+          </p>
+          <Subhead>
+            Comparison
+            <Planned />
+          </Subhead>
+          <p>
             Historical comparison will set current observable activity against
-            a historical dataset covering August 2020 – February 2022, starting
-            with the period from late 2020 to February 2021.
+            this record, starting with the period from late 2020 to February 2021.
           </p>
           <p className="border-l-2 border-teal-blue pl-3 text-foreground">
             Similar historical behavior does not imply identical future outcomes.
@@ -529,6 +551,11 @@ export default function MethodologyPage() {
             </li>
             <li>Published events can be browsed in Latest and the Archive.</li>
             <li>
+              A separate historical record (August 2020 – February 2022) is being
+              built, entered and reviewed by a person. It is a baseline for
+              comparison, not a prediction.
+            </li>
+            <li>
               The regional map shows one dot per area with published activity in the
               chosen layer and window. Each dot marks an area, not a location: it sits
               at a fixed point chosen in advance for that area, away from towns and
@@ -547,7 +574,6 @@ export default function MethodologyPage() {
           </Subhead>
           <ul className="list-disc pl-5">
             <li>Air activity page</li>
-            <li>Historical dataset (August 2020 – February 2022)</li>
             <li>Historical comparison</li>
             <li>Northeast Flank Activity Index</li>
             <li>Open data: downloadable datasets and a read-only API</li>

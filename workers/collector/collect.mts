@@ -20,7 +20,8 @@ import {
 import { errorMessage, HttpClient, RobotsDisallowedError } from "./fetch.mjs";
 import { collectGdelt, type GdeltConfig } from "./gdelt.mjs";
 import { collectListing, type ListingConfig } from "./listing.mjs";
-import { domainOf, storeDocument, type CollectedDoc, type StoreOutcome } from "./store.mjs";
+import { buildRegistry, type RegistryRow } from "./registry.mjs";
+import { storeDocument, type CollectedDoc, type StoreOutcome } from "./store.mjs";
 
 type CollectorConfig = {
   user_agent: string;
@@ -88,10 +89,9 @@ const since = new Date(Date.now() - config.lookback_hours * 3600_000);
 const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
 await client.connect();
 
-const { rows: registry } = await client.query<{ id: string; name: string; home_url: string | null }>(
-  "SELECT id, name, home_url FROM sources",
+const { rows: registry } = await client.query<RegistryRow>(
+  "SELECT id, name, home_url, historical_only FROM sources",
 );
-const registryByName = new Map(registry.map((s) => [s.name, s.id]));
 // Sources whose rows must never be sent to an AI model, however they were collected.
 const noAiSources = new Set([
   ...config.no_ai_processing_sources,
@@ -103,23 +103,14 @@ const leadOnlySources = new Set([
   ...config.lead_only_sources,
   ...config.feeds.filter((f) => f.lead_only).map((f) => f.source),
 ]);
-const registryByDomain = new Map<string, { id: string; name: string; noAi: boolean; leadOnly: boolean }>();
-for (const s of registry) {
-  if (s.home_url) {
-    registryByDomain.set(domainOf(s.home_url), {
-      id: s.id,
-      name: s.name,
-      noAi: noAiSources.has(s.name),
-      leadOnly: leadOnlySources.has(s.name),
-    });
-  }
-}
+// Historical-only sources are refused by sourceIdFor and left out of the domain map.
+const { sourceIdFor, byDomain: registryByDomain } = buildRegistry(registry, { noAiSources, leadOnlySources });
 
 const matchers: FeedMatchers = {
   keyword: makeKeywordMatcher(config.keywords),
   polish: makePolishMatcher(config.keyword_stems_pl, config.keyword_whole_words_pl),
   region: makeKeywordMatcher(config.region_terms),
-  credits: makeCreditExtractor([...new Set([...config.known_outlets, ...registry.map((s) => s.name)])]),
+  credits: makeCreditExtractor([...new Set([...config.known_outlets, ...registry.filter((s) => !s.historical_only).map((s) => s.name)])]),
 };
 
 /** Hours since this collector key last stored a row, or null if it never has. */
@@ -129,12 +120,6 @@ async function hoursSinceLastRead(key: string): Promise<number | null> {
     [key],
   );
   return rows[0].last ? (Date.now() - rows[0].last.getTime()) / 3600_000 : null;
-}
-
-function sourceIdFor(name: string): string {
-  const id = registryByName.get(name);
-  if (!id) throw new Error(`source "${name}" is not in the registry`);
-  return id;
 }
 
 async function run(key: string, method: string, collect: () => Promise<CollectedDoc[]>): Promise<Summary> {

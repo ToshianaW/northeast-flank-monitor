@@ -2,7 +2,7 @@ import { connection } from "next/server";
 import { BackLink } from "@/components/admin/back-link";
 import { EventForm } from "@/components/admin/event-form";
 import { emptyEventFormValues, listExerciseOptions } from "@/lib/events";
-import { listSources } from "@/lib/sources";
+import { currentSourceOptions, listSources } from "@/lib/sources";
 import { createEventAction } from "../actions";
 import { requireAdminPage } from "@/lib/admin-session";
 
@@ -34,7 +34,7 @@ export default async function NewEventPage() {
           },
         ]}
         initialPrimaryIndex={0}
-        sourceOptions={sources.map((s) => ({ id: s.id, name: s.name }))}
+        sourceOptions={currentSourceOptions(sources).map((s) => ({ id: s.id, name: s.name }))}
         exerciseOptions={exercises}
       />
     </section>

@@ -558,6 +558,8 @@ export async function validateEventForm(
     }
     if (!source) {
       errors[`${prefix}_source_id`] = "Source not found.";
+    } else if (source.historical_only) {
+      errors[`${prefix}_source_id`] = "This source is historical-only and cannot support current events.";
     }
 
     resolvedSources.push({

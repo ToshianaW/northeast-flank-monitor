@@ -24,6 +24,7 @@ export default async function NewSourcePage() {
           reliability: "UNRATED",
           tier: "",
           notes: "",
+          historical_only: "",
         }}
       />
     </section>

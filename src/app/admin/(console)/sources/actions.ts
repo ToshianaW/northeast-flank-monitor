@@ -8,6 +8,7 @@ import {
   deleteSource,
   formValuesFrom,
   isUniqueViolation,
+  refusedTierChangeEvents,
   updateSource,
   validateSource,
   type SourceField,
@@ -18,6 +19,8 @@ export type SourceFormState = {
   values?: SourceFormValues;
   errors?: Partial<Record<SourceField, string>>;
   formError?: string;
+  /** Published historical events that block a tier change (linked from the form). */
+  refusedEventIds?: string[];
 };
 
 async function save(
@@ -37,6 +40,15 @@ async function save(
       return {
         values,
         errors: { name: "A source with this name already exists." },
+      };
+    }
+    const refused = refusedTierChangeEvents(error);
+    if (refused) {
+      return {
+        values,
+        errors: { tier: "Tier change refused." },
+        formError: `This tier change was refused: ${refused.length === 1 ? "a published historical event" : `${refused.length} published historical events`} would be left with only Tier 4 support. Unpublish ${refused.length === 1 ? "it" : "them"} in Admin · Historical first, or attach another Tier 1–3 source.`,
+        refusedEventIds: refused,
       };
     }
     console.error("Saving source failed", error);
@@ -73,6 +85,9 @@ export async function deleteSourceAction(formData: FormData): Promise<void> {
   const result = await deleteSource(id);
 
   if (!result.ok) {
+    if (result.reason === "historical") {
+      redirect("/admin/sources?delete_blocked=historical");
+    }
     if (result.reason === "in_use") {
       redirect("/admin/sources?delete_blocked=1");
     }
