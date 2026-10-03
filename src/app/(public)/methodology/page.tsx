@@ -528,13 +528,24 @@ export default function MethodologyPage() {
               their post-exercise reset status, entered and reviewed by a person.
             </li>
             <li>Published events can be browsed in Latest and the Archive.</li>
+            <li>
+              The regional map shows one dot per area with published activity in the
+              chosen layer and window. Each dot marks an area, not a location: it sits
+              at a fixed point chosen in advance for that area, away from towns and
+              military sites, and only its size and colour change, in three steps on an
+              amber-to-orange heat scale. The colour shows how much has been reported,
+              not how intense the activity is, and the legend says so. No event
+              positions are drawn. Items are placed by the place they concern, not
+              where something was said; items about Russia elsewhere, Ukraine, Western
+              Europe or North America are counted in cards beside the map. Counts
+              reflect reporting, not intensity of activity.
+            </li>
           </ul>
           <Subhead>
             Planned
             <Planned />
           </Subhead>
           <ul className="list-disc pl-5">
-            <li>Interactive regional map</li>
             <li>Air activity page</li>
             <li>Historical dataset (August 2020 – February 2022)</li>
             <li>Historical comparison</li>
