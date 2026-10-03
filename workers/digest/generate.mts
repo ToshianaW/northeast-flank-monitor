@@ -18,10 +18,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getPool } from "@/lib/db";
 import { formatDigestLine } from "@/lib/digest-refs";
 import { DEFAULT_DIGEST_TITLE, DIGEST_SECTIONS, isValidDigestDate, type DigestMeta } from "@/lib/digests";
-import type { ConfidenceLevel, EventType, SourceRelationship } from "@/lib/event-labels";
+import type { SourceRelationship } from "@/lib/event-labels";
 import { setOutput } from "../lib/ci.mjs";
 import { checkDigestOutput, decideDigestWrite, failureLines, quotedPassages, type AliasedEvent } from "./check.mjs";
 import { draftDigest, type ModelCall } from "./draft.mjs";
+import { loadDigestEvents } from "./input.mjs";
 import {
   buildUserMessage,
   OUTPUT_SCHEMA,
@@ -117,25 +118,7 @@ async function run(): Promise<never> {
   if (decision.action === "SKIP" && !dryRun) finish(decision.status);
 
   // 2. Input: PUBLISHED events for the day, with only the approved fields.
-  const { rows: eventRows } = await pool.query<{
-    event_id: string;
-    headline: string;
-    summary: string | null;
-    event_date: string;
-    event_type: EventType;
-    actor: string | null;
-    country: string | null;
-    location_name: string | null;
-    confidence_level: ConfidenceLevel;
-    contradiction_flag: boolean;
-  }>(
-    `SELECT event_id, headline, summary, event_date::text AS event_date, event_type, actor, country,
-            location_name, confidence_level, contradiction_flag
-     FROM events
-     WHERE review_status = 'PUBLISHED' AND event_date = $1::date
-     ORDER BY created_at, event_id`,
-    [date],
-  );
+  const eventRows = await loadDigestEvents(pool, date);
   eventCount = eventRows.length;
   if (eventCount === 0) finish("NO_EVENTS");
 
