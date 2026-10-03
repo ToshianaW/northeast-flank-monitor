@@ -13,6 +13,7 @@ import {
   REVIEW_STATUS_LABELS,
   SOURCE_RELATIONSHIP_LABELS,
 } from "@/lib/event-labels";
+import { suggestConfidence } from "@/lib/confidence-suggestion";
 import { getEvent } from "@/lib/events";
 import {
   getReviewEventDetail,
@@ -364,6 +365,10 @@ export default async function ReviewEventPage({
             eventId={id}
             reviewStatus={event.review_status}
             confidenceLevel={event.confidence_level}
+            confidenceSuggestion={suggestConfidence({
+              sources,
+              contradiction_flag: event.contradiction_flag,
+            })}
             reviewerDefault={reviewerDefault}
             mergeTargets={mergeTargets.map((t) => ({
               event_id: t.event_id,

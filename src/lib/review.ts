@@ -174,6 +174,7 @@ export async function listReviewQueue(): Promise<ReviewQueueItem[]> {
 }
 
 export type ReviewEventSource = {
+  source_id: string;
   name: string;
   tier: number | null;
   reliability: Reliability;
@@ -197,7 +198,7 @@ export async function getReviewEventDetail(eventId: string): Promise<{
       [eventId],
     ),
     getPool().query<ReviewEventSource>(
-      `SELECT s.name, s.tier, s.reliability, s.source_type, s.source_country,
+      `SELECT s.id AS source_id, s.name, s.tier, s.reliability, s.source_type, s.source_country,
               es.article_url, es.excerpt, es.relationship, es.is_primary
        FROM event_sources es
        JOIN sources s ON s.id = es.source_id

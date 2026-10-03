@@ -10,6 +10,7 @@ import {
   type ReviewActionState,
 } from "@/app/admin/(console)/review/actions";
 import { ReviewerField } from "@/components/admin/reviewer-field";
+import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +24,11 @@ import {
   type ConfidenceLevel,
   type ReviewStatus,
 } from "@/lib/event-labels";
+import {
+  CONFLICT_WARNING,
+  OFFICIAL_ONLY_NOTE,
+  type ConfidenceSuggestion,
+} from "@/lib/confidence-suggestion";
 
 type MergeTarget = { event_id: string; headline: string; event_date: string };
 
@@ -30,6 +36,7 @@ type Props = {
   eventId: string;
   reviewStatus: ReviewStatus;
   confidenceLevel: ConfidenceLevel;
+  confidenceSuggestion: ConfidenceSuggestion | null;
   reviewerDefault: string | null;
   mergeTargets: MergeTarget[];
   editHref: string;
@@ -76,8 +83,37 @@ function ActionForm({
   );
 }
 
+/** Rule-based hint from the attached sources (decision #13). It never changes the selection. */
+function SuggestionHint({ suggestion }: { suggestion: ConfidenceSuggestion | null }) {
+  if (!suggestion) {
+    return <p className="text-xs text-text-muted">Suggested: none (no supporting source)</p>;
+  }
+  return (
+    <div className="grid gap-1 text-xs text-text-muted">
+      <p>
+        Suggested: {CONFIDENCE_LEVEL_LABELS[suggestion.level]} ({suggestion.reason})
+        {suggestion.stateSource ? (
+          <Badge variant="outline" className="ml-2 border-slate-indigo text-text-secondary">
+            State / official source
+          </Badge>
+        ) : null}
+      </p>
+      {suggestion.officialOnlyNote ? <p>{OFFICIAL_ONLY_NOTE}</p> : null}
+      {suggestion.conflictWarning ? (
+        <p className="text-foreground">{CONFLICT_WARNING}</p>
+      ) : null}
+    </div>
+  );
+}
+
 /** Confidence must be chosen at approval; prefilled with the event's current value. */
-function ConfidenceField({ defaultValue }: { defaultValue: ConfidenceLevel }) {
+function ConfidenceField({
+  defaultValue,
+  suggestion,
+}: {
+  defaultValue: ConfidenceLevel;
+  suggestion: ConfidenceSuggestion | null;
+}) {
   const [value, setValue] = useState<ConfidenceLevel>(defaultValue);
   return (
     <div className="grid gap-2">
@@ -96,6 +132,7 @@ function ConfidenceField({ defaultValue }: { defaultValue: ConfidenceLevel }) {
           </NativeSelectOption>
         ))}
       </NativeSelect>
+      <SuggestionHint suggestion={suggestion} />
       {value === "UNVERIFIED" ? (
         <p role="alert" className="border-l-2 border-teal-blue pl-3 text-xs text-foreground">
           Unverified events appear only under Contradictions &amp; Unverified
@@ -110,6 +147,7 @@ export function ReviewEventActions({
   eventId,
   reviewStatus,
   confidenceLevel,
+  confidenceSuggestion,
   reviewerDefault,
   mergeTargets,
   editHref,
@@ -146,7 +184,7 @@ export function ReviewEventActions({
             reviewerDefault={reviewerDefault}
             submitLabel="Approve and publish"
           >
-            <ConfidenceField defaultValue={confidenceLevel} />
+            <ConfidenceField defaultValue={confidenceLevel} suggestion={confidenceSuggestion} />
           </ActionForm>
 
           <ActionForm
