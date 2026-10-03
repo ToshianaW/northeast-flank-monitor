@@ -411,6 +411,24 @@ export default function MethodologyPage() {
               <li key={v}>{RESET_STATUS_LABELS[v]}</li>
             ))}
           </ul>
+          <Subhead>Evidence rule</Subhead>
+          <p>
+            Every reset field starts as Unknown, shown as &ldquo;Not enough
+            open-source evidence&rdquo;. A reviewer can change a field only when
+            the exercise has evidence for it. That means either an attached source
+            whose quoted excerpt supports it, or a linked published event dated on or after
+            the exercise&rsquo;s end. The observed end date is used, or the
+            announced end date if no end has been observed. Events from during the
+            exercise do not count. Full reset is allowed only when personnel,
+            equipment and temporary infrastructure are each recorded as Returned or
+            Removed. Statuses never change on their own when a date passes. If an
+            announced end date has passed with no end reported, the site says so.
+          </p>
+          <p>
+            Where an exercise overlaps or leads into another, the follow-on
+            activity field records the connection; reset fields describe only what
+            sources say about that exercise&rsquo;s own units.
+          </p>
         </Section>
 
         <Section id="review" number={n("review")} title={t("review")}>
