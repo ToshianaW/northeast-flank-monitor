@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { BadgeCheck, CalendarRange, MapPin, Truck, type LucideIcon } from "lucide-react";
 import { formatDigestDate } from "@/components/digest-view";
 import { EventLogEntry } from "@/components/event-log-entry";
+import { ExerciseLogEntry } from "@/components/exercise-log-entry";
 import { PageShell } from "@/components/page-shell";
 import { stripDigestRefs } from "@/lib/digest-refs";
 import { getLatestPublishedDigest } from "@/lib/digests";
@@ -11,6 +12,7 @@ import {
   getSnapshotCounts,
   listPublishedEvents,
 } from "@/lib/public-events";
+import { listUnderWayExercises } from "@/lib/public-exercises";
 
 /** Spec §23, verbatim. */
 const ACTIVITY_INDEX_DISCLAIMER =
@@ -40,10 +42,11 @@ function Panel({
 
 export default async function HomePage() {
   await connection();
-  const [counts, latest, digest] = await Promise.all([
+  const [counts, latest, digest, activeExercises] = await Promise.all([
     getSnapshotCounts(),
     listPublishedEvents(FEED_SIZE),
     getLatestPublishedDigest(),
+    listUnderWayExercises(),
   ]);
   // First paragraph of the Executive Summary as the homepage excerpt.
   const firstParagraph = digest?.sections.executive_summary
@@ -171,9 +174,22 @@ export default async function HomePage() {
         </Panel>
 
         <Panel title="Active exercises">
-          <p className="text-base text-text-secondary">
-            No exercises are recorded yet.
-          </p>
+          {activeExercises.length === 0 ? (
+            <p className="text-base text-text-secondary">
+              No exercises are recorded yet.
+            </p>
+          ) : (
+            <div className="-mx-2 divide-y divide-border">
+              {activeExercises.map((exercise) => (
+                <div key={exercise.id} className="py-2 first:pt-0 last:pb-0">
+                  <ExerciseLogEntry exercise={exercise} variant="row" />
+                </div>
+              ))}
+            </div>
+          )}
+          <Link href="/exercises" className="btn-pill mt-5">
+            All exercises →
+          </Link>
         </Panel>
       </div>
     </PageShell>

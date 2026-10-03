@@ -169,7 +169,6 @@ export default async function EventPage({ params }: PageProps<"/events/[id]">) {
             </div>
           ) : null}
         </dl>
-        <LabelHelp className="mt-3 max-w-3xl" />
 
         {event.contradiction_flag ? (
           <div className="mt-6 border border-destructive/40 bg-destructive/10 px-4 py-3 text-base">
@@ -186,6 +185,7 @@ export default async function EventPage({ params }: PageProps<"/events/[id]">) {
             {event.summary}
           </p>
         ) : null}
+        <LabelHelp size="small" className="mt-4 max-w-3xl" />
 
         <div className="mt-8 grid gap-8">
           <FieldSection
