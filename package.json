@@ -6,8 +6,8 @@
     "node": "24.x"
   },
   "scripts": {
-    "dev": "next dev --hostname 127.0.0.1 --port 43127",
-    "build": "next build",
+    "dev": "node scripts/copy-maplibre-worker.mjs && next dev --hostname 127.0.0.1 --port 43127",
+    "build": "node scripts/copy-maplibre-worker.mjs && next build",
     "start": "next start --hostname 127.0.0.1 --port 43127",
     "lint": "eslint",
     "collect": "tsx workers/collector/collect.mts",

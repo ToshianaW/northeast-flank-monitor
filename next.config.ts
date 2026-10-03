@@ -6,13 +6,16 @@ import {
 import { adminConfigError } from "./src/lib/admin-auth";
 
 // No nonces: they would force every page to render dynamically, so inline scripts need 'unsafe-inline'.
-// UPDATE THIS POLICY WHEN THE MAP IS ADDED: tile servers (img-src, connect-src) and the map
-// library's web workers (worker-src, often blob:) are blocked by the current policy.
+// The map has no tile server: region outlines (/geo) and MapLibre's worker (/maplibre, copied
+// from node_modules at dev/build) are same-origin, so no external host and no blob: workers.
 function contentSecurityPolicy(isDev: boolean): string {
   return [
     "default-src 'self'",
     // React needs eval in development only, for error stack reconstruction.
     `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+    // MapLibre: setWorkerUrl("/maplibre/maplibre-gl-worker.mjs"), a same-origin module worker.
+    "worker-src 'self'",
+    // 'unsafe-inline' is also needed by MapLibre, which positions its controls with inline styles.
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self'",
@@ -35,6 +38,11 @@ export default function config(phase: string): NextConfig {
   }
   const isDev = phase === PHASE_DEVELOPMENT_SERVER;
   return {
+    // Read with fs at request time (src/lib/map-data.ts), so trace it into the server bundle.
+    outputFileTracingIncludes: {
+      "/": ["./public/geo/theater.geojson"],
+      "/map": ["./public/geo/theater.geojson"],
+    },
     async headers() {
       return [
         {
