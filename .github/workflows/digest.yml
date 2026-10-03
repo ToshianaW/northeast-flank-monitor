@@ -1,0 +1,107 @@
+# Daily digest (roadmap step 2.7): drafts yesterday's digest from PUBLISHED events.
+# Nothing is published: the digest is a DRAFT for human review in /admin/digests.
+# The repository is public, so the step logs counts and codes only and never digest text,
+# even on a dry run. No artifacts are uploaded.
+name: Daily digest
+
+on:
+  # Disabled until the manual tests are done. Uncomment these three lines after the manual
+  # workflow_dispatch runs look right; the job summary already handles scheduled runs.
+  # schedule:
+  #   # 05:00 UTC, drafting the previous UTC day.
+  #   - cron: "0 5 * * *"
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Digest date (YYYY-MM-DD, UTC). Empty: yesterday."
+        type: string
+        default: ""
+      dry_run:
+        description: "Dry run: call the model and run the checks, write nothing"
+        type: boolean
+        default: false
+      replace_draft:
+        description: "Replace an existing unedited AI draft for that date (never an edited draft or a published digest)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: daily-digest
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DIGEST_DATE: ${{ inputs.date }}
+      DRY_RUN: ${{ inputs.dry_run == true }}
+      REPLACE_DRAFT: ${{ inputs.replace_draft == true }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+          cache: npm
+
+      # Secrets are passed only to the digest step, never to the install.
+      - run: npm ci
+
+      - name: Draft digest
+        id: digest
+        env:
+          # The generator reads the pooled variable (src/lib/db.ts); the direct URL works for it.
+          DATABASE_URL_POOLED: ${{ secrets.DATABASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          args=(--ci --max-usd 0.25)
+          if [ -n "$DIGEST_DATE" ]; then
+            if ! [[ "$DIGEST_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+              echo "date input must be YYYY-MM-DD"; exit 1
+            fi
+            args+=(--date "$DIGEST_DATE")
+          fi
+          if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          # --force is deliberately never passed from CI.
+          if [ "$REPLACE_DRAFT" = "true" ]; then args+=(--replace-draft); fi
+          npm run digest -- "${args[@]}"
+
+      - name: Job summary
+        if: ${{ always() }}
+        env:
+          EVENT: ${{ github.event_name }}
+          OUTCOME: ${{ steps.digest.outcome }}
+          DATE: ${{ steps.digest.outputs.date }}
+          STATUS: ${{ steps.digest.outputs.status }}
+          DETAIL: ${{ steps.digest.outputs.detail }}
+          EVENTS: ${{ steps.digest.outputs.events }}
+          SECTIONS: ${{ steps.digest.outputs.sections }}
+          SENTENCES: ${{ steps.digest.outputs.sentences }}
+          COST: ${{ steps.digest.outputs.cost_usd }}
+          ATTEMPTS: ${{ steps.digest.outputs.attempts }}
+          RETRIED_FOR: ${{ steps.digest.outputs.retried_for }}
+          DROPPED: ${{ steps.digest.outputs.summary_sentences_dropped }}
+        run: |
+          run="Manual"
+          if [ "$EVENT" = "schedule" ]; then run="Scheduled 05:00 UTC"; fi
+          if [ "$DRY_RUN" = "true" ]; then run="$run · dry run"; fi
+          if [ "$REPLACE_DRAFT" = "true" ]; then run="$run · replace draft"; fi
+          {
+            echo "## Daily digest: $run"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Date | ${DATE:-–} |"
+            echo "| Status | ${STATUS:-not run}${DETAIL:+ ($DETAIL)} |"
+            echo "| Published events | ${EVENTS:-–} |"
+            echo "| Sections / sentences | ${SECTIONS:-–} / ${SENTENCES:-–} |"
+            echo "| Model attempts | ${ATTEMPTS:-–}${RETRIED_FOR:+ (retried for $RETRIED_FOR)} |"
+            echo "| Executive Summary sentences dropped as repeats | ${DROPPED:-–} |"
+            echo "| Cost | \$${COST:-0} |"
+            echo
+            echo "Step outcome: ${OUTCOME:-not run}"
+          } >> "$GITHUB_STEP_SUMMARY"
