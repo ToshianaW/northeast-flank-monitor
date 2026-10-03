@@ -29,6 +29,16 @@ export const EVENT_TYPE_VALUES = [
 
 export type EventType = (typeof EVENT_TYPE_VALUES)[number];
 
+/** Map layers: statements are what someone said; every other type is Activity. */
+export const STATEMENT_TYPES = ["POLITICAL_SIGNALING", "OFFICIAL_WARNING"] as const satisfies readonly EventType[];
+export const ACTIVITY_TYPES: readonly EventType[] = EVENT_TYPE_VALUES.filter(
+  (t) => !(STATEMENT_TYPES as readonly EventType[]).includes(t),
+);
+
+export function isStatementType(type: EventType): boolean {
+  return (STATEMENT_TYPES as readonly EventType[]).includes(type);
+}
+
 export const EXERCISE_STATUS_VALUES = [
   "ANNOUNCED",
   "UPCOMING",
