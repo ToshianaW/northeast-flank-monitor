@@ -4,6 +4,7 @@ import { BadgeCheck, CalendarRange, MapPin, Truck, type LucideIcon } from "lucid
 import { formatDigestDate } from "@/components/digest-view";
 import { EventLogEntry } from "@/components/event-log-entry";
 import { ExerciseLogEntry } from "@/components/exercise-log-entry";
+import { MapThumbnail } from "@/components/map/map-thumbnail";
 import { PageShell } from "@/components/page-shell";
 import { stripDigestRefs } from "@/lib/digest-refs";
 import { getLatestPublishedDigest } from "@/lib/digests";
@@ -12,6 +13,12 @@ import {
   getSnapshotCounts,
   listPublishedEvents,
 } from "@/lib/public-events";
+import {
+  DEFAULT_MAP_LAYER,
+  DEFAULT_MAP_WINDOW,
+  loadMapData,
+  loadTheaterGeo,
+} from "@/lib/map-data";
 import { listUnderWayExercises } from "@/lib/public-exercises";
 
 /** Spec §23, verbatim. */
@@ -42,11 +49,13 @@ function Panel({
 
 export default async function HomePage() {
   await connection();
-  const [counts, latest, digest, activeExercises] = await Promise.all([
+  const [counts, latest, digest, activeExercises, mapData, mapGeo] = await Promise.all([
     getSnapshotCounts(),
     listPublishedEvents(FEED_SIZE),
     getLatestPublishedDigest(),
     listUnderWayExercises(),
+    loadMapData({ days: DEFAULT_MAP_WINDOW, layer: DEFAULT_MAP_LAYER }),
+    loadTheaterGeo(),
   ]);
   // First paragraph of the Executive Summary as the homepage excerpt.
   const firstParagraph = digest?.sections.executive_summary
@@ -135,11 +144,8 @@ export default async function HomePage() {
           </p>
         </Panel>
 
-        {/* Placeholder until the map is built (MVP 3.1). */}
         <Panel title="Regional map">
-          <div className="flex h-64 items-center justify-center rounded-xl border border-dashed border-border bg-background/60 sm:h-80">
-            <p className="text-sm text-text-secondary">Map not built yet.</p>
-          </div>
+          <MapThumbnail data={mapData} geo={mapGeo} />
         </Panel>
 
         <Panel title="Daily digest">
