@@ -26,14 +26,15 @@ permissions:
 
 jobs:
   pipeline:
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moves to Ubuntu 26 on 19 October 2026. Upgrade deliberately.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       DRY_RUN: ${{ inputs.dry_run == true }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: package.json
           cache: npm
