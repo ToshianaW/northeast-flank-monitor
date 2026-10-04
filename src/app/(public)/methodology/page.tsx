@@ -346,6 +346,14 @@ export default function MethodologyPage() {
             read at all, and pages that a site&rsquo;s robots.txt disallows are not
             fetched.
           </p>
+          <p>
+            Some reporting is found through the GDELT Project (
+            <a href="https://www.gdeltproject.org/" target="_blank" rel="noopener noreferrer" className="link">
+              www.gdeltproject.org
+            </a>
+            ), used under its terms, which ask for this citation. Events found this
+            way still cite and link the original article.
+          </p>
         </Section>
 
         <Section id="confidence" number={n("confidence")} title={t("confidence")}>

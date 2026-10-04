@@ -110,6 +110,13 @@ export default async function SourcesPage() {
           ))}
         </div>
       )}
+      <p className="mt-6 max-w-3xl text-sm text-text-secondary">
+        Some reporting is found through the GDELT Project
+        (<a href="https://www.gdeltproject.org/" target="_blank" rel="noopener noreferrer" className="link">
+          www.gdeltproject.org
+        </a>
+        ), used under its terms, which ask for this citation. Each event still links to the original article.
+      </p>
     </PageShell>
   );
 }

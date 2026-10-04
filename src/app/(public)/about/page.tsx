@@ -4,6 +4,7 @@ import { PageShell } from "@/components/page-shell";
 export const metadata = { title: "About" };
 
 const REPOSITORY_URL = "https://github.com/ToshianaW/northeast-flank-monitor";
+const ISSUES_URL = `${REPOSITORY_URL}/issues`;
 
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -63,7 +64,7 @@ export default function AboutPage() {
             >
               GitHub
             </a>
-            . The license has not been finalized yet.
+            , under the MIT licence.
           </p>
         </Block>
 
@@ -76,10 +77,12 @@ export default function AboutPage() {
 
         <Block title="Contact and contributing">
           <p>
-            <span className="text-foreground">Contact:</span>{" "}
-            <span className="border border-dashed border-text-muted px-1.5 py-0.5 font-mono text-xs text-text-muted">
-              [Placeholder — contact method to be added]
-            </span>
+            <span className="text-foreground">Contact:</span> for corrections and
+            questions, open an issue on{" "}
+            <a href={ISSUES_URL} target="_blank" rel="noopener noreferrer" className="link">
+              GitHub Issues
+            </a>
+            .
           </p>
           <p>
             Corrections, source suggestions, and code contributions can be
