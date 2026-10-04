@@ -40,7 +40,7 @@ const { values: args } = parseArgs({
   options: {
     "dry-run": { type: "boolean", default: false },
     limit: { type: "string", default: "100" },
-    "max-usd": { type: "string", default: "2.00" },
+    "max-usd": { type: "string", default: "0.25" },
     model: { type: "string", default: "claude-sonnet-5-5" },
     ci: { type: "boolean", default: false },
   },

@@ -5,10 +5,10 @@ name: Daily pipeline
 
 on:
   schedule:
-    # Both times are UTC. GitHub cron does not follow daylight saving, so the
+    # Times are UTC. GitHub cron does not follow daylight saving, so the
     # local time of each run shifts by an hour when the clocks change.
-    - cron: "0 6 * * *"
-    - cron: "0 18 * * *"
+    # Every 4 hours: 00:00, 04:00, 08:00, 12:00, 16:00, 20:00 UTC.
+    - cron: "0 */4 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -60,7 +60,7 @@ jobs:
           DATABASE_URL_POOLED: ${{ secrets.DATABASE_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          args=(--limit 80 --max-usd 0.75 --ci)
+          args=(--limit 80 --max-usd 0.25 --ci)
           if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
           npm run extract -- "${args[@]}"
 
@@ -103,8 +103,7 @@ jobs:
           DEDUP_COST: ${{ steps.dedup.outputs.cost_usd }}
         run: |
           case "$EVENT:$SCHEDULE" in
-            "schedule:0 6 * * *") run="Scheduled 06:00 UTC" ;;
-            "schedule:0 18 * * *") run="Scheduled 18:00 UTC" ;;
+            "schedule:0 */4 * * *") run="Scheduled every 4 hours (started $(date -u +%H:%M) UTC)" ;;
             schedule:*) run="Scheduled ($SCHEDULE UTC)" ;;
             *) run="Manual" ;;
           esac

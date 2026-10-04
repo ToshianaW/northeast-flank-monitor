@@ -90,11 +90,11 @@ Roadmap: `docs/mvp-plan.md` §4. Decisions that override the plan: `docs/decisio
 | Step | What exists |
 | --- | --- |
 | 2.1 | Source collector (`npm run collect`): 9 feeds, the Polish MoD news listing, and GDELT into the private `raw_documents` table (migration 0003); robots.txt, rate limits, URL and content dedup, keyword filter for broad feeds, `no_ai_processing` and `lead_only` flags |
-| 2.2 | Claude extraction (`npm run extract`): eligible `raw_documents` rows to validated DRAFT events (UNVERIFIED, one SUPPORTS source) for human review; predictive-language and excerpt checks; spend cap; `extraction_runs` log (migration 0004) |
+| 2.2 | Claude extraction (`npm run extract`): eligible `raw_documents` rows to validated DRAFT events (UNVERIFIED, one SUPPORTS source) for human review; predictive-language and excerpt checks; spend cap ($0.25 per run, `--max-usd`); `extraction_runs` log (migration 0004) |
 | 2.3 | Duplicate suggestions (`npm run dedup`): same type and country within 2 days, URL match or headline trigram similarity, one Haiku call for borderline pairs; shown on the review page with a pre-selected merge target; never merged automatically (migration 0005) |
 | 2.4 | Covered by human review (decision #12): `contradiction_flag`, notes, and CONTRADICTS sources are set by the reviewer; no automated contradiction detection |
 | 2.5 | Covered by human review (decision #13): tier, type, and reliability come from the source registry (step 1.3); the reviewer chooses confidence at approval, with a rule-based suggestion from the attached sources (no AI call) |
-| 2.6 | Twice-daily pipeline on GitHub Actions (`.github/workflows/daily.yml`): collect, extract, dedup at 06:00 and 18:00 UTC; manual dry runs; counts-only logs |
+| 2.6 | Pipeline on GitHub Actions (`.github/workflows/daily.yml`): collect, extract, dedup every 4 hours (00:00, 04:00 … 20:00 UTC); manual dry runs; counts-only logs |
 | 2.7 | Claude-drafted daily digest (`npm run digest`): PUBLISHED events for one UTC day into a DRAFT digest; every sentence cites its events (`[ref …]` markers, numbered links on the public page); code checks for unknown or missing references, banned phrases, section names, and placement of unverified events; `.github/workflows/digest.yml` at 05:00 UTC. The digest opens with a short Summary (at most 2 sentences, 45 words) that leaves out unverified and contradicted events; code adds a sentence pointing to them |
 
 **Phase 3 — Monitoring features: in progress**
