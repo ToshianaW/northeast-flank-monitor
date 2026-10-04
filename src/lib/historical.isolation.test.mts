@@ -45,6 +45,9 @@ const reads: Record<string, () => Promise<unknown>> = {
   "Archive: listArchiveEvents (2020-2022)": () =>
     publicEvents.listArchiveEvents({ from: "2020-08-01", to: "2022-02-28" }, 1),
   "Archive: listArchiveFilterOptions": () => publicEvents.listArchiveFilterOptions(),
+  "Compare (current side): listPublishedEventsBetween": () =>
+    publicEvents.listPublishedEventsBetween("2021-01-01", "2021-02-28"),
+  "Compare (current side): getPublishedCoverage": () => publicEvents.getPublishedCoverage("2021-01-01", "2021-02-28"),
   "Map: loadMapData": () => loadMapData({ days: 90, layer: "all", now: NOW }),
   "Exercises: listPublishedExercises": () => publicExercises.listPublishedExercises(),
   "Exercises: listUnderWayExercises": () => publicExercises.listUnderWayExercises(),

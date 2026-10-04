@@ -327,3 +327,51 @@ export async function listArchiveFilterOptions(): Promise<{
     actors: actors.rows.map((r) => r.value),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Side-by-side view (/historical/compare): the current side. Reads current tables only.
+// ---------------------------------------------------------------------------
+
+const WINDOW_LIMIT = 500;
+
+/** Published events dated from `from` to `to` (YYYY-MM-DD, inclusive), oldest first. */
+export async function listPublishedEventsBetween(from: string, to: string): Promise<PublicEvent[]> {
+  const { rows } = await getPool().query<PublicEvent>(
+    `SELECT ${PUBLIC_EVENT_COLUMNS}
+     FROM events
+     WHERE review_status = 'PUBLISHED' AND event_date BETWEEN $1::date AND $2::date
+     ORDER BY event_date ASC, first_reported ASC NULLS LAST, created_at ASC
+     LIMIT $3`,
+    [from, to, WINDOW_LIMIT],
+  );
+  return rows;
+}
+
+/** Published events, distinct sources and per-month counts (YYYY-MM) in the same range. */
+export async function getPublishedCoverage(
+  from: string,
+  to: string,
+): Promise<{ events: number; sources: number; months: Array<{ month: string; n: number }> }> {
+  const pool = getPool();
+  const [months, totals] = await Promise.all([
+    pool.query<{ month: string; n: number }>(
+      `SELECT to_char(event_date, 'YYYY-MM') AS month, count(*)::int AS n
+       FROM events
+       WHERE review_status = 'PUBLISHED' AND event_date BETWEEN $1::date AND $2::date
+       GROUP BY 1`,
+      [from, to],
+    ),
+    pool.query<{ events: number; sources: number }>(
+      `SELECT count(DISTINCT e.event_id)::int AS events, count(DISTINCT es.source_id)::int AS sources
+       FROM events e
+       LEFT JOIN event_sources es ON es.event_id = e.event_id
+       WHERE e.review_status = 'PUBLISHED' AND e.event_date BETWEEN $1::date AND $2::date`,
+      [from, to],
+    ),
+  ]);
+  return {
+    events: totals.rows[0]?.events ?? 0,
+    sources: totals.rows[0]?.sources ?? 0,
+    months: months.rows,
+  };
+}
