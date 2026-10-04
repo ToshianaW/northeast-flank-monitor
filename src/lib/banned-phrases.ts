@@ -33,6 +33,9 @@ export function findBannedPhrase(text: string): string | null {
 export const COMPARISON_WORDING = [
   /\bphases?\b/i,
   /\bP[0-4]\b/,
+  /\bearly[- ]stages?\b/i,
+  /\bprecursor\w*/i,
+  /\bleading up to\b/i,
   /\bresembl\w*/i,
   /\bsimilar\w*/i,
   /\banalog(ue|ous|y)?\b/i,
@@ -52,15 +55,17 @@ export const COMPARISON_WORDING = [
 ];
 
 /**
- * The one fixed caveat that names what the view does not claim. It necessarily uses words from
- * COMPARISON_WORDING, so findComparisonWording skips this exact sentence.
+ * The fixed caveat shown wherever historical and current events sit side by side (the compare
+ * page, the digest's Historical Context section). It necessarily uses a word from
+ * COMPARISON_WORDING, so findComparisonWording skips this exact sentence and nothing else.
  */
-export const COMPARISON_CAVEAT =
-  "Sharing an event type does not mean the two periods resemble each other, and this record does not predict what happens next.";
+export const SIMILARITY_CAVEAT = "Similarity in nature does not mean the same outcome will follow.";
 
-/** The first comparison wording found in the text (the fixed caveat excluded), or null. */
+export const COMPARISON_EXEMPT = [SIMILARITY_CAVEAT];
+
+/** The first comparison wording found in the text (the exact exempt sentence excluded), or null. */
 export function findComparisonWording(text: string): string | null {
-  const rest = text.replaceAll(COMPARISON_CAVEAT, " ");
+  const rest = COMPARISON_EXEMPT.reduce((t, exempt) => t.replaceAll(exempt, " "), text);
   for (const re of COMPARISON_WORDING) {
     const match = rest.match(re);
     if (match) return match[0];

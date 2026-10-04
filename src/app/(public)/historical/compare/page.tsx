@@ -6,32 +6,68 @@ import { PageShell } from "@/components/page-shell";
 import { Button } from "@/components/ui/button";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import {
-  COMPARISON_CAVEAT,
   compareRows,
+  coversText,
+  CURRENT_FLOOR_NOTE,
   CURRENT_METHOD_NOTE,
   currentCoverageNote,
   currentMonthOptions,
-  GROUPING_NOTE,
   hasEnoughHistorical,
   HISTORICAL_METHOD_NOTE,
   historicalMonthOptions,
+  historicalShiftLinks,
+  HOW_TO_READ,
+  LENGTH_OPTIONS,
+  lengthLabel,
+  showingText,
+  windowMonths,
+  type ShiftLink,
   NONE_IN_WINDOW,
   otherTypesText,
   parseCompareWindows,
   SCALE_NOTE,
+  SIMILARITY_CAVEAT,
   tooFewText,
   toCoverage,
   windowLabel,
   windowLengthNote,
   type CompareRow,
 } from "@/lib/historical-compare";
-import { coverageNote, COUNTS_NOTE, HISTORICAL_LABEL, lastDayOf, monthLabel } from "@/lib/historical-rules";
+import {
+  coverageNote,
+  HISTORICAL_LABEL,
+  lastDayOf,
+  monthLabel,
+  type HistoricalPeriod,
+} from "@/lib/historical-rules";
 import { getPublishedCoverage, listPublishedEventsBetween, type PublicEvent } from "@/lib/public-events";
 import { getHistoricalCoverage, listPublishedHistorical, type PublicHistoricalEvent } from "@/lib/public-historical";
 
 export const metadata = { title: "Side-by-side view" };
 
 type Row = CompareRow<PublicHistoricalEvent, PublicEvent>;
+
+/** Earlier / Later on the historical side: plain links, or a disabled control at an end of the record. */
+function ShiftControl({ link }: { link: ShiftLink }) {
+  const text = link.direction === "earlier" ? "← Earlier" : "Later →";
+  const base = "inline-flex h-8 items-center rounded-lg border px-3 text-sm";
+  if (link.disabled) {
+    return (
+      <span role="link" aria-disabled="true" aria-label={link.label} className={`${base} cursor-not-allowed border-border text-text-muted opacity-60`}>
+        {text}
+      </span>
+    );
+  }
+  return (
+    <Link
+      href={link.href}
+      aria-label={link.label}
+      className={`${base} border-input text-foreground hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-blue`}
+    >
+      {text}
+    </Link>
+  );
+}
 
 function MonthSelect({ name, label, value, options }: { name: string; label: string; value: string; options: string[] }) {
   return (
@@ -46,6 +82,33 @@ function MonthSelect({ name, label, value, options }: { name: string; label: str
           </NativeSelectOption>
         ))}
       </NativeSelect>
+    </div>
+  );
+}
+
+function LengthSelect({ name, value }: { name: string; value: number }) {
+  return (
+    <div className="grid gap-1">
+      <label htmlFor={`w-${name}`} className="meta-label">
+        Length
+      </label>
+      <NativeSelect id={`w-${name}`} name={name} defaultValue={String(value)} className="w-full">
+        {LENGTH_OPTIONS.map((n) => (
+          <NativeSelectOption key={n} value={String(n)}>
+            {lengthLabel(n)}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
+    </div>
+  );
+}
+
+/** The range actually shown, and why it differs from the request when it does. */
+function WindowRange({ period, note }: { period: HistoricalPeriod; note: string | null }) {
+  return (
+    <div className="col-span-2 grid gap-0.5 text-sm">
+      <p className="font-mono text-foreground">{showingText(period)}</p>
+      {note ? <p className="text-xs text-text-secondary">{note}</p> : null}
     </div>
   );
 }
@@ -129,6 +192,7 @@ export default async function ComparePage({ searchParams }: PageProps<"/historic
   const rows = enough ? compareRows(historicalEvents, currentEvents) : null;
   const labels: [string, string] = [windowLabel(hp), windowLabel(cp)];
   const lengthNote = windowLengthNote(windows);
+  const shiftLinks = historicalShiftLinks(windows);
 
   return (
     <PageShell
@@ -148,24 +212,46 @@ export default async function ComparePage({ searchParams }: PageProps<"/historic
           Historical comparison
         </Link>
 
+        <section aria-labelledby="how-to-read" className="panel grid gap-2">
+          <h2 id="how-to-read" className="font-medium text-foreground">
+            How to read this page
+          </h2>
+          <ol className="grid list-[lower-alpha] gap-1.5 pl-5 text-sm text-text-secondary">
+            {HOW_TO_READ.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ol>
+        </section>
+
         <form method="get" action="/historical/compare" className="panel grid gap-4 p-4 sm:p-6">
           <div className="grid gap-4 sm:grid-cols-2">
             <fieldset className="grid grid-cols-2 gap-3">
               <legend className="mb-2 text-sm font-medium">Historical window</legend>
               <MonthSelect name="hfrom" label="From" value={hp.from} options={historicalMonthOptions()} />
-              <MonthSelect name="hto" label="To" value={hp.to} options={historicalMonthOptions()} />
+              <LengthSelect name="hlen" value={windowMonths(hp)} />
+              <WindowRange period={hp} note={windows.notes.historical} />
             </fieldset>
             <fieldset className="grid grid-cols-2 gap-3">
               <legend className="mb-2 text-sm font-medium">Current window</legend>
+              <p className="col-span-2 -mt-1 text-xs text-text-secondary">{CURRENT_FLOOR_NOTE}</p>
               <MonthSelect name="cfrom" label="From" value={cp.from} options={currentMonthOptions(now)} />
-              <MonthSelect name="cto" label="To" value={cp.to} options={currentMonthOptions(now)} />
+              <LengthSelect name="clen" value={windowMonths(cp)} />
+              <WindowRange period={cp} note={windows.notes.current} />
             </fieldset>
           </div>
           <div className="flex flex-wrap items-end gap-4">
             <Button type="submit">Show</Button>
-            <p className="text-xs text-text-secondary">Each window covers up to 6 months.</p>
+            <p className="text-xs text-text-secondary">Each window covers 1 to 6 months.</p>
           </div>
         </form>
+
+        <nav aria-label="Move the historical window" className="flex flex-wrap items-center gap-3">
+          <span className="meta-label">Historical window</span>
+          <ShiftControl link={shiftLinks[0]} />
+          <span className="font-mono text-sm">{labels[0]}</span>
+          <ShiftControl link={shiftLinks[1]} />
+          <span className="text-xs text-text-secondary">Moves by the window&rsquo;s own length; the current window stays.</span>
+        </nav>
 
         <section aria-labelledby="notes" className="grid gap-3 border-l-2 border-teal-blue bg-surface-dark px-4 py-3">
           <h2 id="notes" className="font-medium text-foreground">
@@ -173,18 +259,16 @@ export default async function ComparePage({ searchParams }: PageProps<"/historic
           </h2>
           <ul className="grid list-disc gap-1.5 pl-5 text-sm text-text-secondary">
             <li>
-              <span className="text-foreground">Historical, {labels[0]}:</span> {coverageNote(historicalCoverage)}{" "}
-              {HISTORICAL_METHOD_NOTE} {HISTORICAL_LABEL}
+              <span className="text-foreground">Historical, {labels[0]}:</span> {coversText(hp)}{" "}
+              {coverageNote(historicalCoverage)} {HISTORICAL_METHOD_NOTE} {HISTORICAL_LABEL}
             </li>
             <li>
-              <span className="text-foreground">Current, {labels[1]}:</span> {currentCoverageNote(currentCoverage, now)}{" "}
-              {CURRENT_METHOD_NOTE}
+              <span className="text-foreground">Current, {labels[1]}:</span> {coversText(cp)}{" "}
+              {currentCoverageNote(currentCoverage, now)} {CURRENT_METHOD_NOTE}
             </li>
             <li>{SCALE_NOTE}</li>
-            <li>{COUNTS_NOTE}</li>
             {lengthNote ? <li>{lengthNote}</li> : null}
-            <li>{GROUPING_NOTE}</li>
-            <li className="text-foreground">{COMPARISON_CAVEAT}</li>
+            <li className="text-foreground">{SIMILARITY_CAVEAT}</li>
           </ul>
         </section>
 
