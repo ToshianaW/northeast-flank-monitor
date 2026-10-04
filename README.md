@@ -10,7 +10,7 @@ Observe behavior. Track the baseline. Compare historically. Do not predict inten
 
 - Next.js (App Router) + TypeScript + Tailwind CSS
 - Single app: public site + protected `/admin` route group
-- Top-level `workers/`, `data/`, `docs/` (Python workers and datasets arrive in later steps)
+- Top-level `workers/` (TypeScript, run with tsx; decision 8), `data/`, `docs/`
 - PostgreSQL + PostGIS, MapLibre, Claude pipeline — see `docs/spec.md` and the project MVP plan
 
 ## Run locally
@@ -41,16 +41,16 @@ Each migration runs in a single transaction, so a failure leaves the database un
 
 ## Collector
 
-Fetches the last 48 hours from configured feeds, the Polish MoD news listing, and the GDELT DOC API into the private `raw_documents` table (migration 0003). Nothing in `raw_documents` is shown on the site.
+Fetches the last 48 hours from configured feeds, two gov.pl news listings (Polish MoD and RCB), and the GDELT DOC API into the private `raw_documents` table (migration 0003). For sources whose robots.txt and terms allow it (decisions 16, 17 and 19), the article page of each item that passed the keyword and region filters is read for full text, at most 30 pages a run. Nothing in `raw_documents` is shown on the site.
 
 ```bash
 npm run collect
 ```
 
-- Configuration: `data/sources/collector.json` (feeds, listing, GDELT queries, keyword filter, rate limits).
+- Configuration: `data/sources/collector.json` (feeds, listings, GDELT queries, keyword and region filters, full-text opt-ins, skip lists, rate limits).
 - Needs `DATABASE_URL` (the direct connection) in `.env.local` or the environment.
 - Honors robots.txt, identifies itself as `NortheastFlankMonitor-collector/0.1`, and waits between requests to the same host (GDELT: at least 6 s after each response).
-- Prints one summary line per source; exits with code 1 if any source failed.
+- Prints one summary line per source and a full-text line (counts only); exits with code 1 only if more than half of the sources failed.
 - GDELT data is used under its terms, which require citing the GDELT Project with a link to https://www.gdeltproject.org/.
 
 ## Daily digest
@@ -89,7 +89,7 @@ Roadmap: `docs/mvp-plan.md` §4. Decisions that override the plan: `docs/decisio
 
 | Step | What exists |
 | --- | --- |
-| 2.1 | Source collector (`npm run collect`): 9 feeds, the Polish MoD news listing, and GDELT into the private `raw_documents` table (migration 0003); robots.txt, rate limits, URL and content dedup, keyword filter for broad feeds, `no_ai_processing` and `lead_only` flags |
+| 2.1 | Source collector (`npm run collect`): 29 feeds, 2 gov.pl listings, and GDELT into the private `raw_documents` table (migration 0003); robots.txt, rate limits, URL and content dedup, keyword and region filters (English, Polish, Lithuanian, Latvian and Russian stems), full text for 16 opted-in feeds and listings, `no_ai_processing` and `lead_only` flags, skip lists |
 | 2.2 | Claude extraction (`npm run extract`): eligible `raw_documents` rows to validated DRAFT events (UNVERIFIED, one SUPPORTS source) for human review; predictive-language and excerpt checks; spend cap ($0.25 per run, `--max-usd`); `extraction_runs` log (migration 0004) |
 | 2.3 | Duplicate suggestions (`npm run dedup`): same type and country within 2 days, URL match or headline trigram similarity, one Haiku call for borderline pairs; shown on the review page with a pre-selected merge target; never merged automatically (migration 0005) |
 | 2.4 | Covered by human review (decision #12): `contradiction_flag`, notes, and CONTRADICTS sources are set by the reviewer; no automated contradiction detection |
@@ -110,10 +110,11 @@ Roadmap: `docs/mvp-plan.md` §4. Decisions that override the plan: `docs/decisio
 | Step | What exists |
 | --- | --- |
 | 4.0 | Separate historical tables (migration 0008: `historical_events`, `historical_event_sources`, `historical_review_actions`), so no current-facing query can return a historical row (isolation and static tests). Database rules: a published historical event needs a supporting Tier 1–3 source, excerpts are 20 words or fewer, a source's tier cannot be changed if that would leave a published historical event Tier 4-only. Admin `/admin/historical` (own queue; reviewer name on every save, approve, reject and unpublish; phase tag admin-only). Public `/historical` by month with a period filter and `/historical/[id]`, each with a coverage note. Historical-only sources are never collected, hidden from current pickers, and labelled on `/sources` |
+| 4.1 | Context band and type-and-month views on `/historical`; manual candidate suggester (`npm run historical:suggest`, spend cap, verbatim-excerpt and date checks, never scheduled) with source and archive probes that read robots.txt and terms first; admin import page (`/admin/historical/import`) that saves ticked candidates as drafts for review |
 
 **Planned, off the sidebar:** Side-by-side view (`/historical/compare`, roadmap Phase 5: synchronized timelines and the indicator matrix), listed in `PLANNED_PAGES` (`src/lib/nav.ts`). The live page is Historical Comparison (`/historical`).
 
-**Next:** step 3.4 (Air Activity page); Phase 4 import and candidate suggester.
+**Next:** step 3.4 (Air Activity page).
 
 ## License
 

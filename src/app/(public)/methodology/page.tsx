@@ -336,6 +336,15 @@ export default function MethodologyPage() {
           </div>
           <Subhead>Source types</Subhead>
           <p>{SOURCE_TYPE_VALUES.map((v) => SOURCE_TYPE_LABELS[v]).join(" · ")}</p>
+          <Subhead>How sources are read</Subhead>
+          <p>
+            For some sources the full article page is read to extract events.
+            Only our own summary, an excerpt of 20 words or fewer, and a link to
+            the original are stored with an event or shown on this site; the
+            article text read for extraction is kept privately and never
+            published. Sources whose terms or robots.txt prohibit this are not
+            read.
+          </p>
         </Section>
 
         <Section id="confidence" number={n("confidence")} title={t("confidence")}>
@@ -523,7 +532,7 @@ export default function MethodologyPage() {
           <Subhead>Now</Subhead>
           <ul className="list-disc pl-5">
             <li>
-              Sources are collected automatically twice a day. Every event is
+              Sources are collected automatically every 4 hours. Every event is
               reviewed by a person before it is published.
             </li>
             <li>
@@ -574,7 +583,7 @@ export default function MethodologyPage() {
           </Subhead>
           <ul className="list-disc pl-5">
             <li>Air activity page</li>
-            <li>Historical comparison</li>
+            <li>Side-by-side comparison of current activity with the historical record</li>
             <li>Northeast Flank Activity Index</li>
             <li>Open data: downloadable datasets and a read-only API</li>
           </ul>
