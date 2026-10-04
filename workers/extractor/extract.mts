@@ -17,6 +17,7 @@ import { getPool } from "@/lib/db";
 import { insertEvent, type EventWritePayload } from "@/lib/events";
 import type { Reliability, SourceType } from "@/lib/source-labels";
 import { setOutput } from "../lib/ci.mjs";
+import { failureReason, type RowErrorKind } from "./failure.mjs";
 import {
   buildUserMessage,
   OUTPUT_SCHEMA,
@@ -99,6 +100,8 @@ type RowResult = {
   dropped: Array<{ headline: string; excerpt: string; reason: string }>;
   costUsd: number;
   error?: string;
+  /** Set with `error`: a short label for the job summary. */
+  errorKind?: RowErrorKind;
 };
 
 const pool = getPool();
@@ -153,7 +156,7 @@ const totals = {
   cacheWriteTokens: 0,
   costUsd: 0,
 };
-const errors: Array<{ raw_document_id: string; error: string }> = [];
+const errors: Array<{ raw_document_id: string; error: string; kind: RowErrorKind }> = [];
 const results: RowResult[] = [];
 let stopReason: "COMPLETED" | "ROW_LIMIT" | "SPEND_CAP" | "ERROR" =
   !dryRun && eligible.length > rowLimit ? "ROW_LIMIT" : "COMPLETED";
@@ -169,6 +172,7 @@ async function extractRow(row: Row): Promise<RowResult> {
   const text = row.raw_text ?? "";
   if (text.length > MAX_TEXT_CHARS) {
     result.error = `text is ${text.length} chars (limit ${MAX_TEXT_CHARS}); left NEW`;
+    result.errorKind = "text_too_long";
     return result;
   }
   const publishedAt = row.published_at ?? row.fetched_at;
@@ -211,17 +215,20 @@ async function extractRow(row: Row): Promise<RowResult> {
 
   if (response.stop_reason !== "end_turn") {
     result.error = `stop_reason ${response.stop_reason}`;
+    result.errorKind = "model_stop";
     return result;
   }
   const textBlock = response.content.find((b) => b.type === "text");
   if (!textBlock || textBlock.type !== "text") {
     result.error = "no text block in response";
+    result.errorKind = "no_text_block";
     return result;
   }
   try {
     result.output = JSON.parse(textBlock.text) as ExtractionOutput;
   } catch {
     result.error = "response was not valid JSON";
+    result.errorKind = "invalid_json";
     return result;
   }
 
@@ -366,10 +373,17 @@ try {
     try {
       r = await extractRow(row);
     } catch (error) {
-      r = { row, output: null, kept: [], dropped: [], costUsd: 0, error: error instanceof Error ? error.message : String(error) };
-      if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
-        stopReason = "ERROR";
-      }
+      const auth = error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError;
+      r = {
+        row,
+        output: null,
+        kept: [],
+        dropped: [],
+        costUsd: 0,
+        error: error instanceof Error ? error.message : String(error),
+        errorKind: auth ? "api_auth" : "api_error",
+      };
+      if (auth) stopReason = "ERROR";
     }
     totals.costUsd += r.costUsd;
     results.push(r);
@@ -379,7 +393,7 @@ try {
     }
     if (r.error) {
       totals.rowsFailed++;
-      errors.push({ raw_document_id: row.id, error: r.error });
+      errors.push({ raw_document_id: row.id, error: r.error, kind: r.errorKind ?? "api_error" });
       if (stopReason === "ERROR") break;
       continue;
     }
@@ -389,7 +403,11 @@ try {
         totals.eventsCreated += r.kept.length;
       } catch (error) {
         totals.rowsFailed++;
-        errors.push({ raw_document_id: row.id, error: `write failed: ${error instanceof Error ? error.message : error}` });
+        errors.push({
+          raw_document_id: row.id,
+          error: `write failed: ${error instanceof Error ? error.message : error}`,
+          kind: "write_failed",
+        });
         continue;
       }
     }
@@ -451,6 +469,8 @@ if (ci) {
   setOutput("drafts_created", totals.eventsCreated);
   setOutput("drafts_would_create", dryRun ? totals.eventsProposed - totals.eventsRejected : 0);
   setOutput("cost_usd", totals.costUsd.toFixed(4));
+  // Why the step exits 1 (labels and counts only), for the job summary.
+  setOutput("failure_reason", failureReason(errors));
 }
 if (errors.length > 0) process.exitCode = 1;
 
