@@ -3,8 +3,8 @@
  * Pure: selection, grouping, counts and the minimum-data rule. No database, no historical data.
  */
 import { DIMENSIONS } from "@/lib/activity-index";
-import { EVENT_TYPE_LABELS, type EventType } from "@/lib/event-labels";
-import { UNITS, unitName } from "@/lib/placement";
+import type { EventType } from "@/lib/event-labels";
+import { monthLabel } from "@/lib/list-filters";
 
 /** The air types: the Activity Index "Air activity" dimension, so both use one list. */
 export const AIR_TYPES: readonly EventType[] = DIMENSIONS.AIR_ACTIVITY.types;
@@ -49,68 +49,20 @@ export function airCategory(event: { event_type: EventType; headline: string; su
 /** Map area of an item: a gazetteer unit id, THEATER-WIDE, or UNPLACED (as on the map). */
 export type AirArea = string;
 
-export function areaLabel(area: AirArea): string {
-  if (area === "THEATER-WIDE") return "Theater-wide";
-  if (area === "UNPLACED") return "Location unclear";
-  return unitName(area);
-}
-
-/** Areas in map (gazetteer) order, then theater-wide, then unplaced. */
-function areaOrder(area: AirArea): number {
-  const i = UNITS.findIndex((u) => u.id === area);
-  if (i >= 0) return i;
-  return area === "THEATER-WIDE" ? UNITS.length : UNITS.length + 1;
-}
-
 export type AirItem<E> = { date: string; type: EventType; area: AirArea; category: AirCategory; event: E };
 
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
-export function monthLabel(month: string): string {
-  const [y, m] = month.split("-").map(Number);
-  return `${MONTHS[m - 1]} ${y}`;
-}
-
-/** Months newest first; inside each month, areas in map order; items newest first. */
-export function groupByMonthAndArea<E>(items: readonly AirItem<E>[]) {
+/** Months newest first; items newest first inside each month. */
+export function groupByMonth<E>(items: readonly AirItem<E>[]) {
   const months = [...new Set(items.map((i) => i.date.slice(0, 7)))].sort().reverse();
-  return months.map((month) => {
-    const inMonth = items.filter((i) => i.date.startsWith(month));
-    const areas = [...new Set(inMonth.map((i) => i.area))].sort((a, b) => areaOrder(a) - areaOrder(b));
-    return {
-      month,
-      label: monthLabel(month),
-      areas: areas.map((area) => ({
-        area,
-        label: areaLabel(area),
-        items: inMonth.filter((i) => i.area === area).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)),
-      })),
-    };
-  });
+  return months.map((month) => ({
+    month,
+    label: monthLabel(month),
+    items: items.filter((i) => i.date.startsWith(month)).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)),
+  }));
 }
 
 const addDays = (date: string, n: number) =>
   new Date(new Date(`${date}T00:00:00Z`).getTime() + n * 86_400_000).toISOString().slice(0, 10);
-
-/** Counts per type (air types, then deployment types): last 30 days and all time. */
-export function countsByType<E>(items: readonly AirItem<E>[], today: string) {
-  const since = addDays(today, -29);
-  return [...AIR_TYPES, ...DEPLOYMENT_TYPES].map((type) => {
-    const all = items.filter((i) => i.type === type);
-    return {
-      type,
-      label: DEPLOYMENT_TYPES.includes(type) ? `${EVENT_TYPE_LABELS[type]} (aircraft)` : EVENT_TYPE_LABELS[type],
-      last30: all.filter((i) => i.date >= since && i.date <= today).length,
-      all: all.length,
-    };
-  });
-}
-
-/** Counts per area, in map order (areas with no items left out). */
-export function countsByArea<E>(items: readonly AirItem<E>[]) {
-  const areas = [...new Set(items.map((i) => i.area))].sort((a, b) => areaOrder(a) - areaOrder(b));
-  return areas.map((area) => ({ area, label: areaLabel(area), count: items.filter((i) => i.area === area).length }));
-}
 
 /** Weekly counts (spec §19 charts) need at least this many events over this many complete weeks. */
 export const MIN_WEEKLY_EVENTS = 20;

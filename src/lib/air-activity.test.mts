@@ -9,9 +9,7 @@ import { test } from "node:test";
 import {
   AIR_TYPES,
   airCategory,
-  countsByArea,
-  countsByType,
-  groupByMonthAndArea,
+  groupByMonth,
   MIN_WEEKLY_EVENTS,
   minimumDataText,
   SAFETY_NOTE,
@@ -50,23 +48,10 @@ const item = (date: string, area: string, type: EventType = "AIR_ACTIVITY"): Air
   date, type, area, category: "air", event: { id: `${date}-${area}-${type}` },
 });
 
-test("grouped by month (newest first), then area in map order, newest first inside", () => {
-  const groups = groupByMonthAndArea([
-    item("2026-09-15", "LT"), item("2026-10-03", "LV"), item("2026-10-01", "PL"), item("2026-10-02", "PL"),
-    item("2026-10-02", "THEATER-WIDE"), item("2026-10-01", "UNPLACED"),
-  ]);
+test("grouped by month, newest first, items newest first inside", () => {
+  const groups = groupByMonth([item("2026-09-15", "LT"), item("2026-10-01", "PL"), item("2026-10-03", "LV"), item("2026-10-02", "PL")]);
   assert.deepEqual(groups.map((g) => g.label), ["October 2026", "September 2026"]);
-  assert.deepEqual(groups[0].areas.map((a) => a.label), ["Poland", "Latvia", "Theater-wide", "Location unclear"]);
-  assert.deepEqual(groups[0].areas[0].items.map((i) => i.date), ["2026-10-02", "2026-10-01"]);
-});
-
-test("counts by type (30 days and all) and by area", () => {
-  const items = [item("2026-10-01", "PL"), item("2026-08-01", "PL"), item("2026-10-02", "LT", "AIR_DEFENSE"),
-    { ...item("2026-10-03", "LV", "NATO_REINFORCEMENT"), category: "aircraft-deployment" as const }];
-  const byType = countsByType(items, "2026-10-04");
-  assert.deepEqual(byType.find((r) => r.type === "AIR_ACTIVITY"), { type: "AIR_ACTIVITY", label: "Air Activity", last30: 1, all: 2 });
-  assert.equal(byType.find((r) => r.type === "NATO_REINFORCEMENT")!.label, "NATO Reinforcement (aircraft)");
-  assert.deepEqual(countsByArea(items).map((a) => [a.label, a.count]), [["Poland", 2], ["Lithuania", 1], ["Latvia", 1]]);
+  assert.deepEqual(groups[0].items.map((i) => i.date), ["2026-10-03", "2026-10-02", "2026-10-01"]);
 });
 
 test("minimum data: weekly counts only with 20 events over 8 complete weeks", () => {
@@ -91,6 +76,9 @@ test("wording and display: no comparison or predictive wording, no arrows, no re
   assert.ok(!/[↑↓↗↘▲▼]/.test(page), "no arrows");
   assert.ok(!/\b(red|destructive|alert|danger)\b/i.test(page), "no red");
   assert.ok(!/latitude|longitude/.test(page), "the page never touches coordinates");
+  assert.ok(!/Events by type|Events by area|countsByType|countsByArea/.test(page), "the type and area count panels are gone");
+  assert.ok(page.includes('<ListFilterForm action="/air-activity"'));
+  assert.match(page, /<ShowMoreList/);
   const loader = read("src/lib/public-air-activity.ts");
   assert.match(loader, /heldByDecision11\(row, now\)/, "decision 11 as on the map");
   assert.match(loader, /e\.review_status = 'PUBLISHED'/);

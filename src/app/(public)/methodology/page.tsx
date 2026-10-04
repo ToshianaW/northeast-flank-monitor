@@ -660,7 +660,8 @@ export default function MethodologyPage() {
             <li>
               The air activity page lists published air, air-defence, airfield,
               airspace, drone and missile events, plus deployments that involve
-              aircraft, by month and area, with the same safety rules as the map.
+              aircraft, by month, searchable by country and month, with the same
+              safety rules as the map.
               Weekly counts appear only once there is enough data.
             </li>
           </ul>
