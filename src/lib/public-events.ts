@@ -16,7 +16,7 @@ import { SOURCE_TYPE_VALUES, type SourceType } from "@/lib/source-labels";
  * review state, AI summary) and raw coordinates (spec §60).
  */
 
-const PUBLIC_EVENT_FIELDS = [
+export const PUBLIC_EVENT_FIELDS = [
   "event_id",
   "event_date",
   "reported_date",
