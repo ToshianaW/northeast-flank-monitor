@@ -27,3 +27,16 @@ test("GDELT domain attribution leaves historical-only sources out", () => {
   assert.deepEqual([...registry.byDomain.keys()], ["current.example.org"]);
   assert.equal(registry.byDomain.get("current.example.org")?.noAi, true);
 });
+
+test("a domain shared by two current sources (gov.pl paths) is not attributed to either", () => {
+  const shared = buildRegistry(
+    [
+      { id: "mon", name: "Polish Ministry of National Defence", home_url: "https://www.gov.pl/web/obrona-narodowa", historical_only: false },
+      { id: "rcb", name: "Government Security Centre (RCB)", home_url: "https://www.gov.pl/web/rcb", historical_only: false },
+      { id: "x", name: "Other", home_url: "https://other.example.org", historical_only: false },
+    ],
+    { noAiSources: new Set(), leadOnlySources: new Set() },
+  );
+  assert.deepEqual([...shared.byDomain.keys()], ["other.example.org"]);
+  assert.equal(shared.sourceIdFor("Government Security Centre (RCB)"), "rcb", "feeds and listings still resolve by name");
+});

@@ -26,8 +26,8 @@ const BARRED = [
 ];
 
 test("the two exclusion lists: automated-access blocks and terms prohibitions, no overlap", () => {
-  assert.deepEqual(collector.blocked_automated_access, ["kam.lt", "kariuomene.lt", "reuters.com"]);
-  assert.deepEqual(collector.tos_prohibited_domains, ["t.me", "telegram.me", "telegram.org", "discord.com", "discord.gg"]);
+  assert.deepEqual(collector.blocked_automated_access, ["kam.lt", "kariuomene.lt", "reuters.com", "lrvk.lrv.lt", "ve.lt"]);
+  assert.deepEqual(collector.tos_prohibited_domains, ["jauns.lv", "t.me", "telegram.me", "telegram.org", "discord.com", "discord.gg"]);
   assert.ok(!collector.blocked_automated_access.some((d) => collector.tos_prohibited_domains.includes(d)));
 });
 

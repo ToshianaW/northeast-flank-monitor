@@ -5,8 +5,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { collectFeed, foldDiacritics, makeKeywordMatcher, makePolishMatcher, type FeedConfig } from "./feeds.mjs";
+import { collectFeed, foldDiacritics, makeKeywordMatcher, makePolishMatcher, makeRegionMatcher, type FeedConfig } from "./feeds.mjs";
 import type { HttpClient } from "./fetch.mjs";
+import { collectListing } from "./listing.mjs";
 
 const config = JSON.parse(readFileSync("data/sources/collector.json", "utf8")) as {
   keywords: string[];
@@ -84,4 +85,165 @@ test("pay_status: Paid items keep title and link only; Free and Preview keep the
     ],
   );
   assert.ok(docs.every((d) => d.skipReason === undefined), "titles alone pass the filter (wojsk)");
+});
+
+const regionConfig = JSON.parse(readFileSync("data/sources/collector.json", "utf8")) as {
+  region_terms: string[];
+  region_terms_pl: string[];
+  feeds: FeedConfig[];
+  listings: Array<{ key: string; region_filter?: boolean }>;
+};
+const region = makeRegionMatcher(regionConfig.region_terms, regionConfig.region_terms_pl);
+
+test("Polish region terms: case endings and diacritics fold; English terms still work", () => {
+  for (const t of [
+    "Polska wzmacnia granicę",
+    "Polscy żołnierze na ćwiczeniach",
+    "Białoruś przerzuca wojska",
+    "Ambasador na Litwie",
+    "Manewry na Łotwie",
+    "Estońska armia",
+    "Okręt na Bałtyku",
+    "Obwód Królewiecki",
+    "Na wschodniej flance NATO",
+    "Incydent w Zatoce Gdańskiej",
+    "Troops near the Belarus border",
+  ]) assert.ok(region(t), t);
+  for (const t of ["Połączenie kolejowe do Berlina", "Wybory we Francji", "Ukraine strikes on Kyiv", "Polar ice research"]) {
+    assert.ok(!region(t), t);
+  }
+});
+
+test("region filters on rp.pl, mezha.net, 15min and AiF-Kaliningrad; none on Defence24 or the Polish MoD listing", () => {
+  const byKey = new Map(regionConfig.feeds.map((f) => [f.key, f]));
+  for (const key of ["rp-wojsko", "rp-radar-zbrojeniowy", "rp-konflikty", "rp-swiat", "mezha-en", "15min-lt", "aif-klg"]) {
+    assert.equal(byKey.get(key)?.region_filter, true, key);
+  }
+  assert.ok(!byKey.get("defence24")?.region_filter, "Defence24 keeps every row it kept before");
+  assert.equal(byKey.get("defence24")?.keyword_filter, true);
+  assert.ok(!regionConfig.listings.find((l) => l.key === "govpl-mon")?.region_filter);
+  const mezha = byKey.get("mezha-en")!;
+  assert.equal(mezha.keyword_filter, true);
+  assert.equal(mezha.match_chars, 500);
+});
+
+const localConfig = JSON.parse(readFileSync("data/sources/collector.json", "utf8")) as Record<string, string[]>;
+const lt = makePolishMatcher(localConfig.keyword_stems_lt, localConfig.keyword_whole_words_pl);
+const lv = makePolishMatcher(localConfig.keyword_stems_lv, localConfig.keyword_whole_words_pl);
+const regionLt = makeRegionMatcher(localConfig.region_terms, localConfig.region_terms_pl, localConfig.region_terms_lt);
+const regionLv = makeRegionMatcher(localConfig.region_terms, localConfig.region_terms_pl, localConfig.region_terms_lv);
+const regionRu = makeRegionMatcher(localConfig.region_terms, localConfig.region_terms_pl, localConfig.region_terms_ru);
+
+test("Lithuanian keyword stems: the owner's terms, with case endings and diacritics", () => {
+  for (const t of [
+    "Paskelbtas oro pavojus Vilniuje",
+    "Pažeista Lietuvos oro erdvė",
+    "Virš Lietuvos skrido dronas",
+    "Rusija išbandė raketą",
+    "Kariuomenė pradeda pratybas",
+    "Pastebėti kariniai orlaiviai",
+    "Prasidėjo pratybos prie sienos",
+    "NATO sąjungininkai",
+  ]) assert.ok(lt(t), t);
+  for (const t of ["Krepšinio rungtynės Kaune", "Orų prognozė savaitgaliui", "Nato"]) assert.ok(!lt(t), t);
+});
+
+test("Latvian keyword stems: the owner's terms", () => {
+  for (const t of [
+    "Izsludināta gaisa trauksme",
+    "Pārkāpta Latvijas gaisa telpa",
+    "Virs Latgales lidoja drons",
+    "Krievija palaida raķeti",
+    "Armija sāk mācības",
+    "NATO mācības Ādažos",
+  ]) assert.ok(lv(t), t);
+  for (const t of ["Jaunais mācību gads skolās", "Laikapstākļu prognoze"]) assert.ok(!lv(t), t);
+});
+
+test("region stems by language: Lithuanian, Latvian and Russian (Cyrillic folding)", () => {
+  for (const t of ["Baltarusija telkia pajėgas", "Kaliningrado sritis", "Karaliaučiaus kraštas", "Lietuvos kariuomenė", "Baltijos jūroje"]) assert.ok(regionLt(t), t);
+  for (const t of ["Baltkrievija un Krievija", "Kaļiņingradas apgabals", "Igaunijas armija", "Latvijas robeža"]) assert.ok(regionLv(t), t);
+  for (const t of ["Учения в Калининградской области", "Балтийский флот", "Граница с Литвой", "Белоруссия и Польша"]) assert.ok(regionRu(t), t);
+  assert.ok(!regionRu("Футбольный матч в Москве"));
+  assert.ok(!regionLt("Krepšinis Kaune"));
+  assert.ok(!regionLv("Laikapstākļi Rīgā"));
+  assert.ok(!region("Учения в Калининградской области"), "Russian stems apply only to Russian feeds");
+});
+
+test("configured stems are folded, lowercase and free of regex syntax (escape guard)", () => {
+  for (const key of ["keyword_stems_pl", "region_terms_pl", "keyword_stems_lt", "keyword_stems_lv", "region_terms_lt", "region_terms_lv", "region_terms_ru"]) {
+    for (const stem of localConfig[key]) {
+      assert.equal(foldDiacritics(stem), stem, `${key}: "${stem}" is not folded`);
+      assert.ok(!/[.*+?^${}()|[\]\\\u0000-\u001f]/.test(stem), `${key}: "${stem}" has regex syntax or a control character`);
+    }
+  }
+});
+
+test("stem_filter: a Lithuanian feed needs a Lithuanian keyword stem and a region term", async () => {
+  const xml = feedXml([
+    { title: "Virš Lietuvos skrido dronas", description: "Pranešė kariuomenė." },
+    { title: "Krepšinio rungtynės", description: "Lietuvos rinktinė laimėjo." },
+    { title: "Dronas virš Paryžiaus", description: "Prancūzijos policija." },
+  ]);
+  const http = { get: async () => ({ status: 200, body: xml }) } as unknown as HttpClient;
+  const feed: FeedConfig = {
+    key: "lt-test",
+    source: "Test",
+    url: "https://example.test/rss",
+    language: "Lithuanian",
+    keyword_filter: false,
+    stem_filter: "lt",
+    region_filter: true,
+    no_ai_processing: false,
+  };
+  const matchers = { keyword: () => false, polish, stems: { lt }, region, regionByLanguage: { Lithuanian: regionLt }, credits: () => [] };
+  const docs = await collectFeed(http, feed, "source-id", new Date(0), matchers);
+  assert.deepEqual(docs.map((d) => d.skipReason ?? "kept"), ["kept", "no_keyword_match", "no_region_match"]);
+});
+
+test("match_chars: keyword and region must appear in the title or the first 500 characters", async () => {
+  const filler = "Kyiv city services and weather. ".repeat(20); // > 500 characters, no keyword or region
+  const xml = feedXml([
+    { title: "Russian drones strike Kyiv", description: `${filler} Poland closed its airspace.` },
+    { title: "Polish army deploys air defence", description: "Lead text." },
+    { title: "Sanctions update", description: "Troops moved near the Lithuania border overnight." },
+  ]);
+  const http = { get: async () => ({ status: 200, body: xml }) } as unknown as HttpClient;
+  const feed: FeedConfig = {
+    key: "mezha-test",
+    source: "Test",
+    url: "https://example.test/rss",
+    language: "English",
+    keyword_filter: true,
+    region_filter: true,
+    match_chars: 500,
+    no_ai_processing: false,
+  };
+  const matchers = { keyword: makeKeywordMatcher(config.keywords), polish, region, credits: () => [] };
+  const docs = await collectFeed(http, feed, "source-id", new Date(0), matchers);
+  assert.deepEqual(docs.map((d) => d.skipReason ?? "kept"), ["no_region_match", "kept", "kept"]);
+  assert.ok(docs[0].rawText!.length > 500, "the stored text is not shortened");
+});
+
+test("listing region filter: titles without a region term are stored as SKIPPED", async () => {
+  const card = (path: string, title: string) =>
+    `<li><span class="date">04.10.2026</span><div class="title"><a href="${path}">${title}</a></div></li>`;
+  const html = `<section id="Aktualnosci"><ul>${card("/web/obrona-narodowa/a", "Wizyta ministra na Litwie")}${card("/web/obrona-narodowa/b", "Nowe umundurowanie")}</ul></section>`;
+  const http = { get: async () => ({ status: 200, body: html }) } as unknown as HttpClient;
+  const listing = {
+    key: "govpl-test",
+    source: "Test",
+    url: "https://www.gov.pl/web/obrona-narodowa",
+    parser: "govpl" as const,
+    section_id: "Aktualnosci",
+    link_prefix: "/web/obrona-narodowa/",
+    language: "Polish",
+    time_zone: "Europe/Warsaw",
+    no_ai_processing: false,
+    region_filter: true,
+  };
+  const docs = await collectListing(http, listing, "source-id", new Date("2026-10-01T00:00:00Z"), region);
+  assert.deepEqual(docs.map((d) => d.skipReason ?? "kept"), ["kept", "no_region_match"]);
+  const unfiltered = await collectListing(http, { ...listing, region_filter: false }, "source-id", new Date("2026-10-01T00:00:00Z"), region);
+  assert.ok(unfiltered.every((d) => d.skipReason === undefined));
 });

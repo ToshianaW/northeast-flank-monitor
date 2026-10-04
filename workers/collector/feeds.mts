@@ -22,13 +22,27 @@ export type FeedConfig = {
   min_hours_between_reads?: number;
   /** Polish feeds only: filter with keyword_stems_pl / keyword_whole_words_pl instead of keywords. */
   polish_filter?: boolean;
+  /** Fetch the article page for items that pass the filters (article.mts; needs fetch_full_text). */
+  full_text?: boolean;
+  /** Match keywords and region terms against the title plus only this many leading characters of text. */
+  match_chars?: number;
+  /** Lithuanian or Latvian feeds: filter with keyword_stems_lt / keyword_stems_lv (folded stems) instead of keywords. */
+  stem_filter?: StemLanguage;
+  /** Full text only for items the feed marks pay_status Free (rp.pl). */
+  full_text_free_only?: boolean;
 };
+
+export type StemLanguage = "lt" | "lv";
 
 export type FeedMatchers = {
   keyword: (text: string) => boolean;
   /** Polish stem filter, used by feeds with polish_filter. */
   polish: (text: string) => boolean;
+  /** Lithuanian and Latvian stem filters, used by feeds with stem_filter. */
+  stems?: Partial<Record<StemLanguage, (text: string) => boolean>>;
   region: (text: string) => boolean;
+  /** Region matchers for feeds in a given language (feed.language), used instead of `region` when present. */
+  regionByLanguage?: Record<string, (text: string) => boolean>;
   credits: (text: string) => string[];
 };
 
@@ -70,6 +84,21 @@ export function makePolishMatcher(stems: string[], wholeWords: string[]): (text:
   const escaped = wholeWords.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const whole = new RegExp(`(?<![\\p{L}\\p{N}])(?:${escaped.join("|")})(?![\\p{L}\\p{N}])`, "u");
   return (text) => stem(foldDiacritics(text)) || (wholeWords.length > 0 && whole.test(text));
+}
+
+/**
+ * Region filter: English region terms (word start, case-insensitive) or Polish region stems
+ * (diacritics folded on both sides, so "baltyk" matches Bałtyk and Bałtyku).
+ */
+export function makeRegionMatcher(
+  terms: string[],
+  polishStems: string[],
+  localStems: string[] = [],
+): (text: string) => boolean {
+  const english = makeKeywordMatcher(terms);
+  const folded = [...polishStems, ...localStems].map(foldDiacritics);
+  const stems = folded.length ? makeKeywordMatcher(folded) : () => false;
+  return (text) => english(text) || stems(foldDiacritics(text));
 }
 
 const CREDIT_VERBS = "according to|reported by|reporting by|citing|cited by|per|via|told|said to|reports from";
@@ -120,12 +149,16 @@ export async function collectFeed(
       ? ""
       : (item["content:encoded"] ?? item.contentSnippet ?? item.summary ?? "");
     const rawText = htmlToText(textSource) || null;
-    const matchText = `${title ?? ""} ${rawText ?? ""}`;
+    const matchText = `${title ?? ""} ${feed.match_chars ? (rawText ?? "").slice(0, feed.match_chars) : (rawText ?? "")}`;
 
+    const stemMatch = feed.stem_filter ? match.stems?.[feed.stem_filter] : undefined;
+    if (feed.stem_filter && !stemMatch) throw new Error(`feed "${feed.key}": no ${feed.stem_filter} stems configured`);
+    const regionMatch = match.regionByLanguage?.[feed.language] ?? match.region;
     let skipReason: string | undefined;
     if (feed.keyword_filter && !match.keyword(matchText)) skipReason = "no_keyword_match";
     else if (feed.polish_filter && !match.polish(matchText)) skipReason = "no_keyword_match";
-    else if (feed.region_filter && !match.region(matchText)) skipReason = "no_region_match";
+    else if (stemMatch && !stemMatch(matchText)) skipReason = "no_keyword_match";
+    else if (feed.region_filter && !regionMatch(matchText)) skipReason = "no_region_match";
 
     const credited = feed.extract_credits ? match.credits(matchText) : [];
 

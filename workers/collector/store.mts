@@ -68,6 +68,12 @@ export function contentHash(title: string | null, text: string | null): string {
   return createHash("sha256").update(normalized).digest("hex");
 }
 
+/** Whether this URL (normalized) is already in raw_documents; checked before fetching a full-text page. */
+export async function urlExists(client: pg.Client, rawUrl: string): Promise<boolean> {
+  const { rowCount } = await client.query("SELECT 1 FROM raw_documents WHERE url = $1", [normalizeUrl(rawUrl)]);
+  return Boolean(rowCount);
+}
+
 export async function storeDocument(client: pg.Client, doc: CollectedDoc): Promise<StoreOutcome> {
   const url = normalizeUrl(doc.url);
 

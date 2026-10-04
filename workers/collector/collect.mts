@@ -9,11 +9,13 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import pg from "pg";
 import { setOutput } from "../lib/ci.mjs";
+import { applyFullText, fullTextBarredDomains, type FullTextCounts, type FullTextLimits, type FullTextScope } from "./article.mjs";
 import {
   collectFeed,
   makeCreditExtractor,
   makeKeywordMatcher,
   makePolishMatcher,
+  makeRegionMatcher,
   type FeedConfig,
   type FeedMatchers,
 } from "./feeds.mjs";
@@ -21,18 +23,31 @@ import { errorMessage, HttpClient, RobotsDisallowedError } from "./fetch.mjs";
 import { collectGdelt, type GdeltConfig } from "./gdelt.mjs";
 import { collectListing, type ListingConfig } from "./listing.mjs";
 import { buildRegistry, type RegistryRow } from "./registry.mjs";
-import { storeDocument, type CollectedDoc, type StoreOutcome } from "./store.mjs";
+import { domainOf, storeDocument, urlExists, type CollectedDoc, type StoreOutcome } from "./store.mjs";
 
 type CollectorConfig = {
   user_agent: string;
   lookback_hours: number;
   request_timeout_ms: number;
   per_host_interval_ms: number;
+  /** Master switch for article-page fetching; feeds and listings also opt in with full_text. */
   fetch_full_text: boolean;
+  full_text_max_pages: number;
+  full_text_max_chars: number;
+  full_text_min_chars: number;
   no_ai_processing_sources: string[];
   lead_only_sources: string[];
+  citation_only_sources: string[];
+  blocked_automated_access: string[];
+  tos_prohibited_domains: string[];
   keywords: string[];
   region_terms: string[];
+  region_terms_pl: string[];
+  region_terms_lt: string[];
+  region_terms_lv: string[];
+  region_terms_ru: string[];
+  keyword_stems_lt: string[];
+  keyword_stems_lv: string[];
   keyword_stems_pl: string[];
   keyword_whole_words_pl: string[];
   known_outlets: string[];
@@ -49,6 +64,8 @@ type Summary = {
   failedItems: number;
   /** Items the feed marks Paid: stored as title and link only. */
   paid: number;
+  /** Article pages fetched for full text, failed (kept feed text), or not fetched because of the page cap. */
+  fullText: FullTextCounts;
   error?: string;
   /** Not an error: e.g. the feed was not read because of its read limit. */
   note?: string;
@@ -77,10 +94,10 @@ for (const feed of config.feeds) {
   if (feed.polish_filter && feed.language !== "Polish") {
     throw new Error(`feed "${feed.key}": polish_filter needs language "Polish" (got "${feed.language}")`);
   }
-}
-
-if (config.fetch_full_text) {
-  console.warn("fetch_full_text is true, but full-text fetching is not implemented; storing feed text and metadata only.");
+  const stemLanguage = { lt: "Lithuanian", lv: "Latvian" } as const;
+  if (feed.stem_filter && feed.language !== stemLanguage[feed.stem_filter]) {
+    throw new Error(`feed "${feed.key}": stem_filter "${feed.stem_filter}" needs language "${stemLanguage[feed.stem_filter]}" (got "${feed.language}")`);
+  }
 }
 
 const http = new HttpClient(config.user_agent, config.request_timeout_ms, config.per_host_interval_ms);
@@ -109,9 +126,43 @@ const { sourceIdFor, byDomain: registryByDomain } = buildRegistry(registry, { no
 const matchers: FeedMatchers = {
   keyword: makeKeywordMatcher(config.keywords),
   polish: makePolishMatcher(config.keyword_stems_pl, config.keyword_whole_words_pl),
-  region: makeKeywordMatcher(config.region_terms),
+  // NATO and Zapad (keyword_whole_words_pl) are language-neutral, so the Lithuanian and Latvian filters use them too.
+  stems: {
+    lt: makePolishMatcher(config.keyword_stems_lt, config.keyword_whole_words_pl),
+    lv: makePolishMatcher(config.keyword_stems_lv, config.keyword_whole_words_pl),
+  },
+  region: makeRegionMatcher(config.region_terms, config.region_terms_pl),
+  regionByLanguage: {
+    Lithuanian: makeRegionMatcher(config.region_terms, config.region_terms_pl, config.region_terms_lt),
+    Latvian: makeRegionMatcher(config.region_terms, config.region_terms_pl, config.region_terms_lv),
+    Russian: makeRegionMatcher(config.region_terms, config.region_terms_pl, config.region_terms_ru),
+  },
   credits: makeCreditExtractor([...new Set([...config.known_outlets, ...registry.filter((s) => !s.historical_only).map((s) => s.name)])]),
 };
+
+// Full text (article.mts): domains never fetched, each source's own domain, and the run's page cap.
+const homeDomainOf = (name: string): string | null => {
+  const home = registry.find((s) => s.name === name)?.home_url;
+  return home ? domainOf(home) : null;
+};
+const barredDomains = fullTextBarredDomains(
+  {
+    blocked: config.blocked_automated_access,
+    prohibited: config.tos_prohibited_domains,
+    citationOnly: config.citation_only_sources,
+    noAi: noAiSources,
+  },
+  homeDomainOf,
+);
+const fullTextLimits: FullTextLimits = { maxChars: config.full_text_max_chars, minChars: config.full_text_min_chars };
+const pageBudget = { remaining: config.full_text_max_pages };
+const fullTextScope = (source: string, optedIn: boolean | undefined, freeOnly?: boolean): FullTextScope => ({
+  masterOn: config.fetch_full_text,
+  optedIn: optedIn === true,
+  homeDomain: homeDomainOf(source),
+  barredDomains,
+  freeOnly: freeOnly === true,
+});
 
 /** Hours since this collector key last stored a row, or null if it never has. */
 async function hoursSinceLastRead(key: string): Promise<number | null> {
@@ -122,7 +173,12 @@ async function hoursSinceLastRead(key: string): Promise<number | null> {
   return rows[0].last ? (Date.now() - rows[0].last.getTime()) / 3600_000 : null;
 }
 
-async function run(key: string, method: string, collect: () => Promise<CollectedDoc[]>): Promise<Summary> {
+async function run(
+  key: string,
+  method: string,
+  collect: () => Promise<CollectedDoc[]>,
+  fullText?: FullTextScope,
+): Promise<Summary> {
   const summary: Summary = {
     key,
     method,
@@ -130,6 +186,7 @@ async function run(key: string, method: string, collect: () => Promise<Collected
     outcomes: { new: 0, filtered: 0, duplicate: 0, existing: 0 },
     failedItems: 0,
     paid: 0,
+    fullText: { fetched: 0, failed: 0, capped: 0 },
   };
   let docs: CollectedDoc[];
   try {
@@ -141,6 +198,9 @@ async function run(key: string, method: string, collect: () => Promise<Collected
   }
   summary.fetched = docs.length;
   summary.paid = docs.filter((d) => d.metadata.pay_status === "Paid").length;
+  if (fullText) {
+    summary.fullText = await applyFullText(http, docs, fullText, fullTextLimits, pageBudget, (url) => urlExists(client, url));
+  }
   for (const doc of docs) {
     try {
       summary.outcomes[await storeDocument(client, doc)]++;
@@ -164,19 +224,28 @@ for (const feed of config.feeds) {
         outcomes: { new: 0, filtered: 0, duplicate: 0, existing: 0 },
         failedItems: 0,
         paid: 0,
+        fullText: { fetched: 0, failed: 0, capped: 0 },
         note: `not read: last read ${hours.toFixed(1)}h ago (limit: once per ${feed.min_hours_between_reads}h)`,
       });
       continue;
     }
   }
   summaries.push(
-    await run(feed.key, "FEED", () => collectFeed(http, feed, sourceIdFor(feed.source), since, matchers)),
+    await run(
+      feed.key,
+      "FEED",
+      () => collectFeed(http, feed, sourceIdFor(feed.source), since, matchers),
+      fullTextScope(feed.source, feed.full_text, feed.full_text_free_only),
+    ),
   );
 }
 for (const listing of config.listings) {
   summaries.push(
-    await run(listing.key, "LISTING", () =>
-      collectListing(http, listing, sourceIdFor(listing.source), since),
+    await run(
+      listing.key,
+      "LISTING",
+      () => collectListing(http, listing, sourceIdFor(listing.source), since, matchers.region),
+      fullTextScope(listing.source, listing.full_text),
     ),
   );
 }
@@ -204,6 +273,9 @@ for (const s of summaries) {
     s.outcomes.duplicate ? `${s.outcomes.duplicate} duplicate content` : "",
     s.outcomes.filtered ? `${s.outcomes.filtered} filtered out (keyword/region)` : "",
     s.paid ? `${s.paid} paid (title and link only)` : "",
+    s.fullText.fetched ? `${s.fullText.fetched} full text` : "",
+    s.fullText.failed ? `${s.fullText.failed} full-text failed (feed text kept)` : "",
+    s.fullText.capped ? `${s.fullText.capped} over the page cap` : "",
     s.note ?? "",
     s.error ? (args.ci ? shortReason(s.error) : s.error) : "",
   ]
@@ -219,6 +291,13 @@ for (const s of summaries) {
 }
 console.log(
   `${pad("TOTAL", 35)}${pad(total.fetched, 9)}${pad(total.new, 6)}${pad(total.skipped, 9)}${total.failed}`,
+);
+const fullTextTotal = summaries.reduce(
+  (t, s) => ({ fetched: t.fetched + s.fullText.fetched, failed: t.failed + s.fullText.failed, capped: t.capped + s.fullText.capped }),
+  { fetched: 0, failed: 0, capped: 0 },
+);
+console.log(
+  `Full text: ${config.fetch_full_text ? "on" : "off"} · ${fullTextTotal.fetched} fetched · ${fullTextTotal.failed} failed · ${fullTextTotal.capped} over the cap of ${config.full_text_max_pages} pages`,
 );
 
 // A few failing sources are warnings; the run fails only when more than half fail.
@@ -241,6 +320,9 @@ if (args.ci) {
   setOutput("failed_sources", failedSources.length);
   setOutput("total_sources", summaries.length);
   setOutput("warned_sources", failedSources.map((s) => `${s.key} (${shortReason(s.error!)})`).join(", "));
+  setOutput("full_text_fetched", fullTextTotal.fetched);
+  setOutput("full_text_failed", fullTextTotal.failed);
+  setOutput("full_text_capped", fullTextTotal.capped);
 }
 if (tooManyFailed) process.exitCode = 1;
 

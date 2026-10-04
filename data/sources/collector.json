@@ -4,7 +4,11 @@
   "lookback_hours": 48,
   "request_timeout_ms": 20000,
   "per_host_interval_ms": 3000,
-  "fetch_full_text": false,
+  "_fetch_full_text": "Master switch for article-page fetching (workers/collector/article.mts). A feed or listing must also opt in with full_text: true, which is set only for sources whose robots.txt and terms allow it (docs/decisions.md, decision 16) or by the owner's decision (decision 17). full_text_free_only limits a feed to items it marks pay_status Free. Only items that passed the keyword and region filters are fetched, through HttpClient (robots.txt, rate limits), at most full_text_max_pages per run; text is cut at full_text_max_chars, and text shorter than full_text_min_chars is not used.",
+  "fetch_full_text": true,
+  "full_text_max_pages": 30,
+  "full_text_max_chars": 20000,
+  "full_text_min_chars": 200,
   "_no_ai_processing_sources": "Registry sources that are not collected directly but whose rows (for example GDELT results from their domain) must carry no_ai_processing. Feeds flagged with no_ai_processing are added to this set automatically.",
   "no_ai_processing_sources": [
     "The Atlantic"
@@ -17,14 +21,17 @@
   "citation_only_sources": [
     "RFE/RL"
   ],
-  "_blocked_automated_access": "Domains no worker fetches or sends to a model, because the site blocks automated access. These sites' terms were not read; the entry records the blocking, not a terms decision. Subdomains are included.",
+  "_blocked_automated_access": "Domains no worker fetches or sends to a model, because the site blocks automated access. These sites' terms were not read; the entry records the blocking, not a terms decision. lrvk.lrv.lt answers HTTP 403 even for robots.txt; ve.lt's robots.txt blocks Anthropic's crawlers (decision 16). Subdomains are included.",
   "blocked_automated_access": [
     "kam.lt",
     "kariuomene.lt",
-    "reuters.com"
+    "reuters.com",
+    "lrvk.lrv.lt",
+    "ve.lt"
   ],
-  "_tos_prohibited_domains": "Domains no worker fetches or sends to a model, because their terms were read and prohibit automated aggregation or AI use of their content (decision 9: Telegram's Content Licensing and AI Scraping terms and API terms section 1.5; Discord's ban on self-bots). Subdomains are included.",
+  "_tos_prohibited_domains": "Domains no worker fetches or sends to a model, because their terms were read and prohibit automated aggregation or AI use of their content (decision 9: Telegram's Content Licensing and AI Scraping terms and API terms section 1.5; Discord's ban on self-bots; jauns.lv's terms forbid indexing, copying and analytical use, decision 16). Subdomains are included.",
   "tos_prohibited_domains": [
+    "jauns.lv",
     "t.me",
     "telegram.me",
     "telegram.org",
@@ -97,11 +104,125 @@
     "Estonia",
     "Baltic",
     "Poland",
+    "Polish",
     "Suwałki",
     "Suwalki",
     "eastern flank"
   ],
-  "_keyword_stems_pl": "Used instead of keywords by Polish feeds with polish_filter. Diacritics are folded on both sides (ł→l, ż→z, ...), then each stem must match at a word start, so bialorus matches Białoruś, Białorusi and białoruski. Write stems without diacritics.",
+  "_region_terms_pl": "Polish region stems, also accepted by every region filter (rp.pl, Defence24, the Polish MoD listing). Diacritics are folded on both sides and each stem must match at a word start, so polsk matches Polska and polskie, lotw matches Łotwa, baltyk matches Bałtyku. Write stems without diacritics; polacy rather than polac, which would match połączenie.",
+  "region_terms_pl": [
+    "polsk",
+    "polsc",
+    "polak",
+    "polacy",
+    "bialorus",
+    "litw",
+    "litew",
+    "lotw",
+    "lotew",
+    "estoni",
+    "estons",
+    "kaliningrad",
+    "krolewiec",
+    "krolewc",
+    "krolewieck",
+    "baltyk",
+    "baltyc",
+    "suwalk",
+    "suwalsk",
+    "przesmyk suwalsk",
+    "flanka wschodni",
+    "flanki wschodni",
+    "flance wschodni",
+    "wschodniej flank",
+    "wschodniej flanc",
+    "wschodnia flank",
+    "zatok gdansk",
+    "zatoce gdansk"
+  ],
+  "_region_terms_local": "Region stems for feeds in Lithuanian, Latvian and Russian (by the feed's language), added to region_terms and region_terms_pl. Folded and matched at a word start like the Polish stems (Cyrillic folds й→и, ё→е, so балти matches Балтийск).",
+  "region_terms_lt": [
+    "baltarus",
+    "kaliningrad",
+    "karaliauc",
+    "lenkij",
+    "latvij",
+    "estij",
+    "lietuv",
+    "baltij",
+    "suvalk",
+    "rytinio flang",
+    "rytinis flang",
+    "rytiniame flang"
+  ],
+  "region_terms_lv": [
+    "baltkriev",
+    "kaliningrad",
+    "lietuv",
+    "igaunij",
+    "polij",
+    "latvij",
+    "baltij",
+    "suvalk",
+    "austrumu flang"
+  ],
+  "region_terms_ru": [
+    "калининград",
+    "кенигсберг",
+    "балти",
+    "литв",
+    "латви",
+    "эстони",
+    "польш",
+    "польск",
+    "белорус",
+    "беларус",
+    "сувалк"
+  ],
+  "_keyword_stems_local": "Used instead of keywords by Lithuanian (stem_filter lt) and Latvian (stem_filter lv) feeds, with keyword_whole_words_pl (NATO, Zapad). Folded and matched at a word start like the Polish stems; write them without diacritics. macibas is the whole plural (exercises), so the singular mācību (study) does not match.",
+  "keyword_stems_lt": [
+    "oro pavoj",
+    "oro erdv",
+    "dron",
+    "raket",
+    "kariuomen",
+    "karin",
+    "karys",
+    "kariai",
+    "orlaiv",
+    "naikintuv",
+    "pratyb",
+    "gynyb",
+    "pasienio",
+    "ginkl",
+    "mobiliz",
+    "sabotaz",
+    "hibridin",
+    "batalion",
+    "brigad",
+    "sauliu sajung"
+  ],
+  "keyword_stems_lv": [
+    "gaisa trauksm",
+    "gaisa telp",
+    "dron",
+    "raket",
+    "armij",
+    "macibas",
+    "militar",
+    "brunot",
+    "zemessardz",
+    "karavir",
+    "aizsardzib",
+    "robezsardz",
+    "iznicinataj",
+    "mobiliz",
+    "sabotaz",
+    "hibrid",
+    "bataljon",
+    "brigad"
+  ],
+  "_keyword_stems_pl":"Used instead of keywords by Polish feeds with polish_filter. Diacritics are folded on both sides (ł→l, ż→z, ...), then each stem must match at a word start, so bialorus matches Białoruś, Białorusi and białoruski. Write stems without diacritics.",
   "keyword_stems_pl": [
     "wojsk",
     "zolnierz",
@@ -230,7 +351,8 @@
       "url": "https://news.err.ee/rss",
       "language": "English",
       "keyword_filter": true,
-      "no_ai_processing": false
+      "no_ai_processing": false,
+      "full_text": true
     },
     {
       "key": "euronews",
@@ -238,7 +360,8 @@
       "url": "https://www.euronews.com/rss",
       "language": "English",
       "keyword_filter": true,
-      "no_ai_processing": false
+      "no_ai_processing": false,
+      "full_text": true
     },
     {
       "key": "lrt-en",
@@ -268,8 +391,11 @@
       "key": "mezha-en",
       "source": "mezha.net",
       "url": "https://mezha.net/eng/rss/",
+      "_comment": "Ukrainian general news with full text in the feed: an item needs a keyword and a region term in its title or first 500 characters (match_chars), so passing mentions further down do not count.",
       "language": "English",
-      "keyword_filter": false,
+      "keyword_filter": true,
+      "region_filter": true,
+      "match_chars": 500,
       "no_ai_processing": false
     },
     {
@@ -278,7 +404,8 @@
       "url": "https://defence24.com/rss",
       "language": "English",
       "keyword_filter": true,
-      "no_ai_processing": false
+      "no_ai_processing": false,
+      "full_text": true
     },
     {
       "key": "lsm-en",
@@ -315,7 +442,10 @@
       "url": "https://www.rp.pl/rss/71-wojsko",
       "language": "Polish",
       "keyword_filter": false,
-      "no_ai_processing": false
+      "region_filter": true,
+      "no_ai_processing": false,
+      "full_text": true,
+      "full_text_free_only": true
     },
     {
       "key": "rp-radar-zbrojeniowy",
@@ -323,7 +453,10 @@
       "url": "https://radar.rp.pl/rss/4991-przemysl-zbrojeniowy",
       "language": "Polish",
       "keyword_filter": false,
-      "no_ai_processing": false
+      "region_filter": true,
+      "no_ai_processing": false,
+      "full_text": true,
+      "full_text_free_only": true
     },
     {
       "key": "rp-konflikty",
@@ -332,7 +465,10 @@
       "language": "Polish",
       "keyword_filter": false,
       "polish_filter": true,
-      "no_ai_processing": false
+      "region_filter": true,
+      "no_ai_processing": false,
+      "full_text": true,
+      "full_text_free_only": true
     },
     {
       "key": "rp-swiat",
@@ -341,7 +477,42 @@
       "language": "Polish",
       "keyword_filter": false,
       "polish_filter": true,
+      "region_filter": true,
+      "no_ai_processing": false,
+      "full_text": true,
+      "full_text_free_only": true
+    },
+    {
+      "key": "15min-lt",
+      "source": "15min",
+      "url": "https://www.15min.lt/rss",
+      "_comment": "Lithuanian general news: an item needs a Lithuanian keyword stem (keyword_stems_lt, plus NATO/Zapad) and a region term. Full text by the owner's decision (decision 17).",
+      "language": "Lithuanian",
+      "keyword_filter": false,
+      "stem_filter": "lt",
+      "region_filter": true,
+      "no_ai_processing": false,
+      "full_text": true
+    },
+    {
+      "key": "aif-klg",
+      "source": "AiF-Kaliningrad",
+      "url": "https://klg.aif.ru/rss/all.php",
+      "_comment": "Russian state-aligned outlet (decision 18). The feed carries titles only, so rows are metadata only and never reach the extractor; they are leads, and any claim from it must be attributed. No full text: its terms forbid copying full materials. Region filter on titles (region_terms_ru).",
+      "language": "Russian",
+      "keyword_filter": false,
+      "region_filter": true,
       "no_ai_processing": false
+    },
+    {
+      "key": "certlv-en",
+      "source": "CERT.LV",
+      "url": "https://cert.lv/en/feed/rss/all",
+      "_comment": "Latvia's national CERT: items are Latvia-specific, so no keyword or region filter. Terms silent (no terms page), robots.txt allows our client and Anthropic's crawlers (decision 16).",
+      "language": "English",
+      "keyword_filter": false,
+      "no_ai_processing": false,
+      "full_text": true
     }
   ],
   "listings": [
@@ -355,7 +526,21 @@
       "link_prefix": "/web/obrona-narodowa/",
       "language": "Polish",
       "time_zone": "Europe/Warsaw",
-      "no_ai_processing": false
+      "no_ai_processing": false,
+      "full_text": true
+    },
+    {
+      "key": "govpl-rcb",
+      "source": "Government Security Centre (RCB)",
+      "url": "https://www.gov.pl/web/rcb",
+      "_comment": "RCB alerts and news from the 'Aktualnosci' section of its gov.pl page. Poland-specific, so no region filter. gov.pl text is CC BY-SA 4.0 (decision 16).",
+      "parser": "govpl",
+      "section_id": "Aktualnosci",
+      "link_prefix": "/web/rcb/",
+      "language": "Polish",
+      "time_zone": "Europe/Warsaw",
+      "no_ai_processing": false,
+      "full_text": true
     }
   ],
   "gdelt": {

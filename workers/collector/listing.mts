@@ -12,6 +12,10 @@ export type ListingConfig = {
   time_zone: string;
   /** Stored as usual, but marked so later steps never send the text to an AI model. */
   no_ai_processing: boolean;
+  /** Require a region term in the card title; others are stored as SKIPPED. */
+  region_filter?: boolean;
+  /** Fetch the article page for cards that pass the filters (article.mts; needs fetch_full_text). */
+  full_text?: boolean;
 };
 
 /** YYYY-MM-DD of an instant in the given time zone. */
@@ -59,6 +63,7 @@ export async function collectListing(
   listing: ListingConfig,
   sourceId: string,
   since: Date,
+  region?: (text: string) => boolean,
 ): Promise<CollectedDoc[]> {
   const res = await http.get(listing.url);
   if (res.status < 200 || res.status >= 300) throw new Error(`listing returned HTTP ${res.status}`);
@@ -87,6 +92,8 @@ export async function collectListing(
         ...(card.day ? { listing_date: card.day, date_precision: "day" } : { date_missing: true }),
         ...(listing.no_ai_processing ? { no_ai_processing: true } : {}),
       },
+      // Listings carry titles only, so the region filter sees the title alone.
+      skipReason: listing.region_filter && region && !region(card.title) ? "no_region_match" : undefined,
     });
   }
   return docs;
