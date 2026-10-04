@@ -35,6 +35,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/exercises", label: "Exercises" },
       { href: "/air-activity", label: "Air Activity" },
       { href: "/historical", label: "Historical Comparison" },
+      { href: "/historical/compare", label: "Side-by-side view" },
     ],
   },
   {
@@ -48,27 +49,27 @@ export const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
-/**
- * Planned pages, kept off the sidebar until built. The side-by-side view is roadmap Phase 5
- * (spec §21-22: synchronized timelines and the indicator matrix) and will live at /historical/compare.
- */
-export const PLANNED_PAGES: NavItem[] = [{ href: "/historical/compare", label: "Side-by-side view" }];
-
 export function isActivePath(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+/**
+ * The sidebar item for a path: the longest matching href, so /historical/compare marks
+ * "Side-by-side view" and not also "Historical Comparison".
+ */
+export function activeNavItem(pathname: string): NavItem | null {
+  let best: NavItem | null = null;
+  for (const group of NAV_GROUPS) {
+    for (const item of group.items) {
+      if (isActivePath(pathname, item.href) && (!best || item.href.length > best.href.length)) best = item;
+    }
+  }
+  return best;
+}
+
 /** Top-bar title for a public path. Detail pages fall back to their section. */
 export function pageTitleFor(pathname: string): string {
   if (pathname.startsWith("/events/")) return "Event";
-  for (const item of PLANNED_PAGES) {
-    if (isActivePath(pathname, item.href)) return item.label;
-  }
-  for (const group of NAV_GROUPS) {
-    for (const item of group.items) {
-      if (isActivePath(pathname, item.href)) return item.label;
-    }
-  }
-  return "Northeast Flank Monitor";
+  return activeNavItem(pathname)?.label ?? "Northeast Flank Monitor";
 }

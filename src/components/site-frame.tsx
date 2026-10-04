@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
-import { NAV_GROUPS, isActivePath, pageTitleFor } from "@/lib/nav";
+import { NAV_GROUPS, activeNavItem, pageTitleFor } from "@/lib/nav";
 
 /**
  * Public page frame: grouped sidebar, top bar and main column.
@@ -19,6 +19,7 @@ export function SiteFrame({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const activeHref = activeNavItem(pathname)?.href;
   const [open, setOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   const drawer = useRef<HTMLElement>(null);
@@ -88,7 +89,7 @@ export function SiteFrame({
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      aria-current={isActivePath(pathname, item.href) ? "page" : undefined}
+                      aria-current={activeHref === item.href ? "page" : undefined}
                       onClick={() => close(false)}
                       className="nav-item flex w-full text-sm"
                     >

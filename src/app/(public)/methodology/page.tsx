@@ -500,7 +500,10 @@ export default function MethodologyPage() {
             </Link>{" "}
             covers August 2020 – February 2022. It is kept separate from current
             reporting: historical events never appear in Latest, the Archive, the
-            map, the dashboard or the daily digest.
+            map or the dashboard. The daily digest&rsquo;s Historical Context
+            section states only how many historical events of each of the day&rsquo;s
+            event types were recorded, and in which months. That section is written
+            by code, not by AI.
           </p>
           <p>
             Each historical event is entered and reviewed by a person before it is
@@ -515,13 +518,26 @@ export default function MethodologyPage() {
             months have no entries yet, so a thin record is not mistaken for a
             complete one.
           </p>
-          <Subhead>
-            Comparison
-            <Planned />
-          </Subhead>
+          <Subhead>Side-by-side view</Subhead>
           <p>
-            Historical comparison will set current observable activity against
-            this record, starting with the period from late 2020 to February 2021.
+            The{" "}
+            <Link href="/historical/compare" className="link">
+              side-by-side view
+            </Link>{" "}
+            lists published events from a chosen window of the historical record
+            next to published events from a chosen window of current reporting,
+            grouped by event type, with a count for each. It is descriptive only.
+            It assigns no phase, score or trend, and it implies no outcome.
+          </p>
+          <p>
+            The two sides are collected differently. Historical entries are entered
+            by hand from archived reporting. Current events are collected
+            automatically from monitored sources and published only after a person
+            reviews them. The sources differ too, so the counts on the two sides are
+            not on the same scale, and both reflect reporting, not intensity of
+            activity. The page states each side&rsquo;s events, sources and months.
+            It does not show the rows when the historical window holds fewer than
+            4 events or 2 sources.
           </p>
           <p className="border-l-2 border-teal-blue pl-3 text-foreground">
             Similar historical behavior does not imply identical future outcomes.
@@ -565,6 +581,11 @@ export default function MethodologyPage() {
               comparison, not a prediction.
             </li>
             <li>
+              The side-by-side view lists published historical and current events
+              by event type for two chosen windows, with coverage notes. It is
+              descriptive only.
+            </li>
+            <li>
               The regional map shows one dot per area with published activity in the
               chosen layer and window. Each dot marks an area, not a location: it sits
               at a fixed point chosen in advance for that area, away from towns and
@@ -583,7 +604,6 @@ export default function MethodologyPage() {
           </Subhead>
           <ul className="list-disc pl-5">
             <li>Air activity page</li>
-            <li>Side-by-side comparison of current activity with the historical record</li>
             <li>Northeast Flank Activity Index</li>
             <li>Open data: downloadable datasets and a read-only API</li>
           </ul>
@@ -604,9 +624,9 @@ export default function MethodologyPage() {
                 every published event.
               </p>
               <p>
-                Historical comparisons identify similarities and differences in
-                observable activity. They are not forecasts of future political
-                or military outcomes.
+                Historical comparisons are descriptive. They show counts of
+                recorded events by type and period. The AI does not write them,
+                and they imply no outcome.
               </p>
             </div>
           </div>

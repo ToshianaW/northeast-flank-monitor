@@ -58,6 +58,14 @@ export default async function HistoricalPage() {
     >
       <div className="grid max-w-5xl gap-8">
         <HistoricalNotice />
+        <p>
+          <Link href="/historical/compare" className="link text-sm">
+            Side-by-side view →
+          </Link>{" "}
+          <span className="text-sm text-text-secondary">
+            Published events from a historical window next to current reporting, by event type.
+          </span>
+        </p>
         <TypeCards id="activity" title="Activity" summaries={groups.activity} />
         <TypeCards id="statements" title="Statements" summaries={groups.statements} />
         <ContextTimeline stretches={PRELUDE_TIMELINE} />
