@@ -1,6 +1,6 @@
 # Methodology
 
-Stub for Northeast Flank Monitor. Full public methodology lands in roadmap step 1.10 / 7.4.
+The public methodology is the Methodology page (`/methodology`, `src/app/(public)/methodology/page.tsx`).
 
 Core question: Is the regional military baseline changing?
 

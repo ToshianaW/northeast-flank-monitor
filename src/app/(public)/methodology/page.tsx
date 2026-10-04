@@ -338,12 +338,13 @@ export default function MethodologyPage() {
           <p>{SOURCE_TYPE_VALUES.map((v) => SOURCE_TYPE_LABELS[v]).join(" · ")}</p>
           <Subhead>How sources are read</Subhead>
           <p>
-            For some sources the full article page is read to extract events.
+            For some sources, the full article page is read to extract events.
             Only our own summary, an excerpt of 20 words or fewer, and a link to
-            the original are stored with an event or shown on this site; the
-            article text read for extraction is kept privately and never
-            published. Sources whose terms or robots.txt prohibit this are not
-            read.
+            the original are stored with an event or shown on this site. The
+            article text read for extraction is kept privately and is never
+            published. Sources whose terms prohibit automated reading are not
+            read at all, and pages that a site&rsquo;s robots.txt disallows are not
+            fetched.
           </p>
         </Section>
 
@@ -588,8 +589,9 @@ export default function MethodologyPage() {
               the final choice.
             </li>
             <li>
-              The daily digest is drafted with AI assistance from published events,
-              then edited and approved by a person.
+              The daily digest is drafted once a day with AI assistance from
+              published events, then edited and approved by a person before it is
+              published.
             </li>
             <li>
               The exercise tracker records announced and observed exercises with
@@ -605,6 +607,12 @@ export default function MethodologyPage() {
               The side-by-side view lists published historical and current events
               by event type for two chosen windows, with coverage notes. It is
               descriptive only.
+            </li>
+            <li>
+              A published event page can list up to three historical entries
+              &ldquo;similar in nature&rdquo;. For physical-activity event types, code
+              links entries with the same event type and country automatically;
+              a reviewer can remove any link. No AI writes this text.
             </li>
             <li>
               The regional map shows one dot per area with published activity in the
@@ -632,12 +640,14 @@ export default function MethodologyPage() {
             <p className="meta-label mb-2">AI disclosure</p>
             <div className="grid gap-2">
               <p>
-                Digests are compiled every 24 hours with AI assistance under a
-                fixed procedure: collection of recent reporting, structured
-                event extraction, duplicate detection, a curated source registry with tier and reliability
-                labels assigned by the reviewer, and editorial review. A digest
-                is drafted only from events a reviewer has already published,
-                and each sentence links to the events it rests on.
+                Sources are collected every 4 hours, and a digest is drafted once
+                a day with AI assistance under a fixed procedure: collection of
+                recent reporting, structured event extraction, duplicate detection,
+                a curated source registry with tier and reliability labels assigned
+                by the reviewer, and editorial review. A digest is drafted only from
+                events a reviewer has already published, each sentence links to the
+                events it rests on, and it is published only after a person edits
+                and approves it.
               </p>
               <p>
                 AI does not independently determine whether claims are true.
