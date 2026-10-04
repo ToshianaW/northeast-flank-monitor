@@ -28,6 +28,7 @@ const exercises = await import("./exercises");
 const { loadDigestEvents } = await import("../../workers/digest/input.mjs");
 const { findPairs } = await import("../../workers/deduplication/pairs.mjs");
 const { loadOpenDataPage } = await import("./public-open-data");
+const { loadAirActivity } = await import("./public-air-activity");
 
 const marker = `ZZ-HISTORICAL-ISOLATION-${randomUUID()}`;
 const publishedId = randomUUID();
@@ -74,6 +75,7 @@ const reads: Record<string, () => Promise<unknown>> = {
   "Admin: listEventSources": () => events.listEventSources(publishedId),
   "Admin: listLinkableEvents": () => exercises.listLinkableEvents(),
   "Admin: listLinkedEvents": () => exercises.listLinkedEvents(publishedId),
+  "Air activity: loadAirActivity": () => loadAirActivity(NOW),
   "Open data: /api/events (historical dates)": () =>
     loadOpenDataPage({ area: null, types: [], from: "2020-12-01", to: "2021-02-28", layer: "all", limit: 200, cursor: null }, NOW),
   "Open data: /api/events (last 90 days)": () =>
