@@ -3,15 +3,8 @@ import { connection } from "next/server";
 import { ContextTimeline } from "@/components/historical/context-timeline";
 import { HistoricalNotice } from "@/components/historical/historical-notice";
 import { PageShell } from "@/components/page-shell";
-import {
-  emptyGroupText,
-  FULL_PERIOD,
-  groupTypeSummaries,
-  monthSpan,
-  typeSlug,
-  type TypeSummary,
-} from "@/lib/historical-rules";
-import { getHistoricalCoverage, getTypeMonthCounts } from "@/lib/public-historical";
+import { emptyGroupText, groupTypeSummaries, monthSpan, typeSlug, type TypeSummary } from "@/lib/historical-rules";
+import { getTypeMonthCounts } from "@/lib/public-historical";
 import { PRELUDE_TIMELINE } from "@/content/ukraine-prelude-timeline";
 
 export const metadata = { title: "Historical comparison" };
@@ -47,8 +40,7 @@ function TypeCards({ id, title, summaries }: { id: "activity" | "statements"; ti
 
 export default async function HistoricalPage() {
   await connection();
-  const [counts, coverage] = await Promise.all([getTypeMonthCounts(), getHistoricalCoverage(FULL_PERIOD)]);
-  const groups = groupTypeSummaries(counts);
+  const groups = groupTypeSummaries(await getTypeMonthCounts());
 
   return (
     <PageShell
@@ -65,10 +57,10 @@ export default async function HistoricalPage() {
       }
     >
       <div className="grid max-w-5xl gap-8">
-        <ContextTimeline stretches={PRELUDE_TIMELINE} />
-        <HistoricalNotice coverage={coverage} listEmptyMonths={false} />
+        <HistoricalNotice />
         <TypeCards id="activity" title="Activity" summaries={groups.activity} />
         <TypeCards id="statements" title="Statements" summaries={groups.statements} />
+        <ContextTimeline stretches={PRELUDE_TIMELINE} />
       </div>
     </PageShell>
   );
