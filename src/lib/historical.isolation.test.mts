@@ -5,14 +5,17 @@
  * dedup, review queue, admin lists) before and after seeding. Each result must be unchanged
  * and must not contain the historical ids or headline marker.
  * Run: npm test (needs DATABASE_URL_POOLED in .env.local). Skipped until migration 0008 is applied.
- * Everything runs in one transaction that is rolled back: no test row is ever committed.
+ * Everything runs in one REPEATABLE READ transaction that is rolled back: no test row is ever
+ * committed, and live writes from the pipeline during the run are not seen.
  */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { test } from "node:test";
 import { openRollbackDb } from "./historical.testing.mjs";
 
-const db = await openRollbackDb({ installAsAppPool: true });
+// One REPEATABLE READ snapshot: rows the live pipeline commits during the test cannot change a
+// read between the before and after snapshots.
+const db = await openRollbackDb({ installAsAppPool: true, repeatableRead: true });
 const skip = db.applied ? false : "migration 0008 not applied";
 
 const publicEvents = await import("./public-events");
@@ -128,6 +131,13 @@ for (const name of Object.keys(reads)) {
 
 test("digest refs treat historical ids as unpublished", { skip }, async () => {
   assert.deepEqual(await digests.findUnpublishedEventIds([publishedId, draftId]), [publishedId, draftId]);
+});
+
+test("the snapshots run in one REPEATABLE READ transaction", { skip }, async () => {
+  const { rows: [{ level }] } = await db.client.query<{ level: string }>(
+    "SELECT current_setting('transaction_isolation') AS level",
+  );
+  assert.equal(level, "repeatable read");
 });
 
 test("rollback leaves no test row behind", async () => {

@@ -25,12 +25,21 @@ declare global {
   var __nfmPool: Pool | undefined;
 }
 
-export async function openRollbackDb(options: { installAsAppPool?: boolean } = {}): Promise<RollbackDb> {
+export async function openRollbackDb(
+  options: {
+    installAsAppPool?: boolean;
+    /**
+     * REPEATABLE READ: every query sees one snapshot taken at the first statement, plus the
+     * transaction's own writes, so rows committed meanwhile (the live pipeline) never appear.
+     */
+    repeatableRead?: boolean;
+  } = {},
+): Promise<RollbackDb> {
   const connectionString = process.env.DATABASE_URL_POOLED;
   if (!connectionString) throw new Error("DATABASE_URL_POOLED is not set (see .env.example).");
   const pool = new Pool({ connectionString, max: 1 });
   const client = await pool.connect();
-  await client.query("BEGIN");
+  await client.query(options.repeatableRead ? "BEGIN ISOLATION LEVEL REPEATABLE READ" : "BEGIN");
   await client.query("SET CONSTRAINTS ALL IMMEDIATE");
   const { rows: [{ applied }] } = await client.query<{ applied: boolean }>(
     "SELECT to_regclass('public.historical_events') IS NOT NULL AS applied",
