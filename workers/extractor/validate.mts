@@ -5,7 +5,7 @@ export const MAX_EXCERPT_WORDS = 20;
 const OLD_EVENT_DAYS = 30;
 
 /** Folds the differences a faithful quote may still show: Unicode form, quotes, dashes, spacing, case. */
-function normalize(text: string): string {
+export function normalize(text: string): string {
   return text
     .normalize("NFC")
     .replace(/[‘’‚‛′]/g, "'")

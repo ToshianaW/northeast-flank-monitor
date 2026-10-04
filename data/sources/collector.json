@@ -13,6 +13,24 @@
   "lead_only_sources": [
     "OSINT613"
   ],
+  "_citation_only_sources": "Registry sources that may be cited by a person but are never fetched or processed by a worker (for example the historical suggester).",
+  "citation_only_sources": [
+    "RFE/RL"
+  ],
+  "_blocked_automated_access": "Domains no worker fetches or sends to a model, because the site blocks automated access. These sites' terms were not read; the entry records the blocking, not a terms decision. Subdomains are included.",
+  "blocked_automated_access": [
+    "kam.lt",
+    "kariuomene.lt",
+    "reuters.com"
+  ],
+  "_tos_prohibited_domains": "Domains no worker fetches or sends to a model, because their terms were read and prohibit automated aggregation or AI use of their content (decision 9: Telegram's Content Licensing and AI Scraping terms and API terms section 1.5; Discord's ban on self-bots). Subdomains are included.",
+  "tos_prohibited_domains": [
+    "t.me",
+    "telegram.me",
+    "telegram.org",
+    "discord.com",
+    "discord.gg"
+  ],
   "keywords": [
     "military",
     "army",

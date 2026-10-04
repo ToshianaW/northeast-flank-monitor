@@ -51,3 +51,7 @@ next-env.d.ts
 
 # MapLibre worker, copied from node_modules by scripts/copy-maplibre-worker.mjs
 /public/maplibre/
+
+# Historical URL lists and candidate files (article excerpts): never committed
+data/historical/*
+!data/historical/.gitkeep
