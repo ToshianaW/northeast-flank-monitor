@@ -124,4 +124,4 @@ Roadmap: `docs/mvp-plan.md` §4. Decisions that override the plan: `docs/decisio
 
 ## License
 
-TBD (MIT or Apache 2.0).
+MIT. See [LICENSE](LICENSE) (decision 21).
