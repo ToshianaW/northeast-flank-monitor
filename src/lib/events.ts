@@ -1,4 +1,5 @@
 import "server-only";
+import { findBannedPhrase, findComparisonWording } from "@/lib/banned-phrases";
 import { getPool } from "@/lib/db";
 import {
   CONFIDENCE_LEVEL_VALUES,
@@ -369,6 +370,25 @@ export function eventFormValuesFrom(formData: FormData): EventFormValues {
   return values;
 }
 
+/**
+ * historical_analogue and historical_notes are internal (never shown publicly). They still may
+ * not hold predictive or comparison wording, so nothing in them can be read as a claim that the
+ * periods match or that an outcome follows.
+ */
+export function historicalFieldErrors(
+  values: Pick<EventFormValues, "historical_analogue" | "historical_notes">,
+): Partial<Record<"historical_analogue" | "historical_notes", string>> {
+  const errors: Partial<Record<"historical_analogue" | "historical_notes", string>> = {};
+  for (const field of ["historical_analogue", "historical_notes"] as const) {
+    const text = values[field] ?? "";
+    const banned = findBannedPhrase(text);
+    const comparison = banned ? null : findComparisonWording(text);
+    if (banned) errors[field] = `Remove the predictive phrase "${banned}".`;
+    else if (comparison) errors[field] = `Remove the comparison wording "${comparison}".`;
+  }
+  return errors;
+}
+
 export async function validateEventForm(
   formData: FormData,
   options: { preserveReviewStatus?: ReviewStatus; humanReviewed: boolean },
@@ -495,6 +515,7 @@ export async function validateEventForm(
   ) {
     errors.observed_end_date = "End date must be on or after start date.";
   }
+  Object.assign(errors, historicalFieldErrors(values));
 
   const first_reported = parseDateTimeField(
     values.first_reported,

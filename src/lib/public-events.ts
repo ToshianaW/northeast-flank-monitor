@@ -53,8 +53,6 @@ const PUBLIC_EVENT_FIELDS = [
   "infrastructure_status",
   "follow_on_activity",
   "overall_reset_status",
-  "historical_analogue",
-  "historical_notes",
   "contradiction_flag",
   "contradiction_notes",
 ] as const satisfies readonly (keyof Event)[];

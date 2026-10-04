@@ -271,27 +271,6 @@ export default async function EventPage({ params }: PageProps<"/events/[id]">) {
               },
             ]}
           />
-          {event.historical_analogue || event.historical_notes ? (
-            <section className="border-t border-border pt-5">
-              <h2 className="meta-label mb-3">Historical context</h2>
-              {event.historical_analogue ? (
-                <p className="text-base">
-                  <span className="text-xs text-text-muted">Analogue: </span>
-                  {event.historical_analogue}
-                </p>
-              ) : null}
-              {event.historical_notes ? (
-                <p className="mt-2 max-w-3xl text-base text-text-secondary whitespace-pre-line">
-                  {event.historical_notes}
-                </p>
-              ) : null}
-              <p className="mt-3 text-xs text-text-muted">
-                Similarity is not trajectory. Historical comparisons describe
-                observable activity, not a forecast of outcomes.
-              </p>
-            </section>
-          ) : null}
-
           <section className="border-t border-border pt-5">
             <h2 className="meta-label">
               Sources
