@@ -21,7 +21,7 @@ export type FullTextLimits = {
   minChars: number;
 };
 
-export type FullTextFailure = "robots" | "http_status" | "no_article_body" | "too_short" | "fetch_error";
+export type FullTextFailure = "robots" | "http_status" | "no_article_body" | "too_short" | "timeout" | "fetch_error";
 
 export type Ineligible =
   | "master_off"
@@ -164,7 +164,9 @@ export async function fetchFullText(
   try {
     res = await http.get(url);
   } catch (error) {
-    return { ok: false, reason: error instanceof RobotsDisallowedError ? "robots" : "fetch_error" };
+    if (error instanceof RobotsDisallowedError) return { ok: false, reason: "robots" };
+    // HttpClient aborts with AbortSignal.timeout, which rejects with a TimeoutError.
+    return { ok: false, reason: error instanceof Error && error.name === "TimeoutError" ? "timeout" : "fetch_error" };
   }
   if (res.status < 200 || res.status >= 300) return { ok: false, reason: "http_status" };
   const text = extractArticleText(res.body);
@@ -173,7 +175,42 @@ export async function fetchFullText(
   return { ok: true, text: text.slice(0, limits.maxChars) };
 }
 
-export type FullTextCounts = { fetched: number; failed: number; capped: number };
+/**
+ * attempted: pages requested. fetched: replaced the feed text. failed: kept the feed text, with
+ * `reasons` counting why (labels only). capped: not requested because of the page cap.
+ * paywalled: not requested because the item is Paid/Preview (or not Free on a free-only feed).
+ */
+export type FullTextCounts = {
+  attempted: number;
+  fetched: number;
+  failed: number;
+  capped: number;
+  paywalled: number;
+  reasons: Record<string, number>;
+};
+
+export function emptyFullTextCounts(): FullTextCounts {
+  return { attempted: 0, fetched: 0, failed: 0, capped: 0, paywalled: 0, reasons: {} };
+}
+
+export function addFullTextCounts(a: FullTextCounts, b: FullTextCounts): FullTextCounts {
+  const reasons = { ...a.reasons };
+  for (const [k, n] of Object.entries(b.reasons)) reasons[k] = (reasons[k] ?? 0) + n;
+  return {
+    attempted: a.attempted + b.attempted,
+    fetched: a.fetched + b.fetched,
+    failed: a.failed + b.failed,
+    capped: a.capped + b.capped,
+    paywalled: a.paywalled + b.paywalled,
+    reasons,
+  };
+}
+
+/** "no_article_body 1, timeout 2", sorted by label; "none" when empty. Labels and counts only. */
+export function formatFullTextReasons(reasons: Record<string, number>): string {
+  const parts = Object.entries(reasons).sort(([a], [b]) => a.localeCompare(b)).map(([k, n]) => `${k} ${n}`);
+  return parts.length ? parts.join(", ") : "none";
+}
 
 /**
  * Replaces feed text with article text for eligible items, in place. `budget.remaining` is the
@@ -188,15 +225,21 @@ export async function applyFullText(
   budget: { remaining: number },
   isStored: (url: string) => Promise<boolean>,
 ): Promise<FullTextCounts> {
-  const counts: FullTextCounts = { fetched: 0, failed: 0, capped: 0 };
+  const counts = emptyFullTextCounts();
   for (const doc of docs) {
-    if (fullTextIneligibility(doc, scope)) continue;
+    const ineligible = fullTextIneligibility(doc, scope);
+    if (ineligible && ineligible !== "paywalled") continue;
     if (await isStored(doc.url)) continue;
+    if (ineligible === "paywalled") {
+      counts.paywalled++;
+      continue;
+    }
     if (budget.remaining <= 0) {
       counts.capped++;
       continue;
     }
     budget.remaining--;
+    counts.attempted++;
     const result = await fetchFullText(http, doc.url, limits);
     const feedChars = doc.rawText?.length ?? 0;
     if (result.ok && result.text.length > feedChars) {
@@ -205,8 +248,10 @@ export async function applyFullText(
       doc.metadata = { ...doc.metadata, full_text: { chars: result.text.length, feed_chars: feedChars } };
       counts.fetched++;
     } else {
-      doc.metadata = { ...doc.metadata, full_text_error: result.ok ? "not_longer_than_feed_text" : result.reason };
+      const reason = result.ok ? "not_longer_than_feed_text" : result.reason;
+      doc.metadata = { ...doc.metadata, full_text_error: reason };
       counts.failed++;
+      counts.reasons[reason] = (counts.reasons[reason] ?? 0) + 1;
     }
   }
   return counts;

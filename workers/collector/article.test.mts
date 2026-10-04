@@ -7,8 +7,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
+  addFullTextCounts,
   applyFullText,
   elementByClass,
+  emptyFullTextCounts,
+  formatFullTextReasons,
   extractArticleText,
   fetchFullText,
   fullTextBarredDomains,
@@ -176,7 +179,13 @@ test("page cap: at most `remaining` pages per run, shared across calls; stored U
   const isStored = async (url: string) => url.endsWith("/stored");
   const c1 = await applyFullText(http, first, scope(), limits, budget, isStored);
   const c2 = await applyFullText(http, second, scope(), limits, budget, isStored);
-  assert.deepEqual([c1, c2], [{ fetched: 2, failed: 0, capped: 0 }, { fetched: 1, failed: 0, capped: 1 }]);
+  assert.deepEqual(
+    [c1, c2],
+    [
+      { attempted: 2, fetched: 2, failed: 0, capped: 0, paywalled: 0, reasons: {} },
+      { attempted: 1, fetched: 1, failed: 0, capped: 1, paywalled: 0, reasons: {} },
+    ],
+  );
   assert.equal(calls.length, 3);
   assert.equal(budget.remaining, 0);
   assert.equal(first[0].textKind, "FULL_TEXT");
@@ -188,11 +197,49 @@ test("robots.txt refusal and HTTP errors keep the feed text and record a reason 
   const { http } = fakeHttp({ "https://example.org/r": "robots", "https://example.org/e": 500 });
   const docs = [doc("https://example.org/r"), doc("https://example.org/e")];
   const counts = await applyFullText(http, docs, scope(), limits, { remaining: 30 }, notStored);
-  assert.deepEqual(counts, { fetched: 0, failed: 2, capped: 0 });
+  assert.deepEqual(counts, { attempted: 2, fetched: 0, failed: 2, capped: 0, paywalled: 0, reasons: { robots: 1, http_status: 1 } });
   assert.deepEqual(docs.map((d) => [d.textKind, d.rawText, d.metadata.full_text_error]), [
     ["FEED_TEXT", "Short feed lead.", "robots"],
     ["FEED_TEXT", "Short feed lead.", "http_status"],
   ]);
+});
+
+test("summary counts: attempted, succeeded, fell back by reason (timeout included), paywalled not fetched", async () => {
+  const timeoutHttp = {
+    get: async () => {
+      throw Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
+    },
+  } as unknown as HttpClient;
+  assert.deepEqual(await fetchFullText(timeoutHttp, "https://example.org/slow", limits), { ok: false, reason: "timeout" });
+
+  const { http, calls } = fakeHttp({
+    "https://example.org/ok": `<article>${LONG}</article>`,
+    "https://example.org/robots": "robots",
+    "https://example.org/404": 404,
+    "https://example.org/short": "<article>Too short.</article>",
+  });
+  const docs = [
+    doc("https://example.org/ok", {}, { pay_status: "Free" }),
+    doc("https://example.org/robots", {}, { pay_status: "Free" }),
+    doc("https://example.org/404", {}, { pay_status: "Free" }),
+    doc("https://example.org/short", {}, { pay_status: "Free" }),
+    doc("https://example.org/preview", {}, { pay_status: "Preview" }),
+    doc("https://example.org/unmarked"),
+  ];
+  const counts = await applyFullText(http, docs, scope({ freeOnly: true }), limits, { remaining: 30 }, notStored);
+  assert.deepEqual(counts, {
+    attempted: 4,
+    fetched: 1,
+    failed: 3,
+    capped: 0,
+    paywalled: 2,
+    reasons: { robots: 1, http_status: 1, too_short: 1 },
+  });
+  assert.ok(!calls.some((u) => u.endsWith("/preview") || u.endsWith("/unmarked")), "paywalled items are never requested");
+
+  const total = addFullTextCounts(counts, { ...emptyFullTextCounts(), attempted: 1, failed: 1, reasons: { timeout: 1, robots: 1 } });
+  assert.equal(formatFullTextReasons(total.reasons), "http_status 1, robots 2, timeout 1, too_short 1");
+  assert.equal(formatFullTextReasons({}), "none");
 });
 
 test("listing rows (no feed text) become FULL_TEXT when the page has text", async () => {

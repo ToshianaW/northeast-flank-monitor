@@ -9,7 +9,13 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import pg from "pg";
 import { setOutput } from "../lib/ci.mjs";
-import { applyFullText, fullTextBarredDomains, type FullTextCounts, type FullTextLimits, type FullTextScope } from "./article.mjs";
+import {
+  addFullTextCounts,
+  applyFullText,
+  emptyFullTextCounts,
+  formatFullTextReasons,
+  fullTextBarredDomains,
+  type FullTextCounts, type FullTextLimits, type FullTextScope } from "./article.mjs";
 import {
   collectFeed,
   makeCreditExtractor,
@@ -186,7 +192,7 @@ async function run(
     outcomes: { new: 0, filtered: 0, duplicate: 0, existing: 0 },
     failedItems: 0,
     paid: 0,
-    fullText: { fetched: 0, failed: 0, capped: 0 },
+    fullText: emptyFullTextCounts(),
   };
   let docs: CollectedDoc[];
   try {
@@ -224,7 +230,7 @@ for (const feed of config.feeds) {
         outcomes: { new: 0, filtered: 0, duplicate: 0, existing: 0 },
         failedItems: 0,
         paid: 0,
-        fullText: { fetched: 0, failed: 0, capped: 0 },
+        fullText: emptyFullTextCounts(),
         note: `not read: last read ${hours.toFixed(1)}h ago (limit: once per ${feed.min_hours_between_reads}h)`,
       });
       continue;
@@ -292,12 +298,10 @@ for (const s of summaries) {
 console.log(
   `${pad("TOTAL", 35)}${pad(total.fetched, 9)}${pad(total.new, 6)}${pad(total.skipped, 9)}${total.failed}`,
 );
-const fullTextTotal = summaries.reduce(
-  (t, s) => ({ fetched: t.fetched + s.fullText.fetched, failed: t.failed + s.fullText.failed, capped: t.capped + s.fullText.capped }),
-  { fetched: 0, failed: 0, capped: 0 },
-);
+const fullTextTotal = summaries.reduce((t, s) => addFullTextCounts(t, s.fullText), emptyFullTextCounts());
+const fullTextReasons = formatFullTextReasons(fullTextTotal.reasons);
 console.log(
-  `Full text: ${config.fetch_full_text ? "on" : "off"} · ${fullTextTotal.fetched} fetched · ${fullTextTotal.failed} failed · ${fullTextTotal.capped} over the cap of ${config.full_text_max_pages} pages`,
+  `Full text: ${config.fetch_full_text ? "on" : "off"} · ${fullTextTotal.attempted} attempted · ${fullTextTotal.fetched} succeeded · ${fullTextTotal.failed} fell back (${fullTextReasons}) · ${fullTextTotal.paywalled} paywalled, not fetched · ${fullTextTotal.capped} over the cap of ${config.full_text_max_pages} pages`,
 );
 
 // A few failing sources are warnings; the run fails only when more than half fail.
@@ -320,9 +324,13 @@ if (args.ci) {
   setOutput("failed_sources", failedSources.length);
   setOutput("total_sources", summaries.length);
   setOutput("warned_sources", failedSources.map((s) => `${s.key} (${shortReason(s.error!)})`).join(", "));
+  setOutput("full_text_attempted", fullTextTotal.attempted);
   setOutput("full_text_fetched", fullTextTotal.fetched);
   setOutput("full_text_failed", fullTextTotal.failed);
   setOutput("full_text_capped", fullTextTotal.capped);
+  setOutput("full_text_paywalled", fullTextTotal.paywalled);
+  // Reason labels and counts only (never URLs or titles).
+  setOutput("full_text_reasons", fullTextReasons);
 }
 if (tooManyFailed) process.exitCode = 1;
 
