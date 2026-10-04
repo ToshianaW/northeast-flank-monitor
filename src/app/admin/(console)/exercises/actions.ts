@@ -16,6 +16,7 @@ import {
   type ExerciseFormValues,
   type ExerciseSourceFormRow,
 } from "@/lib/exercises";
+import { postToXAfterResponse } from "@/lib/x-posting";
 import {
   rememberReviewerName,
   requireReviewerName,
@@ -81,6 +82,7 @@ async function saveExercise(
     };
   }
 
+  postToXAfterResponse();
   await rememberReviewerName(reviewer);
   revalidateExercisePaths(savedId);
   redirect(`/admin/exercises/${savedId}/edit?saved=1`);

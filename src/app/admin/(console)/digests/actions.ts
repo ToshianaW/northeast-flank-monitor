@@ -17,6 +17,7 @@ import {
   type DigestInput,
 } from "@/lib/digests";
 import { isUniqueViolation } from "@/lib/sources";
+import { postToXAfterResponse } from "@/lib/x-posting";
 
 export type DigestFormState = {
   values?: DigestFormValues;
@@ -62,6 +63,7 @@ async function save(
     return { values, formError: "Could not save the digest. Try again." };
   }
 
+  postToXAfterResponse();
   revalidatePath("/digest", "layout");
   revalidatePath("/admin/digests");
   redirect("/admin/digests?saved=1");
