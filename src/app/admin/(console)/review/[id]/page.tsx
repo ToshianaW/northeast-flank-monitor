@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { ExternalLink } from "lucide-react";
 import { BackLink } from "@/components/admin/back-link";
 import { ReviewEventActions } from "@/components/admin/review-event-actions";
+import { XPostCopy } from "@/components/admin/x-post-copy";
 import { Badge } from "@/components/ui/badge";
 import {
   CONFIDENCE_LEVEL_LABELS,
@@ -32,6 +33,7 @@ import {
   SOURCE_TYPE_LABELS,
 } from "@/lib/source-labels";
 import { requireAdminPage } from "@/lib/admin-session";
+import { buildPostText, postWeight } from "@/lib/x-text";
 
 export const metadata = { title: "Review event" };
 
@@ -157,6 +159,12 @@ export default async function ReviewEventPage({
   const isAiDraft = extraction_run_id !== null;
   const primary = sources.find((s) => s.is_primary) ?? sources.find((s) => s.relationship === "SUPPORTS");
   const supports = sources.filter((s) => s.relationship === "SUPPORTS");
+  // Same link choice as the X poster: the primary supporting source, never a contradicting one.
+  const xPost = buildPostText({
+    summary: event.summary,
+    headline: event.headline,
+    sourceUrl: (supports.find((s) => s.is_primary) ?? supports[0])?.article_url ?? event.source_url,
+  });
 
   const warnings = [
     supports.length === 0 ? "No supporting source attached." : null,
@@ -358,6 +366,13 @@ export default async function ReviewEventPage({
             </div>
           )}
         </section>
+
+        {/* Copy-ready X post (admin only; posted by hand) */}
+        <XPostCopy
+          text={xPost.ok ? xPost.text : null}
+          weight={xPost.ok ? postWeight(xPost.text) : 0}
+          refusal={xPost.ok ? null : xPost.reason}
+        />
 
         {/* 6. Actions (unchanged) */}
         <section className="border-t border-border pt-5">

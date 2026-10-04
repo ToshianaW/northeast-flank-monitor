@@ -17,7 +17,6 @@ import {
 } from "@/lib/events";
 import { exerciseConstraintMessage } from "@/lib/exercise-rules";
 import { logEditReviewAction, payloadHasSupportsSource } from "@/lib/review";
-import { postToXAfterResponse } from "@/lib/x-posting";
 import {
   requireReviewerName,
   reviewerFromForm,
@@ -92,7 +91,6 @@ async function saveEvent(
     };
   }
 
-  postToXAfterResponse();
   revalidatePath("/admin/events");
   revalidatePath("/admin/review");
   redirect(redirectTo ?? "/admin/events?saved=1");

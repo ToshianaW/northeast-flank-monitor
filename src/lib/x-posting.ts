@@ -7,6 +7,10 @@ import { processXQueue, xSettingsFromEnv } from "./x-queue";
 const PER_SAVE_LIMIT = 3;
 
 /**
+ * NOT CALLED at present: automatic posting is switched off (X charges per post; posts are copied
+ * by hand from the admin review page instead). The triggers still queue rows, so before calling
+ * this again from the admin actions, mark the old backlog SKIPPED or it will all be posted.
+ *
  * Called by admin save and approve actions: once the response has been sent, posts whatever the
  * publish triggers queued (migration 0009). Does nothing unless X_POSTING_ENABLED=true and the
  * four X keys are set. A failed post never affects the save; it is recorded on the queue row.

@@ -15,7 +15,6 @@ import {
   reviewerFromForm,
   REVIEWER_NAME_COOKIE,
 } from "@/lib/reviewer";
-import { postToXAfterResponse } from "@/lib/x-posting";
 import { cookies } from "next/headers";
 
 async function persistReviewer(name: string) {
@@ -72,7 +71,6 @@ export async function approveEventAction(
   const result = await approveEvent(eventId, reviewer.name, confidence as ConfidenceLevel);
   if (!result.ok) return { error: result.error };
 
-  postToXAfterResponse();
   await persistReviewer(reviewer.name);
   revalidatePath("/admin/review");
   revalidatePath(`/admin/review/${eventId}`);
