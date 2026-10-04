@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin-session";
-import { CONFIDENCE_LEVEL_VALUES, type ConfidenceLevel } from "@/lib/event-labels";
 import {
   approveHistoricalEvent,
   createHistoricalEvent,
@@ -18,6 +17,8 @@ import {
   type HistoricalSourceFormRow,
   type WriteResult,
 } from "@/lib/historical";
+import { importCandidates, readCandidateFile, type ImportResult } from "@/lib/historical-import";
+import { parseConfidenceChoice } from "@/lib/historical-rules";
 import { rememberReviewerName, requireReviewerName, reviewerFromForm } from "@/lib/reviewer";
 
 export type HistoricalFormState = {
@@ -110,14 +111,15 @@ export async function approveHistoricalAction(
   _prev: HistoricalActionState,
   formData: FormData,
 ): Promise<HistoricalActionState> {
-  const confidence = String(formData.get("confidence_level") ?? "");
-  if (!CONFIDENCE_LEVEL_VALUES.includes(confidence as ConfidenceLevel)) {
-    return { error: "Choose a confidence level." };
+  // An explicit choice is required: the select starts empty, with the rule-based suggestion beside it.
+  const confidence = parseConfidenceChoice(formData.get("confidence_level"));
+  if (!confidence) {
+    return { error: "Choose a confidence level before approving." };
   }
   return statusAction(
     id,
     formData,
-    (reviewer) => approveHistoricalEvent(id, reviewer, confidence as ConfidenceLevel),
+    (reviewer) => approveHistoricalEvent(id, reviewer, confidence),
     "approved",
   );
 }
@@ -138,4 +140,27 @@ export async function unpublishHistoricalAction(
 ): Promise<HistoricalActionState> {
   const reason = String(formData.get("reason") ?? "");
   return statusAction(id, formData, (reviewer) => unpublishHistoricalEvent(id, reviewer, reason), "unpublished");
+}
+
+export type HistoricalImportState = { error?: string; results?: ImportResult[] };
+
+/** Saves ticked suggester candidates as DRAFT historical events (never published here). */
+export async function importHistoricalAction(
+  fileName: string,
+  _prev: HistoricalImportState,
+  formData: FormData,
+): Promise<HistoricalImportState> {
+  await requireAdmin();
+  const reviewer = reviewerFromForm(formData);
+  const reviewerError = requireReviewerName(reviewer);
+  if (reviewerError) return { error: reviewerError };
+  const ids = formData.getAll("candidate").map(String);
+  if (ids.length === 0) return { error: "Tick at least one candidate." };
+  const file = readCandidateFile(fileName);
+  if (!file.ok) return { error: file.error };
+  const results = await importCandidates(file.file, fileName, ids, reviewer);
+  await rememberReviewerName(reviewer);
+  revalidatePath("/admin/historical");
+  revalidatePath("/admin/historical/import");
+  return { results };
 }

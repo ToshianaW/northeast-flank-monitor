@@ -42,9 +42,14 @@ export default async function AdminHistoricalPage({ searchParams }: PageProps<"/
             digest. Every save and review action is logged with the reviewer&rsquo;s name.
           </p>
         </div>
-        <Link href="/admin/historical/new" className={buttonVariants()}>
-          Add historical event
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/admin/historical/import" className={buttonVariants({ variant: "outline" })}>
+            Import candidates
+          </Link>
+          <Link href="/admin/historical/new" className={buttonVariants()}>
+            Add historical event
+          </Link>
+        </div>
       </div>
 
       <nav aria-label="Historical status" className="mt-6 flex flex-wrap gap-2">

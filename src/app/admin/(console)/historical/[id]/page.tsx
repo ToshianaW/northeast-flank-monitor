@@ -18,6 +18,7 @@ import {
   type HistoricalActionRow,
 } from "@/lib/historical";
 import { HISTORICAL_FIELD_NAMES, PHASE_TAG_LABELS, type PhaseTag } from "@/lib/historical-rules";
+import { suggestConfidence } from "@/lib/confidence-suggestion";
 import { getReviewerName } from "@/lib/reviewer";
 import { isTier4OnlySupport } from "@/lib/source-labels";
 
@@ -170,8 +171,8 @@ export default async function HistoricalReviewPage({ params, searchParams }: Pag
             <HistoricalReviewActions
               eventId={id}
               status={event.review_status}
-              confidenceLevel={event.confidence_level}
               reviewerDefault={reviewerDefault}
+              suggestion={suggestConfidence({ sources, contradiction_flag: event.contradiction_flag })}
             />
           </section>
           <section>
