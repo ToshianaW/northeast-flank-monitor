@@ -3,8 +3,9 @@
  * reports the code and a position (section number, sentence number), never the text; local runs
  * also print the rejected sentences (failureLines).
  */
-import { findBannedPhrase } from "@/lib/banned-phrases";
+import { findBannedPhrase, findComparisonWording } from "@/lib/banned-phrases";
 import { HISTORICAL_CONTEXT_LINE, type DigestSectionKey } from "@/lib/digests";
+import { isHistoricalContextLine } from "@/lib/historical-compare";
 import { CODE_SECTION, LAST_SECTION, MODEL_SECTION_KEYS, SECTION_KEYS, type DigestOutput } from "./prompt.mjs";
 
 export type CheckCode =
@@ -84,8 +85,8 @@ export type CheckResult =
       ok: true;
       /**
        * In DIGEST_SECTIONS order; model sections without sentences are absent. Always includes
-       * historical_context with the fixed HISTORICAL_CONTEXT_LINE, and the summary ends with the
-       * unverified note when the day has restricted events.
+       * historical_context, written by code (historicalContextSection), and the summary ends with
+       * the unverified note when the day has restricted events.
        */
       sections: Array<{ key: DigestSectionKey; sentences: CheckedSentence[] }>;
       /** Model-written sentences. */
@@ -94,7 +95,37 @@ export type CheckResult =
     }
   | CheckFailure;
 
-export function checkDigestOutput(output: DigestOutput, events: readonly AliasedEvent[]): CheckResult {
+export type HistoricalContext = {
+  lines: string[];
+  /** Why the fixed HISTORICAL_CONTEXT_LINE is used instead of generated lines, or null. */
+  fallback: null | "NOT_GENERATED" | "INVALID_LINE";
+  /** 1-based position of the first failing generated line (INVALID_LINE only). */
+  badLine?: number;
+};
+
+/**
+ * The Historical Context section. Only lines built by historicalContextLines() are used, and
+ * only if every one matches its grammar and passes the predictive and comparison-wording checks.
+ * Anything else falls back to the fixed line; it never throws, so the digest continues.
+ */
+export function historicalContextSection(generated: readonly string[] | null): HistoricalContext {
+  if (!generated || generated.length === 0) return { lines: [HISTORICAL_CONTEXT_LINE], fallback: "NOT_GENERATED" };
+  const bad = generated.findIndex(
+    (line) => !isHistoricalContextLine(line) || findBannedPhrase(line) !== null || findComparisonWording(line) !== null,
+  );
+  if (bad !== -1) return { lines: [HISTORICAL_CONTEXT_LINE], fallback: "INVALID_LINE", badLine: bad + 1 };
+  return { lines: [...generated], fallback: null };
+}
+
+/**
+ * `historicalLines` comes from code (historicalContextLines), never from the model's output;
+ * null keeps the fixed line.
+ */
+export function checkDigestOutput(
+  output: DigestOutput,
+  events: readonly AliasedEvent[],
+  historicalLines: readonly string[] | null = null,
+): CheckResult {
   const byAlias = new Map(events.map((e) => [e.alias, e]));
   const seenKeys = new Set<string>();
   const checked = new Map<DigestSectionKey, CheckedSentence[]>();
@@ -181,7 +212,10 @@ export function checkDigestOutput(output: DigestOutput, events: readonly Aliased
       },
     ]);
   }
-  checked.set(CODE_SECTION, [{ text: HISTORICAL_CONTEXT_LINE, eventIds: [], aliases: [], byCode: true }]);
+  checked.set(
+    CODE_SECTION,
+    historicalContextSection(historicalLines).lines.map((text) => ({ text, eventIds: [], aliases: [], byCode: true as const })),
+  );
   const sections = SECTION_KEYS.filter((k) => checked.has(k)).map((key) => ({ key, sentences: checked.get(key)! }));
   return { ok: true, sections, sentenceCount, citedEvents: cited.size };
 }

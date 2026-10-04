@@ -6,7 +6,10 @@ export const PROMPT_VERSION = "digest-v5.1";
 
 export const SECTION_KEYS = DIGEST_SECTIONS.map((s) => s.key) as DigestSectionKey[];
 export const LAST_SECTION: DigestSectionKey = "contradictions_unverified";
-/** Written by code, never by the model (see HISTORICAL_CONTEXT_LINE in src/lib/digests.ts). */
+/**
+ * Written by code, never by the model: historicalContextLines() in src/lib/historical-compare.ts,
+ * or HISTORICAL_CONTEXT_LINE in src/lib/digests.ts. The model is never given historical data.
+ */
 export const CODE_SECTION: DigestSectionKey = "historical_context";
 /** The sections the model may write. */
 export const MODEL_SECTION_KEYS: DigestSectionKey[] = SECTION_KEYS.filter((k) => k !== CODE_SECTION);

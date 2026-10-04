@@ -1,7 +1,8 @@
 import "server-only";
-import { findBannedPhrase } from "@/lib/banned-phrases";
+import { findBannedPhrase, findComparisonWording } from "@/lib/banned-phrases";
 import { getPool } from "@/lib/db";
 import { hasMalformedMarker, hasMarker } from "@/lib/digest-refs";
+import { isHistoricalContextLine } from "@/lib/historical-compare";
 
 /** Spec §16 digest sections, in display order. */
 export const DIGEST_SECTIONS = [
@@ -31,7 +32,10 @@ export type DigestStatus = (typeof DIGEST_STATUS_VALUES)[number];
 
 export const DEFAULT_DIGEST_TITLE = "Northeast Flank Daily Digest";
 
-/** Written by code (not the model) into every AI-drafted digest until historical comparison exists. */
+/**
+ * Written by code (not the model) into an AI-drafted digest when the generated Historical Context
+ * lines are unavailable: the record is below the threshold, or a line failed its checks.
+ */
 export const HISTORICAL_CONTEXT_LINE =
   "No historical comparison is available yet. The historical dataset is still being built.";
 
@@ -182,21 +186,29 @@ export function validateDigest(values: DigestFormValues): DigestValidationResult
 
 /**
  * Extra rules for AI-drafted digests: every sentence keeps a [ref …] marker (except the fixed
- * Historical Context line) and no banned phrase is added while editing. Blank lines are allowed.
+ * Historical Context line, and in Historical Context only, lines in the code-written form) and no
+ * banned phrase is added while editing. Blank lines are allowed.
  */
 export function checkAiDigestSections(sections: DigestSections): DigestFormErrors {
   const errors: DigestFormErrors = {};
   for (const { key } of DIGEST_SECTIONS) {
     const lines = sections[key].split("\n");
+    const codeWritten = (line: string) =>
+      line === HISTORICAL_CONTEXT_LINE || (key === "historical_context" && isHistoricalContextLine(line));
     const unreferenced = lines.findIndex(
-      (line) => line.trim() !== "" && line.trim() !== HISTORICAL_CONTEXT_LINE && !hasMarker(line),
+      (line) => line.trim() !== "" && !codeWritten(line.trim()) && !hasMarker(line),
     );
     if (unreferenced !== -1) {
       errors[key] = `Line ${unreferenced + 1} has no [ref …] marker. Every sentence in an AI-drafted digest must cite its events.`;
       continue;
     }
     const banned = findBannedPhrase(sections[key]);
-    if (banned) errors[key] = `Remove the predictive phrase "${banned}".`;
+    if (banned) {
+      errors[key] = `Remove the predictive phrase "${banned}".`;
+      continue;
+    }
+    const comparison = key === "historical_context" ? findComparisonWording(sections[key]) : null;
+    if (comparison) errors[key] = `Remove the comparison wording "${comparison}". This section states counts only.`;
   }
   return errors;
 }

@@ -148,6 +148,13 @@ export function DigestView({
               >
                 <PlainText text={digest.sections[key]} citations={citations} />
               </div>
+              {key === "historical_context" ? (
+                <p className="mt-3 text-sm">
+                  <Link href="/historical" className="link">
+                    Browse the historical record →
+                  </Link>
+                </p>
+              ) : null}
             </section>
           ))}
         </div>

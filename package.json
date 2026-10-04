@@ -14,6 +14,7 @@
     "extract": "tsx --conditions=react-server workers/extractor/extract.mts",
     "dedup": "tsx workers/deduplication/dedup.mts",
     "digest": "tsx --conditions=react-server workers/digest/generate.mts",
+    "digest:historical-preview": "tsx --conditions=react-server workers/digest/historical-preview.mts",
     "historical:suggest": "tsx --conditions=react-server workers/historical/suggest.mts",
     "historical:list-urls": "tsx --conditions=react-server workers/historical/list-urls.mts",
     "historical:probe-archive": "tsx --conditions=react-server workers/historical/probe-archive.mts",

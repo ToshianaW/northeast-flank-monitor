@@ -19,8 +19,18 @@ import { getPool } from "@/lib/db";
 import { formatDigestLine } from "@/lib/digest-refs";
 import { DEFAULT_DIGEST_TITLE, DIGEST_SECTIONS, isValidDigestDate, type DigestMeta } from "@/lib/digests";
 import type { SourceRelationship } from "@/lib/event-labels";
+import { historicalContextLines } from "@/lib/historical-compare";
+import { FULL_PERIOD } from "@/lib/historical-rules";
+import { getHistoricalCoverage, getTypeMonthCounts } from "@/lib/public-historical";
 import { setOutput } from "../lib/ci.mjs";
-import { checkDigestOutput, decideDigestWrite, failureLines, quotedPassages, type AliasedEvent } from "./check.mjs";
+import {
+  checkDigestOutput,
+  decideDigestWrite,
+  failureLines,
+  historicalContextSection,
+  quotedPassages,
+  type AliasedEvent,
+} from "./check.mjs";
 import { draftDigest, type ModelCall } from "./draft.mjs";
 import { loadDigestEvents } from "./input.mjs";
 import {
@@ -83,6 +93,8 @@ let sectionCount = 0;
 let attempts = 0;
 /** The check code that triggered the retry, if there was one. */
 let retriedFor = "";
+/** How the Historical Context section was written: GENERATED, or the fallback reason. */
+let historicalStatus = "";
 
 /** Ends the run. Thrown rather than process.exit(), which trips a libuv assertion on Windows. */
 class Finished {
@@ -157,6 +169,24 @@ async function run(): Promise<never> {
     quotes: quotedPassages(e.summary),
   }));
 
+  // Historical Context, written by code from published historical counts per event type. The
+  // model never sees these counts and cannot write the section. A line that fails its checks
+  // means the fixed line is used; the digest continues.
+  const [typeCounts, historicalCoverage] = await Promise.all([getTypeMonthCounts(), getHistoricalCoverage(FULL_PERIOD)]);
+  const historicalLines = historicalContextLines(
+    [...new Set(eventRows.map((e) => e.event_type))],
+    typeCounts,
+    historicalCoverage,
+  );
+  const historical = historicalContextSection(historicalLines);
+  historicalStatus = historical.fallback ?? "GENERATED";
+  if (historical.fallback === "INVALID_LINE") {
+    // Counts and positions only.
+    console.warn(
+      `warning: historical context line ${historical.badLine} of ${historicalLines!.length} failed its check; using the fixed line (historical events ${historicalCoverage.events}, sources ${historicalCoverage.sources})`,
+    );
+  }
+
   // 3–5. Model call and code checks, with one retry on a failed check. The spend cap is checked
   // against the worst case before each call and covers both.
   const anthropic = new Anthropic();
@@ -179,7 +209,7 @@ async function run(): Promise<never> {
   const draft = await draftDigest({
     userMessage: buildUserMessage(date, inputs),
     call,
-    check: (output) => checkDigestOutput(output, aliased),
+    check: (output) => checkDigestOutput(output, aliased, historicalLines),
     maxUsd,
     worstCaseUsd: (messages) => {
       const chars = SYSTEM_PROMPT.length + messages.reduce((n, m) => n + m.content.length, 0);
@@ -207,7 +237,7 @@ async function run(): Promise<never> {
         console.log(`\n## ${labels.get(section.key)}`);
         for (const [i, sentence] of section.sentences.entries()) {
           console.log(`\n${i + 1}. ${sentence.text}`);
-          if (sentence.byCode) console.log("   (fixed text written by code, not the model)");
+          if (sentence.byCode) console.log("   (written by code, not the model)");
           for (const alias of sentence.aliases) {
             const e = byAlias.get(alias)!;
             console.log(`   ↳ ${alias} [${e.confidence_level}${e.contradiction_flag ? ", contradicted" : ""}] ${e.headline}`);
@@ -226,7 +256,7 @@ async function run(): Promise<never> {
   const meta: DigestMeta = { generator: "ai", model, prompt_version: PROMPT_VERSION, generated_at: new Date().toISOString() };
   const sections: Record<string, unknown> = { _meta: meta };
   for (const s of checked.sections) {
-    // The code-written Historical Context line cites no event, so it carries no marker.
+    // The code-written Historical Context lines cite no event, so they carry no marker.
     sections[s.key] = s.sentences
       .map((n) => (n.eventIds.length ? formatDigestLine(n.text, n.eventIds) : n.text))
       .join("\n");
@@ -280,7 +310,7 @@ const failed =
 
 // Counts and codes only: the repository and its Actions logs are public.
 console.log(
-  `digest ${date} · ${result.status}${result.detail ? ` (${result.detail})` : ""} · events ${eventCount} · sections ${sectionCount} · sentences ${sentenceCount} · attempts ${attempts}${retriedFor ? ` (retried for ${retriedFor})` : ""} · cost $${costUsd.toFixed(4)} (cap $${maxUsd.toFixed(2)}) · ${model} · ${PROMPT_VERSION}`,
+  `digest ${date} · ${result.status}${result.detail ? ` (${result.detail})` : ""} · events ${eventCount} · sections ${sectionCount} · sentences ${sentenceCount} · attempts ${attempts}${retriedFor ? ` (retried for ${retriedFor})` : ""}${historicalStatus ? ` · historical context ${historicalStatus}` : ""} · cost $${costUsd.toFixed(4)} (cap $${maxUsd.toFixed(2)}) · ${model} · ${PROMPT_VERSION}`,
 );
 if (ci) {
   setOutput("completed", "true");
@@ -292,6 +322,7 @@ if (ci) {
   setOutput("sentences", sentenceCount);
   setOutput("attempts", attempts);
   setOutput("retried_for", retriedFor);
+  setOutput("historical_context", historicalStatus);
   setOutput("cost_usd", costUsd.toFixed(4));
 }
 await pool.end();
