@@ -18,6 +18,7 @@ const { rows: picked } = ready
   ? await db.client.query<{ event_id: string; event_type: string; country: string }>(
       `SELECT e.event_id, e.event_type::text AS event_type, e.country FROM events e
        WHERE e.review_status = 'PUBLISHED' AND btrim(coalesce(e.country, '')) <> ''
+         AND e.event_type NOT IN ('POLITICAL_SIGNALING', 'OFFICIAL_WARNING')
          AND NOT EXISTS (SELECT 1 FROM event_historical_references r WHERE r.event_id = e.event_id)
        ORDER BY e.created_at LIMIT 1`,
     )

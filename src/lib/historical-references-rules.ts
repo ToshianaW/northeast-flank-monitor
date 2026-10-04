@@ -9,7 +9,7 @@ import {
   REFERENCES_HEADING,
   SIMILARITY_CAVEAT,
 } from "@/lib/banned-phrases";
-import { EVENT_TYPE_LABELS, type EventType } from "@/lib/event-labels";
+import { EVENT_TYPE_LABELS, isStatementType, type EventType } from "@/lib/event-labels";
 import { HISTORICAL_LABEL } from "@/lib/historical-rules";
 
 export { REFERENCES_HEADING, SIMILARITY_CAVEAT };
@@ -232,6 +232,22 @@ export function boxText(lines: readonly ReferenceLine[]): string {
 
 export type AutoEvent = ReferenceFields & { event_id: string };
 
+/** Automatic links apply to physical-activity event types only, never to statement types. */
+export function isAutoLinkType(type: EventType): boolean {
+  return !isStatementType(type);
+}
+
+/**
+ * Re-checks a planned automatic link before it is written: both sides an activity type, the same
+ * event type, and the same non-empty country. Returns the problem, or null when it holds.
+ */
+export function autoLinkProblem(current: AutoEvent, historical: AutoEvent): string | null {
+  if (!isAutoLinkType(current.event_type) || !isAutoLinkType(historical.event_type)) return "statement type";
+  if (current.event_type !== historical.event_type) return "different event type";
+  if (norm(current.country) === "" || norm(current.country) !== norm(historical.country)) return "different country";
+  return null;
+}
+
 /** 32-bit FNV-1a: a fixed, portable hash so the same pair always ranks the same way. */
 export function pairHash(eventId: string, historicalEventId: string): number {
   let h = 0x811c9dc5;
@@ -253,7 +269,9 @@ export function rankAutoLinks(
   candidates: readonly AutoEvent[],
   options: { slots: number; linkCounts: ReadonlyMap<string, number>; excluded: ReadonlySet<string> },
 ): Array<{ historical_event_id: string; attributes: ReferenceAttribute[] }> {
-  if (options.slots <= 0 || norm(current.country) === "") return [];
+  // Statements (political signalling, official warnings) are never linked automatically: only
+  // physical-activity types are. A reviewer can still approve a statement link.
+  if (options.slots <= 0 || norm(current.country) === "" || !isAutoLinkType(current.event_type)) return [];
   const ranked = candidates
     .filter(
       (h) =>

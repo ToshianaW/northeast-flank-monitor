@@ -10,6 +10,8 @@ import { COMPARISON_EXEMPT, findBannedPhrase, findComparisonWording } from "./ba
 import {
   AI_SUGGESTED_LABEL,
   AUTO_LINK_NOTE,
+  autoLinkProblem,
+  isAutoLinkType,
   BOX_STRINGS,
   pairHash,
   planAutoLinks,
@@ -187,4 +189,20 @@ test("the plan keeps existing links, fills only free slots, and never re-adds a 
   });
   const ids = plan.get(e.event_id)!.map((l) => l.historical_event_id).sort();
   assert.deepEqual(ids, [H(3).event_id, H(4).event_id].sort());
+});
+
+test("statement types are never linked automatically; the write-time check enforces it", () => {
+  for (const type of ["POLITICAL_SIGNALING", "OFFICIAL_WARNING"] as const) {
+    assert.equal(isAutoLinkType(type), false);
+    const current = ev("statement-1", { event_type: type });
+    const candidates = [H(1, { event_type: type }), H(2, { event_type: type })];
+    assert.deepEqual(rankAutoLinks(current, candidates, { slots: 3, linkCounts: new Map(), excluded: new Set() }), [], type);
+    assert.deepEqual(planAutoLinks([current], candidates, { existingByEvent: new Map(), linkCounts: new Map(), removedPairs: new Set() }).get("statement-1"), []);
+    assert.equal(autoLinkProblem(current, candidates[0]), "statement type");
+  }
+  assert.equal(isAutoLinkType("EXERCISE"), true);
+  assert.equal(autoLinkProblem(ev("a"), H(1)), null);
+  assert.equal(autoLinkProblem(ev("a"), H(1, { event_type: "AIR_ACTIVITY" })), "different event type");
+  assert.equal(autoLinkProblem(ev("a"), H(1, { country: "Poland" })), "different country");
+  assert.equal(autoLinkProblem(ev("a", { country: null }), H(1, { country: null })), "different country");
 });

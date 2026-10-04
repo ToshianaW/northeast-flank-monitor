@@ -18,7 +18,7 @@ import {
   loadAutoState,
   referencesTableExists,
 } from "@/lib/historical-references";
-import { ATTRIBUTE_LABELS, MAX_REFERENCES, planAutoLinks } from "@/lib/historical-references-rules";
+import { ATTRIBUTE_LABELS, autoLinkProblem, isAutoLinkType, MAX_REFERENCES, planAutoLinks } from "@/lib/historical-references-rules";
 
 const envFile = fileURLToPath(new URL("../.env.local", import.meta.url));
 if (existsSync(envFile)) process.loadEnvFile(envFile);
@@ -50,18 +50,36 @@ try {
     distribution.set(total, (distribution.get(total) ?? 0) + 1);
     console.log(`${e.headline}`);
     if (existing > 0) console.log(`  (${existing} existing link${existing === 1 ? "" : "s"} kept)`);
-    if (links.length === 0 && existing === 0) console.log("  (no automatic link: no published entry of the same type and country)");
+    if (links.length === 0 && existing === 0) {
+      console.log(
+        isAutoLinkType(e.event_type)
+          ? "  (no automatic link: no published entry of the same type and country)"
+          : "  (no automatic link: statement type)",
+      );
+    }
     for (const l of links) {
       used.set(l.historical_event_id, (used.get(l.historical_event_id) ?? 0) + 1);
       console.log(`  -> ${headlineOf.get(l.historical_event_id)} [${l.attributes.map((a) => ATTRIBUTE_LABELS[a]).join(", ")}]`);
     }
   }
 
-  console.log(`\nLinks per event: ${Array.from({ length: MAX_REFERENCES + 1 }, (_, n) => `${n}: ${distribution.get(n) ?? 0}`).join(" · ")}`);
+  // Every planned link must be between activity types and share event type and country.
+  const historicalById = new Map(historical.map((h) => [h.event_id, h]));
+  const problems: string[] = [];
+  for (const e of events) {
+    for (const l of plan.get(e.event_id) ?? []) {
+      const problem = autoLinkProblem(e, historicalById.get(l.historical_event_id)!);
+      if (problem) problems.push(problem);
+    }
+  }
+  console.log(`\nChecked ${[...plan.values()].flat().length} planned links: ${problems.length === 0 ? "all activity types sharing event type and country" : `${problems.length} PROBLEM(S): ${[...new Set(problems)].join(", ")}`}`);
+
+  console.log(`Links per event: ${Array.from({ length: MAX_REFERENCES + 1 }, (_, n) => `${n}: ${distribution.get(n) ?? 0}`).join(" · ")}`);
   const top = [...used].sort((a, b) => b[1] - a[1] || (headlineOf.get(a[0])! < headlineOf.get(b[0])! ? -1 : 1)).slice(0, 5);
   console.log("Most-used historical entries:");
   for (const [id, n] of top) console.log(`  ${n} × ${headlineOf.get(id)}`);
 
+  if (args.write && problems.length > 0) throw new Error("refusing to write: the plan has links that fail the check");
   if (args.write) {
     let made = 0;
     for (const e of events) made += await autoLinkEvent(e.event_id);
