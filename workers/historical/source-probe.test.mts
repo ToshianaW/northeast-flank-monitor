@@ -2,6 +2,7 @@
  * Source-probe rules (no network). Run: npm test
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { isLegalPageUrl, selectLegalLinks, TermsGate } from "./source-probe.mjs";
 
@@ -32,6 +33,32 @@ test("selectLegalLinks keeps same-site legal links only", () => {
     <a href="https://other.example.com/terms">Other site terms</a>
     <a href="/wp-admin/post.php?post=1&amp;action=edit">Edit</a>`;
   assert.deepEqual(selectLegalLinks(html, "https://defence24.com/"), ["https://defence24.com/term-of-use"]);
+});
+
+test("the aif.ru case: anchor text that says 'rules' or 'правила' never makes an article a legal link", () => {
+  const html = `
+    <a href="https://hab.aif.ru/health/ryba-v-racione-norma-polzy-pravila-infografika">Рыба в рационе: правила</a>
+    <a href="/health/food">Правила питания</a>
+    <a href="/static/1965027">Rules</a>
+    <a href="https://aif.ru/privacy-policy/">Политика конфиденциальности</a>`;
+  assert.deepEqual(selectLegalLinks(html, "https://klg.aif.ru/"), ["https://aif.ru/privacy-policy/"]);
+  for (const url of [
+    "https://hab.aif.ru/health/ryba-v-racione-norma-polzy-pravila-infografika",
+    "https://aif.ru/health/food",
+  ]) assert.ok(!isLegalPageUrl(url), url);
+  for (const url of [
+    "https://www.15min.lt/privatumo-politika",
+    "https://info.lsm.lv/privatuma-politika",
+    "https://www.example.pl/polityka-prywatnosci",
+  ]) assert.ok(isLegalPageUrl(url), url);
+});
+
+test("regex escapes in source-probe.mts are intact", () => {
+  const source = readFileSync("workers/historical/source-probe.mts", "utf8");
+  assert.ok(!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(source), "control character (an escape was mangled)");
+  for (const fragment of ["privatumo-politika)([-_.]|$)/i", '/<a\\b[^>]*href="([^"#]+)"/gi']) {
+    assert.ok(source.includes(fragment), `missing pattern fragment: ${fragment}`);
+  }
 });
 
 test("TermsGate refuses article fetches until the site's terms were read", () => {
