@@ -11,7 +11,8 @@ import { join, relative, sep } from "node:path";
 import { test } from "node:test";
 
 const ROOT = process.cwd();
-const HISTORICAL_TABLE = /\bhistorical_(events|event_sources|review_actions)\b/;
+/** The historical tables, and the 0010 link table and its log (the only bridge to current events). */
+const HISTORICAL_TABLE = /\bhistorical_(events|event_sources|review_actions)\b|\bevent_historical_reference(s|_log)\b/;
 
 /** Paths (repo-relative, forward slashes) allowed to name the historical tables. */
 const ALLOWED_PREFIXES = [
@@ -70,6 +71,20 @@ test("the allowlist names no current-facing module", () => {
   for (const path of current) {
     assert.ok(!ALLOWED_PREFIXES.some((prefix) => path.startsWith(prefix)), `${path} is allowlisted`);
   }
+});
+
+test("the event page and admin reach the link table only through the allowlisted module", () => {
+  for (const path of [
+    "src/app/(public)/events/[id]/page.tsx",
+    "src/app/admin/(console)/events/reference-actions.ts",
+    "src/app/admin/(console)/events/[id]/edit/page.tsx",
+  ]) {
+    const text = readFileSync(join(ROOT, path), "utf8");
+    assert.ok(!HISTORICAL_TABLE.test(text), `${path} names a historical table`);
+  }
+  const page = readFileSync(join(ROOT, "src/app/(public)/events/[id]/page.tsx"), "utf8");
+  assert.match(page, /listApprovedReferences\(id\)/);
+  assert.ok(!/public-historical|listReferencesForAdmin|shortlistHistorical/.test(page), "public page uses the approved read only");
 });
 
 test("no GitHub Actions workflow runs the historical suggester", () => {
