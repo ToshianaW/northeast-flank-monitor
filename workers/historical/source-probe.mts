@@ -5,12 +5,13 @@
  */
 
 /**
- * Path segments that name a terms, legal, privacy or copyright page (EN, PL, ET, LV, LT). Only the
+ * Path segments that name a terms, legal, privacy or copyright page (EN, PL, ET, LV, LT, DE, RU
+ * transliterated). Only the
  * URL path decides: a link whose anchor text says "rules" or "правила" but points at an article is
  * never followed (an earlier ad-hoc probe followed two aif.ru articles that way).
  */
 const LEGAL_SEGMENT =
-  /^(terms|term-of-use|terms-of-use|terms-and-conditions|terms-of-service|tos|legal|legal-notice|copyright|copyrights|conditions|disclaimer|reuse|licen[cs]e|privacy|privacy-policy|privacy-notice|regulamin|prawa-autorskie|polityka-prywatnosci|kasutustingimused|lietosanas-noteikumi|noteikumi|autortiesibas|privatuma-politika|naudojimosi-taisykles|autoriu-teises|privatumo-politika)([-_.]|$)/i;
+  /^(terms|term-of-use|terms-of-use|terms-and-conditions|terms-of-service|tos|legal|legal-notice|copyright|copyrights|conditions|disclaimer|reuse|licen[cs]e|privacy|privacy-policy|privacy-notice|regulamin|prawa-autorskie|polityka-prywatnosci|kasutustingimused|lietosanas-noteikumi|noteikumi|autortiesibas|privatuma-politika|naudojimosi-taisykles|autoriu-teises|privatumo-politika|kasutajatingimused|privaatsus|privaatsuspoliitika|andmekaitse|impressum|nutzungsbedingungen|agb|datenschutz|rechtliche-hinweise|user-agreement|polzovatelskoe-soglashenie|soglashenie|usloviya-ispolzovaniya)([-_.]|$)/i;
 
 export function isLegalPageUrl(url: string): boolean {
   let parsed: URL;

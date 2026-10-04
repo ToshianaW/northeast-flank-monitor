@@ -26,19 +26,19 @@ export type FeedConfig = {
   full_text?: boolean;
   /** Match keywords and region terms against the title plus only this many leading characters of text. */
   match_chars?: number;
-  /** Lithuanian or Latvian feeds: filter with keyword_stems_lt / keyword_stems_lv (folded stems) instead of keywords. */
+  /** Lithuanian, Latvian or Russian feeds: filter with keyword_stems_lt / _lv / _ru (folded stems) instead of keywords. */
   stem_filter?: StemLanguage;
   /** Full text only for items the feed marks pay_status Free (rp.pl). */
   full_text_free_only?: boolean;
 };
 
-export type StemLanguage = "lt" | "lv";
+export type StemLanguage = "lt" | "lv" | "ru";
 
 export type FeedMatchers = {
   keyword: (text: string) => boolean;
   /** Polish stem filter, used by feeds with polish_filter. */
   polish: (text: string) => boolean;
-  /** Lithuanian and Latvian stem filters, used by feeds with stem_filter. */
+  /** Lithuanian, Latvian and Russian stem filters, used by feeds with stem_filter. */
   stems?: Partial<Record<StemLanguage, (text: string) => boolean>>;
   region: (text: string) => boolean;
   /** Region matchers for feeds in a given language (feed.language), used instead of `region` when present. */

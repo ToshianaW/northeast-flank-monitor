@@ -128,14 +128,18 @@ test("collector.json: exactly the approved sources opt in; the refused ones stay
   const all = [...config.feeds, ...config.listings];
   const optedIn = all.filter((f: { full_text?: boolean }) => f.full_text).map((f: { key: string }) => f.key).sort();
   assert.deepEqual(optedIn, [
-    "15min-lt", "certlv-en", "defence24", "err-news", "euronews", "govpl-mon", "govpl-rcb",
-    "rp-konflikty", "rp-radar-zbrojeniowy", "rp-swiat", "rp-wojsko",
+    "15min-lt", "certlv-en", "defence24", "err-news", "estonianworld", "euronews", "govpl-mon", "govpl-rcb",
+    "kyivindependent-news", "portalmorski", "rmf24-fakty", "rp-konflikty", "rp-radar-zbrojeniowy", "rp-swiat", "rp-wojsko",
+    "wargov-news",
   ]);
   for (const f of all.filter((x: { key: string }) => x.key.startsWith("rp-"))) assert.equal(f.full_text_free_only, true, f.key);
   const refused = all.filter((f: { url: string; source: string }) =>
-    /jauns\.lv|ve\.lt|lsm\.lv|lrvk\.lrv\.lt|aif\.ru|mil\.by/.test(f.url) || ["LRT", "NPR", "Stars and Stripes", "OSINT613"].includes(f.source));
+    /jauns\.lv|ve\.lt|lsm\.lv|lrvk\.lrv\.lt|aif\.ru|mil\.by|kremlin\.ru|theins\.ru|radio\.lublin\.pl|zerkalo\.io/.test(f.url) ||
+    ["LRT", "NPR", "Stars and Stripes", "OSINT613"].includes(f.source));
   for (const f of refused) assert.ok(!f.full_text, `${f.key} must not opt in`);
-  for (const d of ["jauns.lv", "ve.lt", "lrvk.lrv.lt"]) {
+  // Skipped or undecided in round 3: never collected at all.
+  assert.ok(!all.some((f: { url: string }) => /pagd\.lrv\.lt|pap\.pl|postimees\.ee|bundeswehr\.de|fontanka\.ru|spiegel\.de/.test(f.url)));
+  for (const d of ["jauns.lv", "ve.lt", "lrvk.lrv.lt", "pagd.lrv.lt", "pap.pl", "news.postimees.ee", "bundeswehr.de", "fontanka.ru", "spiegel.de"]) {
     assert.ok([...config.blocked_automated_access, ...config.tos_prohibited_domains].includes(d), `${d} is on a skip list`);
   }
 });
@@ -167,6 +171,20 @@ test("no-AI, citation-only, blocked and prohibited sources are never fetched", a
     await applyFullText(http, [doc(url)], scope({ homeDomain: home, barredDomains: barred }), limits, { remaining: 30 }, notStored);
   }
   await applyFullText(http, [doc("https://example.org/x", {}, { no_ai_processing: true })], scope(), limits, { remaining: 30 }, notStored);
+  assert.deepEqual(calls, []);
+});
+
+test("every domain on collector.json's skip lists is refused, even for an opted-in feed on that domain", async () => {
+  const config = JSON.parse(readFileSync("data/sources/collector.json", "utf8"));
+  const barred = fullTextBarredDomains(
+    { blocked: config.blocked_automated_access, prohibited: config.tos_prohibited_domains, citationOnly: [], noAi: [] },
+    () => null,
+  );
+  const { http, calls } = fakeHttp({});
+  for (const domain of barred) {
+    await applyFullText(http, [doc(`https://www.${domain}/news/1`)], scope({ homeDomain: domain, barredDomains: barred }), limits, { remaining: 30 }, notStored);
+  }
+  assert.ok(barred.includes("spiegel.de") && barred.includes("pap.pl") && barred.includes("fontanka.ru"));
   assert.deepEqual(calls, []);
 });
 

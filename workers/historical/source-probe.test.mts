@@ -53,10 +53,26 @@ test("the aif.ru case: anchor text that says 'rules' or 'правила' never m
   ]) assert.ok(isLegalPageUrl(url), url);
 });
 
+test("German, Estonian and transliterated Russian legal paths are recognised; articles are not", () => {
+  for (const url of [
+    "https://www.spiegel.de/impressum",
+    "https://www.spiegel.de/nutzungsbedingungen",
+    "https://www.bundeswehr.de/de/impressum",
+    "https://www.fontanka.ru/polzovatelskoe-soglashenie/",
+    "https://www.example.ee/privaatsuspoliitika",
+    "https://www.example.ee/kasutajatingimused",
+  ]) assert.ok(isLegalPageUrl(url), url);
+  for (const url of [
+    "https://www.spiegel.de/politik/deutschland/bundeswehr-uebung-in-litauen-a-123",
+    "https://www.fontanka.ru/2026/10/04/7512345/",
+    "https://news.postimees.ee/1234567/estonia-hosts-nato-exercise",
+  ]) assert.ok(!isLegalPageUrl(url), url);
+});
+
 test("regex escapes in source-probe.mts are intact", () => {
   const source = readFileSync("workers/historical/source-probe.mts", "utf8");
   assert.ok(!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(source), "control character (an escape was mangled)");
-  for (const fragment of ["privatumo-politika)([-_.]|$)/i", '/<a\\b[^>]*href="([^"#]+)"/gi']) {
+  for (const fragment of ["usloviya-ispolzovaniya)([-_.]|$)/i", '/<a\\b[^>]*href="([^"#]+)"/gi']) {
     assert.ok(source.includes(fragment), `missing pattern fragment: ${fragment}`);
   }
 });

@@ -116,15 +116,21 @@ test("Polish region terms: case endings and diacritics fold; English terms still
 
 test("region filters on rp.pl, mezha.net, 15min and AiF-Kaliningrad; none on Defence24 or the Polish MoD listing", () => {
   const byKey = new Map(regionConfig.feeds.map((f) => [f.key, f]));
-  for (const key of ["rp-wojsko", "rp-radar-zbrojeniowy", "rp-konflikty", "rp-swiat", "mezha-en", "15min-lt", "aif-klg"]) {
+  for (const key of [
+    "rp-wojsko", "rp-radar-zbrojeniowy", "rp-konflikty", "rp-swiat", "mezha-en", "15min-lt", "aif-klg",
+    "wargov-news", "kremlin-en", "rmf24-fakty", "radio-lublin", "kyivindependent-news", "theinsider-ru",
+    "estonianworld", "portalmorski", "zerkalo",
+  ]) {
     assert.equal(byKey.get(key)?.region_filter, true, key);
   }
   assert.ok(!byKey.get("defence24")?.region_filter, "Defence24 keeps every row it kept before");
   assert.equal(byKey.get("defence24")?.keyword_filter, true);
   assert.ok(!regionConfig.listings.find((l) => l.key === "govpl-mon")?.region_filter);
-  const mezha = byKey.get("mezha-en")!;
-  assert.equal(mezha.keyword_filter, true);
-  assert.equal(mezha.match_chars, 500);
+  for (const key of ["mezha-en", "wargov-news", "kremlin-en", "kyivindependent-news"]) {
+    const feed = byKey.get(key)!;
+    assert.equal(feed.keyword_filter, true, key);
+    assert.equal(feed.match_chars, 500, `${key}: region term must be in the title or first 500 characters`);
+  }
 });
 
 const localConfig = JSON.parse(readFileSync("data/sources/collector.json", "utf8")) as Record<string, string[]>;
@@ -171,12 +177,28 @@ test("region stems by language: Lithuanian, Latvian and Russian (Cyrillic foldin
 });
 
 test("configured stems are folded, lowercase and free of regex syntax (escape guard)", () => {
-  for (const key of ["keyword_stems_pl", "region_terms_pl", "keyword_stems_lt", "keyword_stems_lv", "region_terms_lt", "region_terms_lv", "region_terms_ru"]) {
+  for (const key of ["keyword_stems_pl", "region_terms_pl", "keyword_stems_lt", "keyword_stems_lv", "keyword_stems_ru", "region_terms_lt", "region_terms_lv", "region_terms_ru"]) {
     for (const stem of localConfig[key]) {
       assert.equal(foldDiacritics(stem), stem, `${key}: "${stem}" is not folded`);
       assert.ok(!/[.*+?^${}()|[\]\\\u0000-\u001f]/.test(stem), `${key}: "${stem}" has regex syntax or a control character`);
     }
   }
+  for (const word of [...localConfig.keyword_whole_words_pl, ...localConfig.keyword_whole_words_ru]) {
+    assert.ok(!/[.*+?^${}()|[\]\\\u0000-\u001f]/.test(word), `whole word "${word}" has regex syntax or a control character`);
+  }
+});
+
+test("Russian keyword stems and abbreviations", () => {
+  const ru = makePolishMatcher(localConfig.keyword_stems_ru, localConfig.keyword_whole_words_ru);
+  for (const t of [
+    "Минобороны сообщило о начале учений",
+    "Учения Балтийского флота в Калининградской области",
+    "ПВО сбила беспилотник",
+    "Военные учения у границы с Литвой",
+    "НАТО усиливает восточный фланг",
+    "Пограничники задержали нарушителя",
+  ]) assert.ok(ru(t), t);
+  for (const t of ["Ученик школы выиграл олимпиаду", "Запад ввел новые санкции", "Погода в Петербурге", "нато"]) assert.ok(!ru(t), t);
 });
 
 test("stem_filter: a Lithuanian feed needs a Lithuanian keyword stem and a region term", async () => {

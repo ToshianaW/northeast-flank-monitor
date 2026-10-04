@@ -54,6 +54,8 @@ type CollectorConfig = {
   region_terms_ru: string[];
   keyword_stems_lt: string[];
   keyword_stems_lv: string[];
+  keyword_stems_ru: string[];
+  keyword_whole_words_ru: string[];
   keyword_stems_pl: string[];
   keyword_whole_words_pl: string[];
   known_outlets: string[];
@@ -100,7 +102,7 @@ for (const feed of config.feeds) {
   if (feed.polish_filter && feed.language !== "Polish") {
     throw new Error(`feed "${feed.key}": polish_filter needs language "Polish" (got "${feed.language}")`);
   }
-  const stemLanguage = { lt: "Lithuanian", lv: "Latvian" } as const;
+  const stemLanguage = { lt: "Lithuanian", lv: "Latvian", ru: "Russian" } as const;
   if (feed.stem_filter && feed.language !== stemLanguage[feed.stem_filter]) {
     throw new Error(`feed "${feed.key}": stem_filter "${feed.stem_filter}" needs language "${stemLanguage[feed.stem_filter]}" (got "${feed.language}")`);
   }
@@ -136,6 +138,7 @@ const matchers: FeedMatchers = {
   stems: {
     lt: makePolishMatcher(config.keyword_stems_lt, config.keyword_whole_words_pl),
     lv: makePolishMatcher(config.keyword_stems_lv, config.keyword_whole_words_pl),
+    ru: makePolishMatcher(config.keyword_stems_ru, config.keyword_whole_words_ru),
   },
   region: makeRegionMatcher(config.region_terms, config.region_terms_pl),
   regionByLanguage: {
