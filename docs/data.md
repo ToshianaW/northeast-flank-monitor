@@ -9,7 +9,7 @@ Summaries and metadata: CC BY 4.0, Northeast Flank Monitor. Excerpts and linked 
 ## Endpoints
 
 - `GET /api/events`: JSON `{ data, meta: { count, limit, next_cursor, filters, generated_at }, attribution }`.
-- `GET /api/events.csv`: the same events as CSV (RFC 4180; cells starting with `= + - @`, tab or CR are prefixed with `'`). Licence in the `X-Data-Licence` header. When more rows exist: `X-Truncated: true` and `X-Next-Cursor`.
+- `GET /api/events.csv`: the same events as CSV (RFC 4180; cells starting with `= + - @`, tab or CR are prefixed with `'`). Licence in the `X-Data-Licence` header and in a final `licence` column on every row ("CC BY 4.0, Northeast Flank Monitor. Excerpts and linked articles remain the property of their original sources."). When more rows exist: `X-Truncated: true` and `X-Next-Cursor`.
 - `OPTIONS` on both: CORS preflight. `Access-Control-Allow-Origin: *`, GET only, no credentials.
 
 ## Parameters

@@ -9,6 +9,7 @@ import { test } from "node:test";
 import {
   CACHE_CONTROL,
   CSV_COLUMNS,
+  CSV_LICENCE,
   csvBody,
   csvCell,
   decodeCursor,
@@ -133,6 +134,12 @@ test("CSV: RFC 4180 quoting and formula escaping", () => {
   assert.equal(header, CSV_COLUMNS.join(","));
   assert.match(line, /Source; Other/);
   assert.match(line, /1; 4/);
+  assert.equal(CSV_COLUMNS.at(-1), "licence", "licence is the final column");
+  assert.ok(line.endsWith(`,"${CSV_LICENCE}"`), "every row ends with the licence (quoted: it contains commas)");
+  assert.equal(CSV_LICENCE, "CC BY 4.0, Northeast Flank Monitor. Excerpts and linked articles remain the property of their original sources.");
+  // Field leak: CSV columns are the allowed event fields, the flattened source fields and the licence only.
+  const allowedCsv = new Set<string>([...OUTPUT_EVENT_FIELDS.filter((f) => f !== "sources"), "source_count", "source_names", "source_article_urls", "source_tiers", "state_or_official_sources", "licence"]);
+  assert.deepEqual(header.split(",").filter((c) => !allowedCsv.has(c)), []);
 });
 
 test("headers: CORS, caching, licence; OPTIONS is GET-only with no credentials", async () => {

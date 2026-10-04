@@ -236,10 +236,14 @@ export function jsonBody(events: OutputEvent[], query: Query, nextCursor: string
 // CSV
 // ---------------------------------------------------------------------------
 
-/** CSV columns: the event fields (sources flattened), never anything else. */
+/** The value of the final CSV column, on every row (the X-Data-Licence header carries LICENCE_LINE). */
+export const CSV_LICENCE = "CC BY 4.0, Northeast Flank Monitor. Excerpts and linked articles remain the property of their original sources.";
+
+/** CSV columns: the event fields (sources flattened) and the licence, never anything else. */
 export const CSV_COLUMNS = [
   ...OUTPUT_EVENT_FIELDS.filter((f) => f !== "sources"),
   "source_count", "source_names", "source_article_urls", "source_tiers", "state_or_official_sources",
+  "licence",
 ] as const;
 
 /**
@@ -264,6 +268,7 @@ export function csvBody(events: readonly OutputEvent[]): string {
       source_article_urls: sources.map((s) => s.article_url).join("; "),
       source_tiers: sources.map((s) => s.tier ?? "").join("; "),
       state_or_official_sources: sources.filter((s) => s.state_or_official).map((s) => s.name).join("; "),
+      licence: CSV_LICENCE,
     };
     lines.push(CSV_COLUMNS.map((c) => csvCell(flat[c])).join(","));
   }

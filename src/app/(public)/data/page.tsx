@@ -63,7 +63,7 @@ export default function DataPage() {
             </li>
             <li>
               <code className="font-mono text-sm text-foreground">GET /api/events.csv</code>: the same events as CSV,
-              one row per event, sources joined with semicolons.
+              one row per event, sources joined with semicolons, and a final licence column on every row.
             </li>
           </ul>
           <p>Read-only (GET), open to any origin (CORS), cached for an hour.</p>
