@@ -4,6 +4,10 @@
  */
 import {
   CONFIDENCE_LEVEL_VALUES,
+  EVENT_TYPE_LABELS,
+  EVENT_TYPE_VALUES as ALL_EVENT_TYPES,
+  isStatementType,
+  type EventType,
   DIMENSION_STATUS_VALUES,
   EVENT_TYPE_VALUES,
   EXERCISE_STATUS_VALUES,
@@ -103,7 +107,7 @@ export type HistoricalCoverage = {
  *  No entries yet: Aug 2020, Sep 2020." Shown with every historical page and any baseline,
  * so a thin record is not mistaken for a complete one.
  */
-export function coverageNote(c: HistoricalCoverage): string {
+export function coverageNote(c: HistoricalCoverage, options: { listEmptyMonths?: boolean } = {}): string {
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
   const covered = c.months.filter((m) => m.events > 0);
   const empty = c.months.filter((m) => m.events === 0);
@@ -111,7 +115,8 @@ export function coverageNote(c: HistoricalCoverage): string {
   const across = covered.length
     ? ` across these months: ${covered.map((m) => `${monthLabel(m.month)} (${m.events})`).join(", ")}.`
     : " in this period.";
-  const gaps = empty.length ? ` No entries yet: ${empty.map((m) => monthLabel(m.month)).join(", ")}.` : "";
+  const gaps =
+    empty.length && options.listEmptyMonths !== false ? ` No entries yet: ${empty.map((m) => monthLabel(m.month)).join(", ")}.` : "";
   return `${head}${across}${gaps} This is a partial record, not a complete one.`;
 }
 
@@ -161,3 +166,102 @@ export const HISTORICAL_FIELDS = {
 
 export type HistoricalField = keyof typeof HISTORICAL_FIELDS;
 export const HISTORICAL_FIELD_NAMES = Object.keys(HISTORICAL_FIELDS) as HistoricalField[];
+
+// ---------------------------------------------------------------------------
+// Public browsing by event type (pure; the public pages and tests use these)
+// ---------------------------------------------------------------------------
+
+/** URL slug for an event type: READINESS_CHECK → readiness-check. */
+export function typeSlug(type: EventType): string {
+  return type.toLowerCase().replace(/_/g, "-");
+}
+
+/** The event type for a slug, or null when it is not one. */
+export function typeFromSlug(slug: string): EventType | null {
+  const type = slug.toUpperCase().replace(/-/g, "_");
+  return (ALL_EVENT_TYPES as readonly string[]).includes(type) && typeSlug(type as EventType) === slug
+    ? (type as EventType)
+    : null;
+}
+
+export type TypeMonthCount = { event_type: EventType; month: string; n: number };
+export type TypeSummary = { type: EventType; label: string; count: number; firstMonth: string; lastMonth: string };
+
+/**
+ * Published counts per type, under the map's two layers (Activity, Statements), most entries
+ * first. Types with no published entries are listed separately so the page can collapse them.
+ */
+export function groupTypeSummaries(rows: TypeMonthCount[]): {
+  activity: TypeSummary[];
+  statements: TypeSummary[];
+  emptyTypes: string[];
+} {
+  const byType = new Map<EventType, TypeSummary>();
+  for (const r of rows) {
+    if (r.n <= 0) continue;
+    const s = byType.get(r.event_type) ?? {
+      type: r.event_type,
+      label: EVENT_TYPE_LABELS[r.event_type],
+      count: 0,
+      firstMonth: r.month,
+      lastMonth: r.month,
+    };
+    s.count += r.n;
+    if (r.month < s.firstMonth) s.firstMonth = r.month;
+    if (r.month > s.lastMonth) s.lastMonth = r.month;
+    byType.set(r.event_type, s);
+  }
+  const sorted = [...byType.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+  return {
+    activity: sorted.filter((s) => !isStatementType(s.type)),
+    statements: sorted.filter((s) => isStatementType(s.type)),
+    emptyTypes: ALL_EVENT_TYPES.filter((t) => !byType.has(t))
+      .map((t) => EVENT_TYPE_LABELS[t])
+      .sort((a, b) => a.localeCompare(b)),
+  };
+}
+
+/** "Jan 2021" or "Jan 2021 – Feb 2021". */
+export function monthSpan(first: string, last: string): string {
+  return first === last ? monthLabel(first) : `${monthLabel(first)} – ${monthLabel(last)}`;
+}
+
+/** All 19 months Aug 2020 – Feb 2022 with this type's published count (zero allowed). */
+export function monthStrip(rows: Array<{ month: string; n: number }>): Array<{ month: string; count: number }> {
+  const counts = new Map(rows.map((r) => [r.month, r.n]));
+  return monthsBetween(HISTORICAL_FIRST_MONTH, HISTORICAL_LAST_MONTH).map((month) => ({ month, count: counts.get(month) ?? 0 }));
+}
+
+/**
+ * The month to show: the ?month= value when it is a month of the period, otherwise (no value)
+ * the most recent month with entries. `invalid` means the page should return not-found.
+ */
+export function selectMonth(
+  strip: Array<{ month: string; count: number }>,
+  param: string | string[] | undefined,
+): { month: string | null; invalid: boolean } {
+  if (Array.isArray(param)) return { month: null, invalid: true };
+  if (param !== undefined) return isHistoricalMonth(param) ? { month: param, invalid: false } : { month: null, invalid: true };
+  const latest = [...strip].reverse().find((m) => m.count > 0);
+  return { month: latest?.month ?? null, invalid: false };
+}
+
+export const COUNTS_NOTE = "Counts reflect reporting, not intensity of activity.";
+
+/** Empty-state wording for the type page. */
+export function emptyStateText(typeLabel: string, month: string | null): string {
+  return month
+    ? `No published ${typeLabel.toLowerCase()} entries for ${monthLabel(month)}.`
+    : `No published ${typeLabel.toLowerCase()} entries in the historical record yet.`;
+}
+
+/** The muted line on /historical when a group has no published entries. */
+export function emptyGroupText(group: "activity" | "statements"): string {
+  return group === "activity" ? "No activity events recorded yet" : "No statements recorded yet";
+}
+
+/** Approving a historical event needs an explicit confidence choice; an empty or unknown value is refused. */
+export function parseConfidenceChoice(value: FormDataEntryValue | null): (typeof CONFIDENCE_LEVEL_VALUES)[number] | null {
+  const v = typeof value === "string" ? value.trim() : "";
+  return (CONFIDENCE_LEVEL_VALUES as readonly string[]).includes(v) ? (v as (typeof CONFIDENCE_LEVEL_VALUES)[number]) : null;
+}

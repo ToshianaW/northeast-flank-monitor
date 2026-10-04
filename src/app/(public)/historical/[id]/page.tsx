@@ -19,7 +19,7 @@ import {
   type LocationPrecision,
   type ResetStatus,
 } from "@/lib/event-labels";
-import { FULL_PERIOD } from "@/lib/historical-rules";
+import { FULL_PERIOD, monthLabel, typeSlug } from "@/lib/historical-rules";
 import {
   getHistoricalCoverage,
   getPublishedHistorical,
@@ -65,9 +65,12 @@ export default async function HistoricalEventPage({ params }: PageProps<"/histor
 
   return (
     <PageShell>
-      <Link href="/historical" className="mb-6 inline-flex items-center gap-1.5 text-sm text-link hover:underline">
+      <Link
+        href={`/historical/type/${typeSlug(event.event_type)}?month=${event.event_date.toISOString().slice(0, 7)}`}
+        className="mb-6 inline-flex items-center gap-1.5 text-sm text-link hover:underline"
+      >
         <ArrowLeft className="size-4" aria-hidden />
-        Historical comparison
+        {EVENT_TYPE_LABELS[event.event_type]} · {monthLabel(event.event_date.toISOString().slice(0, 7))}
       </Link>
 
       <article className="grid max-w-4xl gap-6">

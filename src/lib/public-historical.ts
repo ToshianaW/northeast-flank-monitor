@@ -5,6 +5,7 @@ import {
   lastDayOf,
   monthsBetween,
   type HistoricalCoverage,
+  type TypeMonthCount,
   type HistoricalPeriod,
 } from "@/lib/historical-rules";
 import type { SourceType } from "@/lib/source-labels";
@@ -134,4 +135,26 @@ export async function getHistoricalCoverage(period: HistoricalPeriod): Promise<H
     sources: totals.rows[0]?.sources ?? 0,
     months: monthsBetween(period.from, period.to).map((month) => ({ month, events: byMonth.get(month) ?? 0 })),
   };
+}
+
+/** Published counts per event type and month (YYYY-MM). */
+export async function getTypeMonthCounts(): Promise<TypeMonthCount[]> {
+  const { rows } = await getPool().query<TypeMonthCount>(
+    `SELECT event_type, to_char(event_date, 'YYYY-MM') AS month, count(*)::int AS n
+     FROM historical_events
+     WHERE review_status = 'PUBLISHED'
+     GROUP BY 1, 2`,
+  );
+  return rows;
+}
+
+/** Published events of one type in one month (YYYY-MM), oldest first. */
+export async function listPublishedByTypeMonth(type: EventType, month: string): Promise<PublicHistoricalEvent[]> {
+  const { rows } = await getPool().query<PublicHistoricalEvent>(
+    `SELECT ${PUBLIC_COLUMNS} FROM historical_events
+     WHERE review_status = 'PUBLISHED' AND event_type = $1 AND event_date BETWEEN $2::date AND $3::date
+     ORDER BY event_date ASC, created_at ASC`,
+    [type, `${month}-01`, lastDayOf(month)],
+  );
+  return rows;
 }
