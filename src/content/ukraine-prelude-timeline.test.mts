@@ -30,7 +30,7 @@ test("the two exclusion lists: automated-access blocks and terms prohibitions, n
     "kam.lt", "kariuomene.lt", "reuters.com", "lrvk.lrv.lt", "ve.lt", "pagd.lrv.lt", "pap.pl", "news.postimees.ee",
   ]);
   assert.deepEqual(collector.tos_prohibited_domains, [
-    "jauns.lv", "bundeswehr.de", "fontanka.ru", "spiegel.de", "t.me", "telegram.me", "telegram.org", "discord.com", "discord.gg",
+    "jauns.lv", "bundeswehr.de", "fontanka.ru", "spiegel.de", "defencenet.gr", "t.me", "telegram.me", "telegram.org", "discord.com", "discord.gg",
   ]);
   assert.ok(!collector.blocked_automated_access.some((d) => collector.tos_prohibited_domains.includes(d)));
 });

@@ -5,7 +5,16 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { collectFeed, foldDiacritics, makeKeywordMatcher, makePolishMatcher, makeRegionMatcher, type FeedConfig } from "./feeds.mjs";
+import { applyFullText } from "./article.mjs";
+import {
+  collectFeed,
+  foldDiacritics,
+  linkPathAllowed,
+  makeKeywordMatcher,
+  makePolishMatcher,
+  makeRegionMatcher,
+  type FeedConfig,
+} from "./feeds.mjs";
 import type { HttpClient } from "./fetch.mjs";
 import { collectListing } from "./listing.mjs";
 
@@ -119,14 +128,14 @@ test("region filters on rp.pl, mezha.net, 15min and AiF-Kaliningrad; none on Def
   for (const key of [
     "rp-wojsko", "rp-radar-zbrojeniowy", "rp-konflikty", "rp-swiat", "mezha-en", "15min-lt", "aif-klg",
     "wargov-news", "kremlin-en", "rmf24-fakty", "radio-lublin", "kyivindependent-news", "theinsider-ru",
-    "estonianworld", "portalmorski", "zerkalo",
+    "estonianworld", "portalmorski", "zerkalo", "defence-industry-eu", "kaliningrad-news",
   ]) {
     assert.equal(byKey.get(key)?.region_filter, true, key);
   }
   assert.ok(!byKey.get("defence24")?.region_filter, "Defence24 keeps every row it kept before");
   assert.equal(byKey.get("defence24")?.keyword_filter, true);
   assert.ok(!regionConfig.listings.find((l) => l.key === "govpl-mon")?.region_filter);
-  for (const key of ["mezha-en", "wargov-news", "kremlin-en", "kyivindependent-news"]) {
+  for (const key of ["mezha-en", "wargov-news", "kremlin-en", "kyivindependent-news", "defence-industry-eu"]) {
     const feed = byKey.get(key)!;
     assert.equal(feed.keyword_filter, true, key);
     assert.equal(feed.match_chars, 500, `${key}: region term must be in the title or first 500 characters`);
@@ -221,6 +230,49 @@ test("stem_filter: a Lithuanian feed needs a Lithuanian keyword stem and a regio
   const matchers = { keyword: () => false, polish, stems: { lt }, region, regionByLanguage: { Lithuanian: regionLt }, credits: () => [] };
   const docs = await collectFeed(http, feed, "source-id", new Date(0), matchers);
   assert.deepEqual(docs.map((d) => d.skipReason ?? "kept"), ["kept", "no_keyword_match", "no_region_match"]);
+});
+
+test("linkPathAllowed: whole path sections, exclusions win, include list limits", () => {
+  const include = ["/society", "/official", "/incident"];
+  const exclude = ["/tg", "/smi"];
+  for (const p of ["/society/123", "/official/a.html", "/incident/x"]) assert.ok(linkPathAllowed(`https://kaliningrad-news.ru${p}`, include, exclude), p);
+  for (const p of ["/tg/123", "/smi/456", "/other/789", "/", "/societyx/1"]) assert.ok(!linkPathAllowed(`https://kaliningrad-news.ru${p}`, include, exclude), p);
+  assert.ok(linkPathAllowed("https://example.org/tgx/1", undefined, exclude), "/tg does not cover /tgx");
+  assert.ok(linkPathAllowed("https://example.org/smile", undefined, exclude), "/smi does not cover /smile");
+  assert.ok(!linkPathAllowed("https://example.org/tg", undefined, exclude));
+  assert.ok(!linkPathAllowed("not a url", undefined, undefined));
+});
+
+test("kaliningrad-news: /tg and /smi items are dropped before storage, and none of its pages is ever fetched", async () => {
+  const kn = regionConfig.feeds.find((f) => f.key === "kaliningrad-news")!;
+  assert.deepEqual(kn.exclude_paths, ["/tg", "/smi"]);
+  assert.equal(kn.metadata_only, true, "titles only");
+  assert.ok(!kn.full_text, "no article pages");
+  for (const p of [...(kn.include_paths ?? []), ...(kn.exclude_paths ?? [])]) {
+    assert.ok(/^\/[a-z0-9-]+$/.test(p), `path "${p}" must be a plain "/section" (no pattern syntax)`);
+  }
+  const base = "https://kaliningrad-news.ru";
+  const items = ["/incident/1", "/tg/2", "/smi/3", "/society/4", "/other/5"]
+    .map((p, i) => `<item><title>Учения ПВО в Калининградской области ${i}</title><link>${base}${p}</link><pubDate>${new Date().toUTCString()}</pubDate></item>`)
+    .join("");
+  const xml = `<?xml version="1.0"?><rss version="2.0"><channel><title>t</title>${items}</channel></rss>`;
+  const calls: string[] = [];
+  const http = { get: async (url: string) => { calls.push(url); return { status: 200, body: url === kn.url ? xml : "<article>x</article>" }; } } as unknown as HttpClient;
+  const ruMatchers = {
+    keyword: () => false, polish,
+    stems: { ru: makePolishMatcher(localConfig.keyword_stems_ru, localConfig.keyword_whole_words_ru) },
+    region, regionByLanguage: { Russian: regionRu }, credits: () => [],
+  };
+  const docs = await collectFeed(http, kn, "source-id", new Date(0), ruMatchers);
+  assert.deepEqual(docs.map((d) => new URL(d.url).pathname), ["/incident/1", "/society/4"]);
+  assert.ok(docs.every((d) => d.textKind === "METADATA_ONLY" && !d.skipReason));
+  // Even if full text were wrongly enabled for it, metadata-only rows are never fetched.
+  await applyFullText(
+    http, docs,
+    { masterOn: true, optedIn: true, homeDomain: "kaliningrad-news.ru", barredDomains: [] },
+    { maxChars: 20_000, minChars: 200 }, { remaining: 30 }, async () => false,
+  );
+  assert.deepEqual(calls, [kn.url], "only the feed itself is requested");
 });
 
 test("match_chars: keyword and region must appear in the title or the first 500 characters", async () => {

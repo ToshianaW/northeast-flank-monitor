@@ -134,12 +134,12 @@ test("collector.json: exactly the approved sources opt in; the refused ones stay
   ]);
   for (const f of all.filter((x: { key: string }) => x.key.startsWith("rp-"))) assert.equal(f.full_text_free_only, true, f.key);
   const refused = all.filter((f: { url: string; source: string }) =>
-    /jauns\.lv|ve\.lt|lsm\.lv|lrvk\.lrv\.lt|aif\.ru|mil\.by|kremlin\.ru|theins\.ru|radio\.lublin\.pl|zerkalo\.io/.test(f.url) ||
+    /jauns\.lv|ve\.lt|lsm\.lv|lrvk\.lrv\.lt|aif\.ru|mil\.by|kremlin\.ru|theins\.ru|radio\.lublin\.pl|zerkalo\.io|kaliningrad-news\.ru|defence-industry\.eu/.test(f.url) ||
     ["LRT", "NPR", "Stars and Stripes", "OSINT613"].includes(f.source));
   for (const f of refused) assert.ok(!f.full_text, `${f.key} must not opt in`);
   // Skipped or undecided in round 3: never collected at all.
-  assert.ok(!all.some((f: { url: string }) => /pagd\.lrv\.lt|pap\.pl|postimees\.ee|bundeswehr\.de|fontanka\.ru|spiegel\.de/.test(f.url)));
-  for (const d of ["jauns.lv", "ve.lt", "lrvk.lrv.lt", "pagd.lrv.lt", "pap.pl", "news.postimees.ee", "bundeswehr.de", "fontanka.ru", "spiegel.de"]) {
+  assert.ok(!all.some((f: { url: string }) => /pagd\.lrv\.lt|pap\.pl|postimees\.ee|bundeswehr\.de|fontanka\.ru|spiegel\.de|defencenet\.gr|marine\.org\.ru/.test(f.url)));
+  for (const d of ["jauns.lv", "ve.lt", "lrvk.lrv.lt", "pagd.lrv.lt", "pap.pl", "news.postimees.ee", "bundeswehr.de", "fontanka.ru", "spiegel.de", "defencenet.gr"]) {
     assert.ok([...config.blocked_automated_access, ...config.tos_prohibited_domains].includes(d), `${d} is on a skip list`);
   }
 });

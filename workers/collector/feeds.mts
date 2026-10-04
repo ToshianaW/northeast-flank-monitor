@@ -30,7 +30,30 @@ export type FeedConfig = {
   stem_filter?: StemLanguage;
   /** Full text only for items the feed marks pay_status Free (rp.pl). */
   full_text_free_only?: boolean;
+  /** Keep only items whose link path starts with one of these sections ("/incident"); others are dropped unstored. */
+  include_paths?: string[];
+  /** Drop items whose link path starts with one of these sections ("/tg"); never stored, never fetched. */
+  exclude_paths?: string[];
 };
+
+/** True when `path` is `section` or lies under it ("/tg" covers "/tg/123", not "/tgx"). */
+function underSection(path: string, section: string): boolean {
+  const s = section.endsWith("/") ? section.slice(0, -1) : section;
+  return path === s || path.startsWith(`${s}/`);
+}
+
+/** Whether a feed item's link passes the feed's include_paths / exclude_paths (exclusions win). */
+export function linkPathAllowed(link: string, include?: string[], exclude?: string[]): boolean {
+  let path: string;
+  try {
+    path = new URL(link).pathname;
+  } catch {
+    return false;
+  }
+  if (exclude?.some((s) => underSection(path, s))) return false;
+  if (include?.length && !include.some((s) => underSection(path, s))) return false;
+  return true;
+}
 
 export type StemLanguage = "lt" | "lv" | "ru";
 
@@ -135,6 +158,7 @@ export async function collectFeed(
   const docs: CollectedDoc[] = [];
   for (const item of parsed.items) {
     if (!item.link) continue;
+    if (!linkPathAllowed(item.link, feed.include_paths, feed.exclude_paths)) continue;
     const dateRaw = item.isoDate ?? item.pubDate;
     const publishedAt = dateRaw ? new Date(dateRaw) : null;
     const validDate = publishedAt && !Number.isNaN(publishedAt.getTime()) ? publishedAt : null;

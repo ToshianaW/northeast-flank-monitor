@@ -32,12 +32,13 @@
     "pap.pl",
     "news.postimees.ee"
   ],
-  "_tos_prohibited_domains": "Domains no worker fetches or sends to a model, because their terms were read and prohibit automated aggregation or AI use of their content (decision 9: Telegram's Content Licensing and AI Scraping terms and API terms section 1.5; Discord's ban on self-bots; jauns.lv's terms forbid indexing, copying and analytical use, decision 16; bundeswehr.de, fontanka.ru and spiegel.de forbid automated reading or reserve text and data mining, decision 19). Subdomains are included.",
+  "_tos_prohibited_domains": "Domains no worker fetches or sends to a model, because their terms were read and prohibit automated aggregation or AI use of their content (decision 9: Telegram's Content Licensing and AI Scraping terms and API terms section 1.5; Discord's ban on self-bots; jauns.lv's terms forbid indexing, copying and analytical use, decision 16; bundeswehr.de, fontanka.ru and spiegel.de forbid automated reading or reserve text and data mining, decision 19; defencenet.gr forbids copying, downloading and derivative works without written permission, decision 20). Subdomains are included.",
   "tos_prohibited_domains": [
     "jauns.lv",
     "bundeswehr.de",
     "fontanka.ru",
     "spiegel.de",
+    "defencenet.gr",
     "t.me",
     "telegram.me",
     "telegram.org",
@@ -615,6 +616,31 @@
       "keyword_filter": false,
       "stem_filter": "ru",
       "region_filter": true,
+      "no_ai_processing": false
+    },
+    {
+      "key": "defence-industry-eu",
+      "source": "Defence Industry Europe",
+      "url": "https://defence-industry.eu/feed/",
+      "_comment": "European defence news; no terms page (privacy only), robots.txt allows our client and Anthropic's crawlers (decision 20). Worldwide news: keyword and region term in the title or first 500 characters. The feed carries the full text, so no article pages are fetched.",
+      "language": "English",
+      "keyword_filter": true,
+      "region_filter": true,
+      "match_chars": 500,
+      "no_ai_processing": false
+    },
+    {
+      "key": "kaliningrad-news",
+      "source": "Kaliningrad News (kaliningrad-news.ru)",
+      "url": "https://kaliningrad-news.ru/rss.xml",
+      "_comment": "Kaliningrad regional outlet (decision 20). Titles only (metadata_only): claims are attributed, and its article pages are windows-1251. Only the main news, official and incident sections; Telegram reposts (/tg) and other outlets' reposts (/smi) are dropped unstored. Russian military keyword and region stems on titles.",
+      "language": "Russian",
+      "keyword_filter": false,
+      "stem_filter": "ru",
+      "region_filter": true,
+      "metadata_only": true,
+      "include_paths": ["/society", "/official", "/incident"],
+      "exclude_paths": ["/tg", "/smi"],
       "no_ai_processing": false
     },
     {
