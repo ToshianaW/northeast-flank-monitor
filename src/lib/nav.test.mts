@@ -46,9 +46,9 @@ test("nothing else in the sidebar changes", () => {
     ["Overview", ["Dashboard", "Map"]],
     ["Reporting", ["Latest", "Digest", "Archive"]],
     ["Activity", ["Exercises", "Air Activity", "Historical Comparison [Overview, Side-by-side view]"]],
-    ["Reference", ["Sources", "Methodology", "About"]],
+    ["Reference", ["Sources", "Methodology", "Open data", "About"]],
   ]);
-  assert.equal(navLinks().length, 12);
+  assert.equal(navLinks().length, 13);
 });
 
 test("active and open states on both pages", () => {

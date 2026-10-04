@@ -635,6 +635,15 @@ export default function MethodologyPage() {
               descriptive only.
             </li>
             <li>
+              Published events are available as open data (JSON and CSV) on the{" "}
+              <Link href="/data" className="link">
+                Open data
+              </Link>{" "}
+              page: the same public fields as the site, never internal notes,
+              reviewer names or coordinates. Summaries and metadata are CC BY 4.0;
+              excerpts and linked articles remain the original sources&rsquo; property.
+            </li>
+            <li>
               The Northeast Flank Activity Index is collecting its baseline: it
               shows no value until twelve complete weeks of current data exist.
             </li>
@@ -663,7 +672,6 @@ export default function MethodologyPage() {
           </Subhead>
           <ul className="list-disc pl-5">
             <li>Air activity page</li>
-            <li>Open data: downloadable datasets and a read-only API</li>
           </ul>
           <div className="border border-border bg-surface-dark px-4 py-3">
             <p className="meta-label mb-2">AI disclosure</p>

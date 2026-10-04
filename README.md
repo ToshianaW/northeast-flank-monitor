@@ -53,6 +53,10 @@ npm run collect
 - Prints one summary line per source and a full-text line (counts only); exits with code 1 only if more than half of the sources failed.
 - GDELT data is used under its terms, which require citing the GDELT Project with a link to https://www.gdeltproject.org/.
 
+## Open data API
+
+Read-only JSON and CSV of published events: `GET /api/events` and `GET /api/events.csv` (public page `/data`; details in `docs/data.md`). Same public fields as the site; never internal notes, reviewer names or coordinates. Unknown or invalid parameters return 400 before any database query; responses are cached by the CDN for an hour; caps of 90 days, 200 JSON events and 2,000 CSV rows. Summaries and metadata CC BY 4.0; excerpts remain the original sources' property. Free-tier limits the project relies on: `docs/running-costs.md`.
+
 ## Daily digest
 
 Drafts the digest for one UTC day (default: yesterday) from PUBLISHED events only, and stores it as a DRAFT for review in `/admin/digests`. The model sees each event's headline, summary, date, type, actor, country, location, confidence, contradiction flag, and source names with tier and relationship; never excerpts, internal notes, URLs, or article text.
@@ -119,6 +123,10 @@ Roadmap: `docs/mvp-plan.md` §4. Decisions that override the plan: `docs/decisio
 | 5.1 | **Built:** Side-by-side view (`/historical/compare`), in the sidebar under the expandable Historical Comparison entry with Overview (`/historical`). Published historical and current events for two windows, each a start month plus a length of 1–6 months (default Jan–Feb 2021 against last and this month; current events start at Aug 2026), with Earlier / Later on the historical side, as counts and linked lists per event type, with coverage and comparability notes. Descriptive only: no phase labels, markers, trend arrows, scores or percentages (the spec §22 indicator matrix is not built). Rows are withheld when the historical window has fewer than 4 events or 2 sources (`src/lib/historical-compare.ts`) |
 | 5.2 | Digest Historical Context written by code, not the model: for each of the day's event types, how many published historical events were recorded and in which months, plus the partial-record caveat. Falls back to the fixed line below the threshold or if a line fails its grammar, banned-phrase or comparison-wording check. No-model preview: `npm run digest:historical-preview -- [--date YYYY-MM-DD]` |
 | 5.3 | Reviewer-controlled "similar in nature" links on event pages (migrations 0010 and 0011): up to 3 published historical entries per published event. For physical-activity types, code links entries with the same event type and country when an event is published (no AI; `npm run references:backfill` plans the same for existing events, `-- --write` to apply); statements are never linked automatically. A reviewer can remove any link and it is never re-added; every link and unlink is logged; links are removed when either event is unpublished. An optional AI suggestion step is off unless `REFERENCES_AI_SUGGEST=on`. |
+
+**Phase 6 — Activity Index: collecting baseline** (formula in `docs/scoring.md`; migration 0012).
+
+**Phase 7 — Public data tools: in progress** (7.1–7.2: JSON API and CSV export of published events, `/data`).
 
 **Next:** step 3.4 (Air Activity page).
 
