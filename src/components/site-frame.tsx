@@ -3,8 +3,84 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
-import { NAV_GROUPS, activeNavItem, pageTitleFor } from "@/lib/nav";
+import { ChevronDown, Menu, X } from "lucide-react";
+import {
+  NAV_GROUPS,
+  activeNavItem,
+  isNavParent,
+  isParentActive,
+  isParentOpenByDefault,
+  pageTitleFor,
+  type NavItem,
+  type NavParent,
+} from "@/lib/nav";
+
+function NavLink({
+  item,
+  activeHref,
+  onNavigate,
+}: {
+  item: NavItem;
+  activeHref: string | undefined;
+  onNavigate: () => void;
+}) {
+  return (
+    <Link
+      href={item.href}
+      aria-current={activeHref === item.href ? "page" : undefined}
+      onClick={onNavigate}
+      className="nav-item flex w-full text-sm"
+    >
+      {item.label}
+    </Link>
+  );
+}
+
+/**
+ * An expandable sidebar entry. Open on its own pages and closed elsewhere; a click, Enter or
+ * Space on the button toggles it for the current page only (the default returns on navigation).
+ */
+function NavDisclosure({
+  parent,
+  pathname,
+  activeHref,
+  onNavigate,
+}: {
+  parent: NavParent;
+  pathname: string;
+  activeHref: string | undefined;
+  onNavigate: () => void;
+}) {
+  const [toggled, setToggled] = useState<{ path: string; open: boolean } | null>(null);
+  const open = toggled?.path === pathname ? toggled.open : isParentOpenByDefault(parent, pathname);
+  const listId = `nav-${parent.id}-children`;
+
+  return (
+    <>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={listId}
+        data-active={isParentActive(parent, pathname) ? "true" : undefined}
+        onClick={() => setToggled({ path: pathname, open: !open })}
+        className="nav-item flex w-full items-center justify-between text-left text-sm"
+      >
+        {parent.label}
+        <ChevronDown
+          className={`size-4 shrink-0 transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`}
+          aria-hidden
+        />
+      </button>
+      <ul id={listId} hidden={!open} className="mt-1 ml-3 grid gap-1 border-l border-border pl-2">
+        {parent.children.map((child) => (
+          <li key={child.href}>
+            <NavLink item={child} activeHref={activeHref} onNavigate={onNavigate} />
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
 
 /**
  * Public page frame: grouped sidebar, top bar and main column.
@@ -85,18 +161,22 @@ export function SiteFrame({
                 {group.label}
               </h2>
               <ul aria-labelledby={`nav-${group.id}`} className="grid gap-1">
-                {group.items.map((item) => (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      aria-current={activeHref === item.href ? "page" : undefined}
-                      onClick={() => close(false)}
-                      className="nav-item flex w-full text-sm"
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                ))}
+                {group.items.map((entry) =>
+                  isNavParent(entry) ? (
+                    <li key={entry.id}>
+                      <NavDisclosure
+                        parent={entry}
+                        pathname={pathname}
+                        activeHref={activeHref}
+                        onNavigate={() => close(false)}
+                      />
+                    </li>
+                  ) : (
+                    <li key={entry.href}>
+                      <NavLink item={entry} activeHref={activeHref} onNavigate={() => close(false)} />
+                    </li>
+                  ),
+                )}
               </ul>
             </div>
           ))}

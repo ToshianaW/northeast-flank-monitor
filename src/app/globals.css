@@ -298,7 +298,7 @@
 
 /* Sidebar nav item. Active: tinted fill and a 3px teal bar on the left edge;
    the keyboard focus ring (foam outline below) stays separate. */
-a.nav-item {
+.nav-item {
   border-radius: 0.5rem;
   padding: 0.5rem 0.75rem;
   color: var(--text-secondary);
@@ -306,30 +306,32 @@ a.nav-item {
     background-color 180ms ease,
     color 180ms ease;
 }
-a.nav-item[aria-current="page"] {
+a.nav-item[aria-current="page"],
+button.nav-item[data-active="true"] {
   background-color: color-mix(in srgb, var(--teal-blue) 22%, transparent);
   box-shadow: inset 3px 0 0 var(--link);
   color: var(--text-primary);
   font-weight: 500;
 }
 @media (hover: hover) and (pointer: fine) {
-  a.nav-item:hover {
+  .nav-item:hover {
     background-color: var(--surface-raised);
     color: var(--foam);
   }
-  a.nav-item[aria-current="page"]:hover {
+  a.nav-item[aria-current="page"]:hover,
+  button.nav-item[data-active="true"]:hover {
     background-color: color-mix(in srgb, var(--teal-blue) 30%, transparent);
   }
 }
 @media (hover: none) {
-  a.nav-item:active {
+  .nav-item:active {
     background-color: var(--surface-raised);
     color: var(--foam);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  a.nav-item {
+  .nav-item {
     transition: none;
   }
 }

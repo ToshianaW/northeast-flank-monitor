@@ -116,7 +116,7 @@ Roadmap: `docs/mvp-plan.md` §4. Decisions that override the plan: `docs/decisio
 
 | Step | What exists |
 | --- | --- |
-| 5.1 | **Built:** Side-by-side view (`/historical/compare`, in the sidebar). Published historical and current events for two selectable windows (default Jan–Feb 2021 against last and this month), as counts and linked lists per event type, with coverage and comparability notes. Descriptive only: no phase labels, markers, trend arrows, scores or percentages (the spec §22 indicator matrix is not built). Rows are withheld when the historical window has fewer than 4 events or 2 sources (`src/lib/historical-compare.ts`) |
+| 5.1 | **Built:** Side-by-side view (`/historical/compare`), in the sidebar under the expandable Historical Comparison entry with Overview (`/historical`). Published historical and current events for two selectable windows (default Jan–Feb 2021 against last and this month), as counts and linked lists per event type, with coverage and comparability notes. Descriptive only: no phase labels, markers, trend arrows, scores or percentages (the spec §22 indicator matrix is not built). Rows are withheld when the historical window has fewer than 4 events or 2 sources (`src/lib/historical-compare.ts`) |
 | 5.2 | Digest Historical Context written by code, not the model: for each of the day's event types, how many published historical events were recorded and in which months, plus the partial-record caveat. Falls back to the fixed line below the threshold or if a line fails its grammar, banned-phrase or comparison-wording check. No-model preview: `npm run digest:historical-preview -- [--date YYYY-MM-DD]` |
 
 **Next:** step 3.4 (Air Activity page).

@@ -1,26 +1,76 @@
 /**
- * Sidebar active item and top-bar title. No database. Run: npm test
+ * Sidebar structure, active item, open state and top-bar title. No database. Run: npm test
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { activeNavItem, NAV_GROUPS, pageTitleFor } from "./nav";
+import {
+  activeNavItem,
+  isNavParent,
+  isParentActive,
+  isParentOpenByDefault,
+  NAV_GROUPS,
+  navLinks,
+  pageTitleFor,
+  type NavParent,
+} from "./nav";
 
-test("the side-by-side view is in the sidebar under Activity", () => {
-  const activity = NAV_GROUPS.find((g) => g.id === "activity")!;
-  assert.ok(activity.items.some((i) => i.href === "/historical/compare" && i.label === "Side-by-side view"));
+const activity = NAV_GROUPS.find((g) => g.id === "activity")!;
+const historical = activity.items.find(isNavParent) as NavParent;
+
+test("Historical Comparison is an expandable entry with exactly two children", () => {
+  assert.equal(historical.label, "Historical Comparison");
+  assert.deepEqual(
+    historical.children.map(({ href, label }) => ({ href, label })),
+    [
+      { href: "/historical", label: "Overview" },
+      { href: "/historical/compare", label: "Side-by-side view" },
+    ],
+  );
+  assert.equal(activity.items.indexOf(historical), 2, "same place in the Activity section");
 });
 
-test("the longest matching href is the active item", () => {
-  assert.equal(activeNavItem("/historical/compare")?.href, "/historical/compare");
+test("Side-by-side view is not a top-level item", () => {
+  for (const group of NAV_GROUPS) {
+    for (const entry of group.items) {
+      if (!isNavParent(entry)) assert.notEqual(entry.href, "/historical/compare");
+    }
+  }
+});
+
+test("nothing else in the sidebar changes", () => {
+  const shape = NAV_GROUPS.map((g) => [
+    g.label,
+    g.items.map((e) => (isNavParent(e) ? `${e.label} [${e.children.map((c) => c.label).join(", ")}]` : e.label)),
+  ]);
+  assert.deepEqual(shape, [
+    ["Overview", ["Dashboard", "Map"]],
+    ["Reporting", ["Latest", "Digest", "Archive"]],
+    ["Activity", ["Exercises", "Air Activity", "Historical Comparison [Overview, Side-by-side view]"]],
+    ["Reference", ["Sources", "Methodology", "About"]],
+  ]);
+  assert.equal(navLinks().length, 12);
+});
+
+test("active and open states on both pages", () => {
+  for (const path of ["/historical", "/historical/compare", "/historical/type/exercise", "/historical/2b4c"]) {
+    assert.equal(isParentOpenByDefault(historical, path), true, path);
+    assert.equal(isParentActive(historical, path), true, path);
+  }
   assert.equal(activeNavItem("/historical")?.href, "/historical");
+  assert.equal(activeNavItem("/historical/compare")?.href, "/historical/compare", "longest match: not also Overview");
   assert.equal(activeNavItem("/historical/type/exercise")?.href, "/historical");
-  assert.equal(activeNavItem("/")?.href, "/");
+  for (const path of ["/", "/latest", "/exercises", "/historicalx"]) {
+    assert.equal(isParentOpenByDefault(historical, path), false, path);
+    assert.equal(isParentActive(historical, path), false, path);
+  }
   assert.equal(activeNavItem("/nowhere"), null);
 });
 
 test("top-bar titles", () => {
+  assert.equal(pageTitleFor("/historical"), "Historical Comparison");
   assert.equal(pageTitleFor("/historical/compare"), "Side-by-side view");
   assert.equal(pageTitleFor("/historical/2b4c"), "Historical Comparison");
+  assert.equal(pageTitleFor("/map"), "Map");
   assert.equal(pageTitleFor("/events/abc"), "Event");
   assert.equal(pageTitleFor("/nowhere"), "Northeast Flank Monitor");
 });
