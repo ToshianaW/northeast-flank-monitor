@@ -11,7 +11,15 @@ import {
 import { currentSourceOptions, listSources } from "@/lib/sources";
 import { getReviewerName } from "@/lib/reviewer";
 import { updateEventAction } from "../../actions";
+import { approveReferencesAction, suggestReferencesAction, unlinkReferenceAction } from "../../reference-actions";
 import { requireAdminPage } from "@/lib/admin-session";
+import { ReferencePanel } from "@/components/historical/reference-panel";
+import {
+  listPublishedHistoricalHeadlines,
+  listReferencesForAdmin,
+  referencesTableExists,
+} from "@/lib/historical-references";
+import { decodeSuggestions, referenceMessage } from "@/lib/historical-references-rules";
 
 export const metadata = { title: "Edit event" };
 
@@ -22,20 +30,32 @@ export default async function EditEventPage({
   await requireAdminPage();
   await connection();
   const { id } = await params;
-  const { fromReview } = await searchParams;
+  const { fromReview, refs, refsMessage } = await searchParams;
   const fromReviewQueue = fromReview === "1";
   const returnTo = `/admin/review/${id}`;
 
-  const [event, eventSources, sources, exercises, reviewerDefault] =
+  const [event, eventSources, sources, exercises, reviewerDefault, referencesApplied, references, savedReviewer] =
     await Promise.all([
       getEvent(id),
       listEventSources(id),
       listSources(),
       listExerciseOptions(),
       fromReviewQueue ? getReviewerName() : Promise.resolve(null),
+      referencesTableExists(),
+      listReferencesForAdmin(id),
+      getReviewerName(),
     ]);
 
   if (!event) notFound();
+
+  const suggested = decodeSuggestions(refs).filter(
+    (s) => !references.some((r) => r.historical_event_id === s.historical_event_id),
+  );
+  const headlines = await listPublishedHistoricalHeadlines(suggested.map((s) => s.historical_event_id));
+  const suggestions = suggested.flatMap((s) => {
+    const h = headlines.get(s.historical_event_id);
+    return h ? [{ ...s, headline: h.headline, event_date: h.event_date }] : [];
+  });
 
   const primaryIndex = Math.max(
     0,
@@ -83,6 +103,17 @@ export default async function EditEventPage({
         initialPrimaryIndex={primaryIndex >= 0 ? primaryIndex : 0}
         sourceOptions={currentSourceOptions(sources, eventSources.map((r) => r.source_id)).map((s) => ({ id: s.id, name: s.name }))}
         exerciseOptions={exercises}
+      />
+      <ReferencePanel
+        applied={referencesApplied}
+        published={event.review_status === "PUBLISHED"}
+        references={references}
+        suggestions={suggestions}
+        message={referenceMessage(refsMessage)}
+        reviewerDefault={savedReviewer}
+        suggestAction={suggestReferencesAction.bind(null, id)}
+        approveAction={approveReferencesAction.bind(null, id)}
+        unlinkAction={unlinkReferenceAction.bind(null, id)}
       />
     </section>
   );
