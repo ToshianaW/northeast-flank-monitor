@@ -17,7 +17,15 @@ import { getPool } from "@/lib/db";
 import { insertEvent, type EventWritePayload } from "@/lib/events";
 import type { Reliability, SourceType } from "@/lib/source-labels";
 import { setOutput } from "../lib/ci.mjs";
-import { failureReason, type RowErrorKind } from "./failure.mjs";
+import {
+  exitCodeFor,
+  failureReason,
+  MAX_TEXT_CHARS,
+  skipKindFor,
+  skippedSummary,
+  type RowErrorKind,
+  type RowSkipKind,
+} from "./failure.mjs";
 import {
   buildUserMessage,
   OUTPUT_SCHEMA,
@@ -63,8 +71,6 @@ const PRICES: Record<string, { input: number; output: number; cacheRead: number;
 const price = PRICES[model];
 if (!price) throw new Error(`no price entry for model "${model}"`);
 
-/** Rows longer than this are left NEW and reported, never truncated. */
-const MAX_TEXT_CHARS = 40_000;
 /** Dry-run sample: rows per registry source (decided 2026-10-02). */
 const DRY_RUN_SAMPLE: Record<string, number> = {
   ICDS: 1,
@@ -157,6 +163,8 @@ const totals = {
   costUsd: 0,
 };
 const errors: Array<{ raw_document_id: string; error: string; kind: RowErrorKind }> = [];
+/** Rows not sent to the model by rule (never truncated). Recorded on the row; not errors. */
+const skips: Array<{ raw_document_id: string; kind: RowSkipKind; chars: number }> = [];
 const results: RowResult[] = [];
 let stopReason: "COMPLETED" | "ROW_LIMIT" | "SPEND_CAP" | "ERROR" =
   !dryRun && eligible.length > rowLimit ? "ROW_LIMIT" : "COMPLETED";
@@ -170,11 +178,6 @@ function estimateRowCost(row: Row): number {
 async function extractRow(row: Row): Promise<RowResult> {
   const result: RowResult = { row, output: null, kept: [], dropped: [], costUsd: 0 };
   const text = row.raw_text ?? "";
-  if (text.length > MAX_TEXT_CHARS) {
-    result.error = `text is ${text.length} chars (limit ${MAX_TEXT_CHARS}); left NEW`;
-    result.errorKind = "text_too_long";
-    return result;
-  }
   const publishedAt = row.published_at ?? row.fetched_at;
 
   const response = await anthropic.messages.create({
@@ -350,7 +353,8 @@ async function writeRow(client: PoolClient, r: RowResult): Promise<void> {
 const client = await pool.connect();
 try {
   for (const row of selected) {
-    if (totals.costUsd + estimateRowCost(row) > maxUsd) {
+    // A row over the text limit costs nothing (no model call), so it never trips the cap.
+    if (!skipKindFor(row.raw_text ?? "") && totals.costUsd + estimateRowCost(row) > maxUsd) {
       stopReason = "SPEND_CAP";
       break;
     }
@@ -364,6 +368,22 @@ try {
              metadata = metadata || '{"lead_only": true, "skip_reason": "not_in_registry"}'::jsonb
            WHERE id = $1`,
           [row.id],
+        );
+      }
+      continue;
+    }
+
+    // Over the text limit: SKIPPED with the reason, no model call, no error (MAX_TEXT_CHARS).
+    const text = row.raw_text ?? "";
+    const skipKind = skipKindFor(text);
+    if (skipKind) {
+      skips.push({ raw_document_id: row.id, kind: skipKind, chars: text.length });
+      if (!dryRun) {
+        await client.query(
+          `UPDATE raw_documents SET status = 'SKIPPED',
+             metadata = metadata || jsonb_build_object('skip_reason', $2::text, 'text_chars', $3::int, 'text_limit', $4::int)
+           WHERE id = $1 AND status = 'NEW'`,
+          [row.id, skipKind, text.length, MAX_TEXT_CHARS],
         );
       }
       continue;
@@ -462,6 +482,7 @@ console.log(
   `tokens: ${totals.inputTokens} in, ${totals.cacheReadTokens} cache read, ${totals.cacheWriteTokens} cache write, ${totals.outputTokens} out · cost $${totals.costUsd.toFixed(4)} (cap $${maxUsd.toFixed(2)})`,
 );
 for (const e of errors) console.log(`error ${e.raw_document_id}: ${e.error}`);
+for (const k of skips) console.log(`skipped ${k.raw_document_id}: ${k.kind} (${k.chars} chars, limit ${MAX_TEXT_CHARS})`);
 if (reviewPath) console.log(`review file: ${reviewPath}`);
 if (ci) {
   setOutput("completed", "true");
@@ -471,8 +492,10 @@ if (ci) {
   setOutput("cost_usd", totals.costUsd.toFixed(4));
   // Why the step exits 1 (labels and counts only), for the job summary.
   setOutput("failure_reason", failureReason(errors));
+  setOutput("skipped", skippedSummary(skips));
 }
-if (errors.length > 0) process.exitCode = 1;
+// Real errors (API, model, database, validation) fail the step; skips do not.
+process.exitCode = exitCodeFor(errors);
 
 function reviewMarkdown(): string {
   const out: string[] = [

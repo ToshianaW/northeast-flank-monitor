@@ -100,6 +100,8 @@ jobs:
           STOP_REASON: ${{ steps.extract.outputs.stop_reason }}
           # Short labels with counts (e.g. "text_too_long (1)"), never row text or URLs.
           EXTRACT_REASON: ${{ steps.extract.outputs.failure_reason }}
+          # Rows skipped by rule, e.g. "text_too_long (1)": recorded, not a failure.
+          EXTRACT_SKIPPED: ${{ steps.extract.outputs.skipped }}
           EXTRACT_COST: ${{ steps.extract.outputs.cost_usd }}
           CANDIDATES: ${{ steps.dedup.outputs.candidates }}
           DEDUP_COST: ${{ steps.dedup.outputs.cost_usd }}
@@ -133,5 +135,6 @@ jobs:
             fi
             extract_note="stop: ${STOP_REASON:-–}"
             if [ -n "$EXTRACT_REASON" ]; then extract_note="$extract_note; row errors: $EXTRACT_REASON"; fi
+            if [ -n "$EXTRACT_SKIPPED" ]; then extract_note="$extract_note; skipped: $EXTRACT_SKIPPED"; fi
             echo "Steps: collect ${COLLECT_OUTCOME:-not run} · extract ${EXTRACT_OUTCOME:-not run} ($extract_note) · dedup ${DEDUP_OUTCOME:-not run}"
           } >> "$GITHUB_STEP_SUMMARY"
