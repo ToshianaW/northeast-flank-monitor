@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin-session";
-import { anthropicSuggestCall, suggestReferences } from "@/lib/historical-reference-suggest";
+import { aiSuggestEnabled, anthropicSuggestCall, suggestReferences } from "@/lib/historical-reference-suggest";
 import {
   getPublishedHistoricalFields,
   getSuggestionEvent,
@@ -32,6 +32,7 @@ function done(eventId: string, message: ReferenceMessage, extra: Record<string, 
 /** One model call (Haiku 4.5, capped per click); suggestions come back in the URL for review. */
 export async function suggestReferencesAction(eventId: string): Promise<void> {
   await requireAdmin();
+  if (!aiSuggestEnabled()) done(eventId, "AI_OFF");
   if (!(await referencesTableExists())) done(eventId, "NOT_APPLIED");
   const current = await getSuggestionEvent(eventId);
   if (!current || current.review_status !== "PUBLISHED") done(eventId, "NOT_PUBLISHED");
@@ -39,9 +40,9 @@ export async function suggestReferencesAction(eventId: string): Promise<void> {
   const result = await suggestReferences({ current: current!, shortlist, call: anthropicSuggestCall });
   // Counts and codes only.
   console.log(
-    `historical references: ${result.ok ? `${result.suggestions.length} suggested from ${result.shortlistSize}` : result.status} · cost $${result.costUsd.toFixed(4)}`,
+    `historical references: ${result.ok ? `${result.suggestions.length} suggested from ${result.shortlistSize}` : `${result.status} (${result.reason})`} · cost $${result.costUsd.toFixed(4)}`,
   );
-  if (!result.ok) done(eventId, result.status);
+  if (!result.ok) done(eventId, result.status, { refsReason: result.reason });
   if (result.suggestions.length === 0) done(eventId, "NONE_SUGGESTED");
   done(eventId, "SUGGESTED", { refs: encodeSuggestions(result.suggestions) });
 }
@@ -63,7 +64,9 @@ export async function approveReferencesAction(eventId: string, formData: FormDat
     const attributes = verifiedAttributes(current!, historical, formData.getAll(`attr_${id}`).map(String).filter(isReferenceAttribute));
     if (attributes.length === 0) continue;
     try {
-      await linkReference({ eventId, historicalEventId: id, attributes, reviewer });
+      // Only the AI step offers "same kind of activity", so it marks the link as AI-suggested.
+      const aiSuggested = attributes.includes("SAME_KIND_OF_ACTIVITY");
+      await linkReference({ eventId, historicalEventId: id, attributes, reviewer, aiSuggested });
       linked++;
     } catch (error) {
       const code = (error as { code?: string }).code;

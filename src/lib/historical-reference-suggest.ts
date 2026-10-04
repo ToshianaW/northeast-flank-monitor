@@ -11,8 +11,17 @@ import {
   MAX_REFERENCES,
   REFERENCE_ATTRIBUTES,
   verifiedAttributes,
+  type FailureReason,
   type ReferenceAttribute,
 } from "@/lib/historical-references-rules";
+
+/**
+ * Server flag for the optional AI step: on only when REFERENCES_AI_SUGGEST is exactly "on".
+ * Off by default; while off the admin button is hidden and the action refuses.
+ */
+export function aiSuggestEnabled(): boolean {
+  return process.env.REFERENCES_AI_SUGGEST?.trim() === "on";
+}
 
 export const SUGGEST_MODEL = "claude-haiku-4-5";
 /** USD per million tokens (Claude Haiku 4.5). */
@@ -35,7 +44,37 @@ export type Suggestion = { historical_event_id: string; attributes: ReferenceAtt
 
 export type SuggestResult =
   | { ok: true; suggestions: Suggestion[]; costUsd: number; worstCaseUsd: number; shortlistSize: number }
-  | { ok: false; status: "NO_SHORTLIST" | "SPEND_CAP" | "MODEL_ERROR"; detail: string; costUsd: number };
+  | {
+      ok: false;
+      status: "NO_SHORTLIST" | "SPEND_CAP" | "MODEL_ERROR";
+      reason: FailureReason;
+      detail: string;
+      costUsd: number;
+    };
+
+/** No credential the server can use: the SDK then throws before sending anything. */
+function credentialsMissing(): boolean {
+  return !process.env.ANTHROPIC_API_KEY?.trim() && !process.env.ANTHROPIC_AUTH_TOKEN?.trim();
+}
+
+/**
+ * A thrown call error as a reason label, by SDK error class or HTTP status (never by message
+ * text). The status check also covers a second copy of the SDK classes (ESM and CJS builds).
+ */
+export function reasonForError(error: unknown): FailureReason {
+  const status = (error as { status?: unknown } | null)?.status;
+  if (
+    error instanceof Anthropic.AuthenticationError ||
+    error instanceof Anthropic.PermissionDeniedError ||
+    status === 401 ||
+    status === 403
+  ) {
+    return "API key rejected";
+  }
+  if (error instanceof Anthropic.RateLimitError || status === 429) return "rate limited";
+  if (error instanceof Anthropic.APIError || typeof status === "number") return "API error";
+  return credentialsMissing() ? "no API key" : "API error";
+}
 
 const alias = (i: number) => `H${i + 1}`;
 
@@ -140,9 +179,13 @@ export async function suggestReferences(options: {
   call: SuggestCall;
 }): Promise<SuggestResult> {
   const { current, shortlist, call } = options;
-  if (shortlist.length === 0) return { ok: false, status: "NO_SHORTLIST", detail: "no published entry of the same type or country", costUsd: 0 };
+  if (shortlist.length === 0) {
+    return { ok: false, status: "NO_SHORTLIST", reason: "no candidates", detail: "no published entry of the same type or country", costUsd: 0 };
+  }
   const capped = cappedRequest(current, shortlist);
-  if (!capped) return { ok: false, status: "SPEND_CAP", detail: `worst case exceeds $${PER_CLICK_CAP_USD}`, costUsd: 0 };
+  if (!capped) {
+    return { ok: false, status: "SPEND_CAP", reason: "over cost cap", detail: `worst case exceeds $${PER_CLICK_CAP_USD}`, costUsd: 0 };
+  }
 
   let reply: SuggestReply;
   try {
@@ -151,14 +194,20 @@ export async function suggestReferences(options: {
     // Error class and HTTP status only; messages can echo request content.
     const status = (error as { status?: unknown }).status;
     const name = error instanceof Error ? error.constructor.name : "error";
-    return { ok: false, status: "MODEL_ERROR", detail: `${name}${typeof status === "number" ? ` ${status}` : ""}`, costUsd: 0 };
+    return {
+      ok: false,
+      status: "MODEL_ERROR",
+      reason: reasonForError(error),
+      detail: `${name}${typeof status === "number" ? ` ${status}` : ""}`,
+      costUsd: 0,
+    };
   }
   const costUsd = costOf(reply);
   if (reply.stopReason !== "end_turn" || reply.text === null) {
-    return { ok: false, status: "MODEL_ERROR", detail: `stop_reason ${reply.stopReason}`, costUsd };
+    return { ok: false, status: "MODEL_ERROR", reason: "model stopped early", detail: `stop_reason ${reply.stopReason}`, costUsd };
   }
   const suggestions = parseSuggestions(reply.text, current, capped.used);
-  if (!suggestions) return { ok: false, status: "MODEL_ERROR", detail: "invalid JSON", costUsd };
+  if (!suggestions) return { ok: false, status: "MODEL_ERROR", reason: "invalid reply", detail: "invalid JSON", costUsd };
   return { ok: true, suggestions, costUsd, worstCaseUsd: worstCaseUsd(capped.request), shortlistSize: capped.used.length };
 }
 

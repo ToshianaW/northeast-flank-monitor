@@ -14,6 +14,7 @@ import { updateEventAction } from "../../actions";
 import { approveReferencesAction, suggestReferencesAction, unlinkReferenceAction } from "../../reference-actions";
 import { requireAdminPage } from "@/lib/admin-session";
 import { ReferencePanel } from "@/components/historical/reference-panel";
+import { aiSuggestEnabled } from "@/lib/historical-reference-suggest";
 import {
   listPublishedHistoricalHeadlines,
   listReferencesForAdmin,
@@ -30,7 +31,7 @@ export default async function EditEventPage({
   await requireAdminPage();
   await connection();
   const { id } = await params;
-  const { fromReview, refs, refsMessage } = await searchParams;
+  const { fromReview, refs, refsMessage, refsReason } = await searchParams;
   const fromReviewQueue = fromReview === "1";
   const returnTo = `/admin/review/${id}`;
 
@@ -106,10 +107,11 @@ export default async function EditEventPage({
       />
       <ReferencePanel
         applied={referencesApplied}
+        aiEnabled={aiSuggestEnabled()}
         published={event.review_status === "PUBLISHED"}
         references={references}
         suggestions={suggestions}
-        message={referenceMessage(refsMessage)}
+        message={referenceMessage(refsMessage, refsReason)}
         reviewerDefault={savedReviewer}
         suggestAction={suggestReferencesAction.bind(null, id)}
         approveAction={approveReferencesAction.bind(null, id)}

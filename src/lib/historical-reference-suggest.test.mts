@@ -4,9 +4,12 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import Anthropic from "@anthropic-ai/sdk";
 import type { ShortlistEntry, SuggestionEvent } from "./historical-references";
+import { FAILURE_REASONS, referenceMessage } from "./historical-references-rules";
 import {
   PER_CLICK_CAP_USD,
+  reasonForError,
   SUGGEST_MAX_TOKENS,
   SUGGEST_MODEL,
   suggestReferences,
@@ -96,7 +99,7 @@ test("the cap is checked against the worst case before the call", async () => {
   // One entry too large for the cap: no call at all.
   const huge = entry(1, { summary: "x".repeat(60_000) });
   const r = await suggestReferences({ current: CURRENT, shortlist: [huge], call: counting });
-  assert.deepEqual(r, { ok: false, status: "SPEND_CAP", detail: "worst case exceeds $0.02", costUsd: 0 });
+  assert.deepEqual(r, { ok: false, status: "SPEND_CAP", reason: "over cost cap", detail: "worst case exceeds $0.02", costUsd: 0 });
   assert.equal(called, 0);
 
   // Many long entries: the shortlist is cut from the end until the worst case fits.
@@ -109,15 +112,57 @@ test("the cap is checked against the worst case before the call", async () => {
 });
 
 test("an empty shortlist makes no call; a bad reply changes nothing", async () => {
-  assert.equal((await suggestReferences({ current: CURRENT, shortlist: [], call: stub("") })).ok, false);
+  const empty = await suggestReferences({ current: CURRENT, shortlist: [], call: stub("") });
+  assert.equal(empty.ok ? null : empty.reason, "no candidates");
   const notJson = await suggestReferences({ current: CURRENT, shortlist: [entry(1)], call: stub("not json") });
-  assert.deepEqual(notJson.ok ? null : notJson.status, "MODEL_ERROR");
+  assert.deepEqual(notJson.ok ? null : [notJson.status, notJson.reason], ["MODEL_ERROR", "invalid reply"]);
   const cut: SuggestCall = async () => ({ text: null, stopReason: "max_tokens", inputTokens: 10, outputTokens: 1_000 });
   const r = await suggestReferences({ current: CURRENT, shortlist: [entry(1)], call: cut });
   assert.equal(r.ok ? null : r.detail, "stop_reason max_tokens");
+  assert.equal(r.ok ? null : r.reason, "model stopped early");
   const thrown: SuggestCall = async () => {
     throw Object.assign(new Error("secret request text"), { status: 529 });
   };
   const e = await suggestReferences({ current: CURRENT, shortlist: [entry(1)], call: thrown });
   assert.equal(e.ok ? null : e.detail, "Error 529", "error class and status only, never the message");
+});
+
+test("a failed call names a short reason: missing key, rejected key, rate limit, other API error", async () => {
+  const saved = { key: process.env.ANTHROPIC_API_KEY, token: process.env.ANTHROPIC_AUTH_TOKEN };
+  try {
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.ANTHROPIC_AUTH_TOKEN;
+    // What the SDK does with no credential: a plain Error before any request is sent.
+    assert.equal(reasonForError(new Error("Could not resolve authentication method")), "no API key");
+    const noKeyCall: SuggestCall = async () => {
+      throw new Error("Could not resolve authentication method");
+    };
+    const noKey = await suggestReferences({ current: CURRENT, shortlist: [entry(1)], call: noKeyCall });
+    assert.equal(noKey.ok ? null : noKey.reason, "no API key");
+
+    process.env.ANTHROPIC_API_KEY = "placeholder-not-a-key";
+    assert.equal(reasonForError(new Error("socket hang up")), "API error");
+    // SDK API errors carry the HTTP status (this test file may load the SDK's other build, so
+    // the classes here can differ from the module's; the status covers both).
+    const apiError = (status: number) => Object.assign(Object.create(Anthropic.APIError.prototype), { status });
+    assert.equal(reasonForError(apiError(401)), "API key rejected");
+    assert.equal(reasonForError(apiError(403)), "API key rejected");
+    assert.equal(reasonForError(apiError(429)), "rate limited");
+    assert.equal(reasonForError(apiError(500)), "API error");
+    assert.equal(reasonForError(apiError(400)), "API error");
+  } finally {
+    if (saved.key === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = saved.key;
+    if (saved.token === undefined) delete process.env.ANTHROPIC_AUTH_TOKEN;
+    else process.env.ANTHROPIC_AUTH_TOKEN = saved.token;
+  }
+});
+
+test("the admin message shows a known reason label only", () => {
+  assert.equal(
+    referenceMessage("MODEL_ERROR", "no API key"),
+    "The suggestion request failed. Nothing was changed. Reason: no API key.",
+  );
+  assert.equal(referenceMessage("MODEL_ERROR", "sk-ant-something"), "The suggestion request failed. Nothing was changed.");
+  assert.deepEqual([...FAILURE_REASONS].filter((r) => r.length > 20), [], "labels stay short");
 });

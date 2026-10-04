@@ -35,6 +35,7 @@ function ReviewerInput({ id, defaultValue }: { id: string; defaultValue: string 
  */
 export function ReferencePanel({
   applied,
+  aiEnabled,
   published,
   references,
   suggestions,
@@ -45,6 +46,8 @@ export function ReferencePanel({
   unlinkAction,
 }: {
   applied: boolean;
+  /** REFERENCES_AI_SUGGEST: while off, the Suggest button is hidden. */
+  aiEnabled: boolean;
   published: boolean;
   references: AdminReference[];
   suggestions: PanelSuggestion[];
@@ -61,9 +64,13 @@ export function ReferencePanel({
         Historical references
       </h2>
       <p className="max-w-3xl text-sm text-text-secondary">
-        Up to {MAX_REFERENCES} published historical entries can be shown on this event&rsquo;s public page, each
-        approved by a person, with the attributes they share. Suggestions come from {SUGGEST_MODEL} (at most $
-        {PER_CLICK_CAP_USD.toFixed(2)} per click); the model only proposes entries and writes no public text.
+        Up to {MAX_REFERENCES} published historical entries are shown on this event&rsquo;s public page with the
+        attributes they share. When the event is published, code links entries with the same event type and
+        country automatically (no AI). Any link can be removed here; a removed pair is never linked again
+        automatically.{" "}
+        {aiEnabled
+          ? `Optional AI suggestions come from ${SUGGEST_MODEL} (at most ${PER_CLICK_CAP_USD.toFixed(2)} per click); the model only proposes entries and writes no public text, and a person approves each one.`
+          : "AI suggestions are switched off on this server."}
       </p>
       {message ? (
         <p role="status" className="border-l-2 border-teal-blue pl-3 text-sm">
@@ -86,15 +93,17 @@ export function ReferencePanel({
                       {r.headline}
                     </Link>{" "}
                     <span className="text-text-secondary">
-                      · {referenceDate(r.event_date)} · {r.shared_attributes.map((a) => ATTRIBUTE_LABELS[a]).join(", ")} ·
-                      approved by {r.reviewer}
+                      · {referenceDate(r.event_date)} · {r.shared_attributes.map((a) => ATTRIBUTE_LABELS[a]).join(", ")} ·{" "}
+                      {r.matched_by === "AUTO"
+                        ? "linked automatically"
+                        : `approved by ${r.reviewer}${r.ai_suggested ? " (AI-suggested)" : ""}`}
                       {r.historical_status !== "PUBLISHED" ? " · hidden: the historical entry is not published" : ""}
                     </span>
                   </div>
                   <form action={unlinkAction.bind(null, r.historical_event_id)} className="flex items-end gap-2">
                     <ReviewerInput id={`unlink-reviewer-${r.historical_event_id}`} defaultValue={reviewerDefault} />
                     <Button type="submit" variant="outline">
-                      Unlink
+                      Remove
                     </Button>
                   </form>
                 </li>
@@ -102,15 +111,17 @@ export function ReferencePanel({
             </ul>
           )}
 
-          <form action={suggestAction}>
-            <Button type="submit" variant="outline" disabled={!published || full}>
-              Suggest historical references
-            </Button>
-            {!published ? <p className="mt-1 text-xs text-text-muted">Publish the event first.</p> : null}
-            {full ? <p className="mt-1 text-xs text-text-muted">This event has the maximum of {MAX_REFERENCES}.</p> : null}
-          </form>
+          {aiEnabled ? (
+            <form action={suggestAction}>
+              <Button type="submit" variant="outline" disabled={!published || full}>
+                Suggest historical references
+              </Button>
+              {!published ? <p className="mt-1 text-xs text-text-muted">Publish the event first.</p> : null}
+              {full ? <p className="mt-1 text-xs text-text-muted">This event has the maximum of {MAX_REFERENCES}.</p> : null}
+            </form>
+          ) : null}
 
-          {suggestions.length > 0 ? (
+          {aiEnabled && suggestions.length > 0 ? (
             <form action={approveAction} className="grid gap-4">
               <fieldset className="grid gap-3">
                 <legend className="mb-1 text-sm font-medium">Suggestions to review</legend>
