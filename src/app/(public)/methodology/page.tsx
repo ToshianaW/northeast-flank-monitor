@@ -14,12 +14,17 @@ import {
   type LocationPrecision,
 } from "@/lib/event-labels";
 import { SOURCE_TYPE_LABELS, SOURCE_TYPE_VALUES } from "@/lib/source-labels";
+import {
+  ACTIVITY_INDEX_DISCLAIMER,
+  BASELINE_WEEKS,
+  MIN_BASELINE_EVENTS,
+  MIN_DIFFERENCE,
+  RATIO,
+  TOTAL_WEEKS,
+  WINDOW_WEEKS,
+} from "@/lib/activity-index";
 
 export const metadata = { title: "Methodology" };
-
-/** Spec §23, verbatim. */
-const ACTIVITY_INDEX_DISCLAIMER =
-  "The Northeast Flank Activity Index measures observable military activity and force posture. It does not estimate the probability of conflict or predict political intent.";
 
 const SECTIONS = [
   { id: "core-question", title: "The core question" },
@@ -489,14 +494,27 @@ export default function MethodologyPage() {
         </Section>
 
         <Section id="activity-index" number={n("activity-index")} title={t("activity-index")}>
-          <p className="text-foreground">Not yet calculated.</p>
           <p className="border border-border bg-surface-dark px-4 py-3">
             {ACTIVITY_INDEX_DISCLAIMER}
           </p>
           <p>
-            The Index will not be introduced until enough historical and
-            contemporary data exists to create a defensible baseline. Its
-            scoring formula will be publicly documented and open source.
+            The Index compares reported activity in the last {WINDOW_WEEKS} complete
+            weeks with the same area&rsquo;s previous {BASELINE_WEEKS} weeks. It counts
+            published current events only; statements are not counted, and events
+            count only when a supporting source was already in the registry before
+            that comparison began, so newly added sources cannot raise it. The
+            result is a phrase, not a score: &ldquo;more than usual&rdquo; needs at least
+            {" "}{RATIO} times the usual number and at least {MIN_DIFFERENCE} more events,
+            &ldquo;fewer than usual&rdquo; the reverse, and anything else is &ldquo;within the
+            usual range&rdquo;.
+          </p>
+          <p>
+            Historical data never enters the Index: the hand-entered historical record
+            and current collection are counted in different ways, so their counts are
+            not compared. Until {TOTAL_WEEKS} complete weeks of current data exist, the
+            dashboard shows &ldquo;Collecting baseline&rdquo; and no number; an area appears
+            only once its own baseline has at least {MIN_BASELINE_EVENTS} activity events.
+            The formula is documented in the repository (docs/scoring.md).
           </p>
         </Section>
 
@@ -617,6 +635,10 @@ export default function MethodologyPage() {
               descriptive only.
             </li>
             <li>
+              The Northeast Flank Activity Index is collecting its baseline: it
+              shows no value until twelve complete weeks of current data exist.
+            </li>
+            <li>
               A published event page can list up to three historical entries
               &ldquo;similar in nature&rdquo;. For physical-activity event types, code
               links entries with the same event type and country automatically;
@@ -641,7 +663,6 @@ export default function MethodologyPage() {
           </Subhead>
           <ul className="list-disc pl-5">
             <li>Air activity page</li>
-            <li>Northeast Flank Activity Index</li>
             <li>Open data: downloadable datasets and a read-only API</li>
           </ul>
           <div className="border border-border bg-surface-dark px-4 py-3">

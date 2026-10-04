@@ -20,10 +20,8 @@ import {
   loadTheaterGeo,
 } from "@/lib/map-data";
 import { listUnderWayExercises } from "@/lib/public-exercises";
-
-/** Spec §23, verbatim. */
-const ACTIVITY_INDEX_DISCLAIMER =
-  "The Northeast Flank Activity Index measures observable military activity and force posture. It does not estimate the probability of conflict or predict political intent.";
+import { ActivityIndexPanel } from "@/components/activity-index-panel";
+import { getActivityIndex } from "@/lib/activity-index-data";
 
 const FEED_SIZE = 3;
 
@@ -49,13 +47,14 @@ function Panel({
 
 export default async function HomePage() {
   await connection();
-  const [counts, latest, digest, activeExercises, mapData, mapGeo] = await Promise.all([
+  const [counts, latest, digest, activeExercises, mapData, mapGeo, activityIndex] = await Promise.all([
     getSnapshotCounts(),
     listPublishedEvents(FEED_SIZE),
     getLatestPublishedDigest(),
     listUnderWayExercises(),
     loadMapData({ days: DEFAULT_MAP_WINDOW, layer: DASHBOARD_MAP_LAYER }),
     loadTheaterGeo(),
+    getActivityIndex(),
   ]);
   // First paragraph of the Executive Summary as the homepage excerpt.
   const firstParagraph = digest?.sections.executive_summary
@@ -136,12 +135,7 @@ export default async function HomePage() {
         </section>
 
         <Panel title="Regional activity">
-          <p className="text-lg font-medium text-text-secondary">
-            Activity Index: not yet calculated
-          </p>
-          <p className="mt-3 max-w-[65ch] text-sm leading-relaxed text-text-secondary">
-            {ACTIVITY_INDEX_DISCLAIMER}
-          </p>
+          <ActivityIndexPanel result={activityIndex} />
         </Panel>
 
         <Panel title="Regional map">
