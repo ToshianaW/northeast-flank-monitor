@@ -544,10 +544,12 @@ export default function MethodologyPage() {
             A published event page can list up to three published entries from the
             historical record under &ldquo;Historical record: similar in nature&rdquo;.
             The page states only the attributes the two share, from a fixed list:
-            same event type, same country, same actor, same kind of activity. Most
-            links are made automatically by code when an event is published: entries
-            with the same event type and the same country, preferring the same actor,
-            then entries linked least often so the same few do not appear everywhere.
+            same event type, same country, same actor, same kind of activity. For
+            physical-activity event types only, links are made automatically by code
+            when an event is published: entries with the same event type and the same
+            country, preferring the same actor, then entries linked least often so the
+            same few do not appear everywhere. Statements (political signalling and
+            official warnings) are never linked automatically.
             These are marked &ldquo;Linked automatically by event type and country.&rdquo;
             A reviewer can remove any link, and a removed link is not added again.
             Other links are approved by a named reviewer. Event type, country and actor
