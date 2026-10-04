@@ -2,8 +2,13 @@ import "server-only";
 import { getPool } from "@/lib/db";
 import type { EventType } from "@/lib/event-labels";
 import {
+  AUTO_REVIEWER,
   MAX_REFERENCES,
+  rankAutoLinks,
+  UNPUBLISH_REVIEWER,
   type ApprovedReference,
+  type AutoEvent,
+  type MatchedBy,
   type ReferenceAttribute,
   type ReferenceFields,
 } from "@/lib/historical-references-rules";
@@ -37,7 +42,7 @@ export async function listApprovedReferences(eventId: string): Promise<ApprovedR
   try {
     const { rows } = await getPool().query<ApprovedReference>(
       `SELECT h.event_id AS historical_event_id, h.event_date, h.headline, h.event_type,
-              r.shared_attributes::text[] AS shared_attributes
+              r.shared_attributes::text[] AS shared_attributes, r.matched_by, r.ai_suggested
        FROM event_historical_references r
        JOIN events e ON e.event_id = r.event_id AND e.review_status = 'PUBLISHED'
        JOIN historical_events h ON h.event_id = r.historical_event_id AND h.review_status = 'PUBLISHED'
@@ -59,6 +64,8 @@ export type AdminReference = {
   headline: string;
   historical_status: string;
   shared_attributes: ReferenceAttribute[];
+  matched_by: MatchedBy;
+  ai_suggested: boolean;
   reviewer: string;
   created_at: Date;
 };
@@ -70,7 +77,7 @@ export async function listReferencesForAdmin(eventId: string): Promise<AdminRefe
     const { rows } = await getPool().query<AdminReference>(
       `SELECT h.event_id AS historical_event_id, h.event_date, h.headline,
               h.review_status::text AS historical_status,
-              r.shared_attributes::text[] AS shared_attributes, r.reviewer, r.created_at
+              r.shared_attributes::text[] AS shared_attributes, r.matched_by, r.ai_suggested, r.reviewer, r.created_at
        FROM event_historical_references r
        JOIN historical_events h ON h.event_id = r.historical_event_id
        WHERE r.event_id = $1
@@ -160,18 +167,20 @@ export async function linkReference(input: {
   historicalEventId: string;
   attributes: ReferenceAttribute[];
   reviewer: string;
+  /** True when the link came from the AI step (only with "same kind of activity"). */
+  aiSuggested?: boolean;
 }): Promise<void> {
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
     await client.query(
-      `INSERT INTO event_historical_references (event_id, historical_event_id, shared_attributes, reviewer)
-       VALUES ($1, $2, $3::reference_attribute[], $4)`,
-      [input.eventId, input.historicalEventId, input.attributes, input.reviewer],
+      `INSERT INTO event_historical_references (event_id, historical_event_id, shared_attributes, reviewer, matched_by, ai_suggested)
+       VALUES ($1, $2, $3::reference_attribute[], $4, 'REVIEWER', $5)`,
+      [input.eventId, input.historicalEventId, input.attributes, input.reviewer, input.aiSuggested ?? false],
     );
     await client.query(
-      `INSERT INTO event_historical_reference_log (event_id, historical_event_id, action, shared_attributes, reviewer)
-       VALUES ($1, $2, 'LINK', $3::reference_attribute[], $4)`,
+      `INSERT INTO event_historical_reference_log (event_id, historical_event_id, action, shared_attributes, reviewer, matched_by)
+       VALUES ($1, $2, 'LINK', $3::reference_attribute[], $4, 'REVIEWER')`,
       [input.eventId, input.historicalEventId, input.attributes, input.reviewer],
     );
     await client.query("COMMIT");
@@ -183,14 +192,17 @@ export async function linkReference(input: {
   }
 }
 
-/** Remove one reference: the row goes, an UNLINK log line (with its attributes) stays. */
+/**
+ * Remove one reference (automatic or reviewer): the row goes, an UNLINK log line with its
+ * attributes and origin stays, and automatic linking never adds the pair again.
+ */
 export async function unlinkReference(input: { eventId: string; historicalEventId: string; reviewer: string }): Promise<boolean> {
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
-    const { rows } = await client.query<{ shared_attributes: string[] }>(
+    const { rows } = await client.query<{ shared_attributes: string[]; matched_by: MatchedBy }>(
       `DELETE FROM event_historical_references WHERE event_id = $1 AND historical_event_id = $2
-       RETURNING shared_attributes::text[] AS shared_attributes`,
+       RETURNING shared_attributes::text[] AS shared_attributes, matched_by`,
       [input.eventId, input.historicalEventId],
     );
     if (rows.length === 0) {
@@ -198,12 +210,135 @@ export async function unlinkReference(input: { eventId: string; historicalEventI
       return false;
     }
     await client.query(
-      `INSERT INTO event_historical_reference_log (event_id, historical_event_id, action, shared_attributes, reviewer)
-       VALUES ($1, $2, 'UNLINK', $3::reference_attribute[], $4)`,
-      [input.eventId, input.historicalEventId, rows[0].shared_attributes, input.reviewer],
+      `INSERT INTO event_historical_reference_log (event_id, historical_event_id, action, shared_attributes, reviewer, matched_by)
+       VALUES ($1, $2, 'UNLINK', $3::reference_attribute[], $4, $5)`,
+      [input.eventId, input.historicalEventId, rows[0].shared_attributes, input.reviewer, rows[0].matched_by],
     );
     await client.query("COMMIT");
     return true;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Automatic links (no model): same event type AND same country (migration 0011)
+// ---------------------------------------------------------------------------
+
+export type AutoState = {
+  existingByEvent: Map<string, string[]>;
+  linkCounts: Map<string, number>;
+  /** "<event_id>:<historical_event_id>" for pairs a person removed (never re-added). */
+  removedPairs: Set<string>;
+};
+
+/** Current links, per-entry link counts, and person-removed pairs (unpublish cleanup excluded). */
+export async function loadAutoState(): Promise<AutoState> {
+  const [links, removed] = await Promise.all([
+    getPool().query<{ event_id: string; historical_event_id: string }>(
+      `SELECT event_id, historical_event_id FROM event_historical_references`,
+    ),
+    getPool().query<{ event_id: string; historical_event_id: string }>(
+      `SELECT DISTINCT event_id, historical_event_id FROM event_historical_reference_log
+       WHERE action = 'UNLINK' AND reviewer <> $1`,
+      [UNPUBLISH_REVIEWER],
+    ),
+  ]);
+  const existingByEvent = new Map<string, string[]>();
+  const linkCounts = new Map<string, number>();
+  for (const l of links.rows) {
+    existingByEvent.set(l.event_id, [...(existingByEvent.get(l.event_id) ?? []), l.historical_event_id]);
+    linkCounts.set(l.historical_event_id, (linkCounts.get(l.historical_event_id) ?? 0) + 1);
+  }
+  return {
+    existingByEvent,
+    linkCounts,
+    removedPairs: new Set(removed.rows.map((r) => `${r.event_id}:${r.historical_event_id}`)),
+  };
+}
+
+export type AutoCandidate = AutoEvent & { headline: string };
+
+/** PUBLISHED current events, oldest first (the backfill order), with public fields. */
+export async function listPublishedForAutoLink(): Promise<AutoCandidate[]> {
+  const { rows } = await getPool().query<AutoCandidate>(
+    `SELECT event_id, headline, event_type, country, actor FROM events
+     WHERE review_status = 'PUBLISHED' ORDER BY event_date ASC, created_at ASC, event_id`,
+  );
+  return rows;
+}
+
+/** PUBLISHED historical entries with public fields (the candidates for automatic links). */
+export async function listHistoricalForAutoLink(): Promise<AutoCandidate[]> {
+  const { rows } = await getPool().query<AutoCandidate>(
+    `SELECT event_id, headline, event_type, country, actor FROM historical_events
+     WHERE review_status = 'PUBLISHED' ORDER BY event_date ASC, event_id`,
+  );
+  return rows;
+}
+
+/**
+ * Links one PUBLISHED event automatically: fills its free slots (of 3) with published historical
+ * entries of the same type AND country, ranked by rankAutoLinks. One transaction; the event row
+ * is locked first, as the 0010 trigger does, so this and a reviewer approval cannot both pass
+ * the count. Returns how many links were made (0 when not published, no country, or full).
+ */
+export async function autoLinkEvent(eventId: string): Promise<number> {
+  if (!UUID_RE.test(eventId)) return 0;
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const { rows: [current] } = await client.query<AutoEvent & { review_status: string }>(
+      `SELECT event_id, event_type, country, actor, review_status::text AS review_status
+       FROM events WHERE event_id = $1 FOR UPDATE`,
+      [eventId],
+    );
+    if (!current || current.review_status !== "PUBLISHED" || !current.country?.trim()) {
+      await client.query("ROLLBACK");
+      return 0;
+    }
+    const [existing, candidates, counts, removed] = await Promise.all([
+      client.query<{ historical_event_id: string }>(
+        `SELECT historical_event_id FROM event_historical_references WHERE event_id = $1`,
+        [eventId],
+      ),
+      client.query<AutoEvent>(
+        `SELECT event_id, event_type, country, actor FROM historical_events
+         WHERE review_status = 'PUBLISHED' AND event_type = $1::event_type
+           AND lower(btrim(country)) = lower(btrim($2::text))`,
+        [current.event_type, current.country],
+      ),
+      client.query<{ historical_event_id: string; n: number }>(
+        `SELECT historical_event_id, count(*)::int AS n FROM event_historical_references GROUP BY 1`,
+      ),
+      client.query<{ historical_event_id: string }>(
+        `SELECT DISTINCT historical_event_id FROM event_historical_reference_log
+         WHERE event_id = $1 AND action = 'UNLINK' AND reviewer <> $2`,
+        [eventId, UNPUBLISH_REVIEWER],
+      ),
+    ]);
+    const links = rankAutoLinks(current, candidates.rows, {
+      slots: MAX_REFERENCES - existing.rows.length,
+      linkCounts: new Map(counts.rows.map((r) => [r.historical_event_id, r.n])),
+      excluded: new Set([...existing.rows, ...removed.rows].map((r) => r.historical_event_id)),
+    });
+    for (const l of links) {
+      await client.query(
+        `INSERT INTO event_historical_references (event_id, historical_event_id, shared_attributes, reviewer, matched_by)
+         VALUES ($1, $2, $3::reference_attribute[], $4, 'AUTO')`,
+        [eventId, l.historical_event_id, l.attributes, AUTO_REVIEWER],
+      );
+      await client.query(
+        `INSERT INTO event_historical_reference_log (event_id, historical_event_id, action, shared_attributes, reviewer, matched_by)
+         VALUES ($1, $2, 'LINK', $3::reference_attribute[], $4, 'AUTO')`,
+        [eventId, l.historical_event_id, l.attributes, AUTO_REVIEWER],
+      );
+    }
+    await client.query("COMMIT");
+    return links.length;
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

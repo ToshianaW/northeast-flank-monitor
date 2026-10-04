@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { autoLinkEvent } from "@/lib/historical-references";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin-session";
 import { CONFIDENCE_LEVEL_VALUES, type ConfidenceLevel } from "@/lib/event-labels";
@@ -70,6 +71,15 @@ export async function approveEventAction(
 
   const result = await approveEvent(eventId, reviewer.name, confidence as ConfidenceLevel);
   if (!result.ok) return { error: result.error };
+
+  // Automatic "similar in nature" links (same type AND country; no model). A failure here never
+  // undoes the approval; the backfill script can fill the links later. Counts only.
+  try {
+    const linked = await autoLinkEvent(eventId);
+    console.log(`historical references: ${linked} linked automatically`);
+  } catch (error) {
+    console.error(`historical references: automatic linking failed (${(error as { code?: string }).code ?? "error"})`);
+  }
 
   await persistReviewer(reviewer.name);
   revalidatePath("/admin/review");

@@ -68,14 +68,35 @@ export const REFERENCE_MESSAGES = {
   LIMIT: "This event already has 3 historical references (the maximum), or one of the events is no longer published.",
   PARTIAL_LIMIT: "Some references were saved; the rest would exceed the maximum of 3 or are no longer published.",
   LINKED: "References saved.",
-  UNLINKED: "Reference removed.",
+  UNLINKED: "Reference removed. Automatic linking will not add this pair again.",
+  AI_OFF: "AI suggestions are switched off on this server.",
 } as const;
 
 export type ReferenceMessage = keyof typeof REFERENCE_MESSAGES;
 
-export function referenceMessage(value: string | string[] | undefined): string | null {
+/** Short reason labels for a failed suggestion: fixed strings, never error text or secrets. */
+export const FAILURE_REASONS = [
+  "no candidates",
+  "over cost cap",
+  "no API key",
+  "API key rejected",
+  "rate limited",
+  "API error",
+  "model stopped early",
+  "invalid reply",
+] as const;
+export type FailureReason = (typeof FAILURE_REASONS)[number];
+
+/** The message for an outcome code, with "Reason: …" when a known reason label came with it. */
+export function referenceMessage(
+  value: string | string[] | undefined,
+  reasonValue?: string | string[] | undefined,
+): string | null {
   const key = Array.isArray(value) ? value[0] : value;
-  return key && key in REFERENCE_MESSAGES ? REFERENCE_MESSAGES[key as ReferenceMessage] : null;
+  if (!key || !(key in REFERENCE_MESSAGES)) return null;
+  const message: string = REFERENCE_MESSAGES[key as ReferenceMessage];
+  const reason = Array.isArray(reasonValue) ? reasonValue[0] : reasonValue;
+  return reason && (FAILURE_REASONS as readonly string[]).includes(reason) ? `${message} Reason: ${reason}.` : message;
 }
 
 /** The public fields both sides are compared on. */
@@ -117,12 +138,25 @@ export function referenceDate(d: Date): string {
   return `${Number(day)} ${DATE_MONTHS[Number(m) - 1]} ${y}`;
 }
 
+/** How a link was made (migration 0011). */
+export type MatchedBy = "AUTO" | "REVIEWER";
+
+/** Reviewer name stored on automatic links (the 0011 constraint requires it). */
+export const AUTO_REVIEWER = "auto-match";
+/** Reviewer name the unpublish-cleanup trigger writes; such removals do not block auto-linking. */
+export const UNPUBLISH_REVIEWER = "system: unpublished";
+
+/** Shown under every automatic link. */
+export const AUTO_LINK_NOTE = "Linked automatically by event type and country.";
+/** Added to "same kind of activity" on a reviewer link that came from an AI suggestion. */
+export const AI_SUGGESTED_LABEL = "AI-suggested, reviewer-approved";
+
 /**
  * "same event type (Exercise)", "same country (Belarus)", "same actor (…)", "same kind of
- * activity". A data value is shown only if it passes isSafeBoxText; otherwise the phrase stands
- * alone.
+ * activity" (with "(AI-suggested, reviewer-approved)" when it came from the AI step). A data value
+ * is shown only if it passes isSafeBoxText; otherwise the phrase stands alone.
  */
-export function attributePhrase(attribute: ReferenceAttribute, current: ReferenceFields): string {
+export function attributePhrase(attribute: ReferenceAttribute, current: ReferenceFields, aiSuggested = false): string {
   const withValue = (phrase: string, value: string | null) =>
     value && value.trim() && isSafeBoxText(value) ? `${phrase} (${value.trim()})` : phrase;
   switch (attribute) {
@@ -133,7 +167,7 @@ export function attributePhrase(attribute: ReferenceAttribute, current: Referenc
     case "SAME_ACTOR":
       return withValue("same actor", current.actor);
     case "SAME_KIND_OF_ACTIVITY":
-      return "same kind of activity";
+      return aiSuggested ? `same kind of activity (${AI_SUGGESTED_LABEL})` : "same kind of activity";
   }
 }
 
@@ -143,6 +177,8 @@ export type ApprovedReference = {
   headline: string;
   event_type: EventType;
   shared_attributes: ReferenceAttribute[];
+  matched_by: MatchedBy;
+  ai_suggested: boolean;
 };
 
 export type ReferenceLine = {
@@ -153,6 +189,8 @@ export type ReferenceLine = {
   typeLabel: string;
   /** "Shared: same event type (Exercise), same country (Belarus)." */
   shared: string;
+  /** AUTO_LINK_NOTE for automatic links, otherwise null. */
+  note: string | null;
 };
 
 /** One line of the public box, composed by code from the fixed list. */
@@ -163,7 +201,8 @@ export function referenceLine(ref: ApprovedReference, current: ReferenceFields):
     headline: isSafeBoxText(ref.headline) ? ref.headline : null,
     date: referenceDate(ref.event_date),
     typeLabel: EVENT_TYPE_LABELS[ref.event_type],
-    shared: `Shared: ${attributes.map((a) => attributePhrase(a, current)).join(", ")}.`,
+    shared: `Shared: ${attributes.map((a) => attributePhrase(a, current, ref.ai_suggested)).join(", ")}.`,
+    note: ref.matched_by === "AUTO" ? AUTO_LINK_NOTE : null,
   };
 }
 
@@ -173,15 +212,91 @@ export const VIEW_ENTRY = "View entry";
 export const HISTORICAL_LABEL_TEXT = HISTORICAL_LABEL;
 
 /** Fixed strings in the box, for the wording test. */
-export const BOX_STRINGS = [REFERENCES_HEADING, HISTORICAL_LABEL_TEXT, SIMILARITY_CAVEAT, VIEW_ENTRY];
+export const BOX_STRINGS = [REFERENCES_HEADING, HISTORICAL_LABEL_TEXT, SIMILARITY_CAVEAT, VIEW_ENTRY, AUTO_LINK_NOTE, AI_SUGGESTED_LABEL];
 
 /** Every text node a box with these lines shows, joined: what the wording test checks. */
 export function boxText(lines: readonly ReferenceLine[]): string {
   return [
     REFERENCES_HEADING,
     HISTORICAL_LABEL_TEXT,
-    ...lines.map((l) => [l.headline ?? `${l.date} · ${l.typeLabel} · ${VIEW_ENTRY}`, l.date, l.shared].join(" ")),
+    ...lines.map((l) =>
+      [l.headline ?? `${l.date} · ${l.typeLabel} · ${VIEW_ENTRY}`, l.date, l.shared, l.note ?? ""].join(" "),
+    ),
     SIMILARITY_CAVEAT,
   ].join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Automatic links (no model): same event type AND same country
+// ---------------------------------------------------------------------------
+
+export type AutoEvent = ReferenceFields & { event_id: string };
+
+/** 32-bit FNV-1a: a fixed, portable hash so the same pair always ranks the same way. */
+export function pairHash(eventId: string, historicalEventId: string): number {
+  let h = 0x811c9dc5;
+  for (const ch of `${eventId}:${historicalEventId}`) {
+    h ^= ch.charCodeAt(0);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h;
+}
+
+/**
+ * Up to `slots` automatic links for one event. Candidates must share the event type AND a
+ * non-empty country (compared case- and space-insensitively); already linked or reviewer-removed
+ * pairs are excluded. Order: same actor first; then fewest existing links (spreads links across
+ * the record); then a fixed per-pair hash (deterministic, but different for each event).
+ */
+export function rankAutoLinks(
+  current: AutoEvent,
+  candidates: readonly AutoEvent[],
+  options: { slots: number; linkCounts: ReadonlyMap<string, number>; excluded: ReadonlySet<string> },
+): Array<{ historical_event_id: string; attributes: ReferenceAttribute[] }> {
+  if (options.slots <= 0 || norm(current.country) === "") return [];
+  const ranked = candidates
+    .filter(
+      (h) =>
+        h.event_type === current.event_type &&
+        norm(h.country) === norm(current.country) &&
+        !options.excluded.has(h.event_id),
+    )
+    .map((h) => ({
+      h,
+      sameActor: norm(current.actor) !== "" && norm(h.actor) === norm(current.actor),
+      links: options.linkCounts.get(h.event_id) ?? 0,
+      hash: pairHash(current.event_id, h.event_id),
+    }))
+    .sort((a, b) => Number(b.sameActor) - Number(a.sameActor) || a.links - b.links || a.hash - b.hash || (a.h.event_id < b.h.event_id ? -1 : 1));
+  return ranked.slice(0, options.slots).map(({ h, sameActor }) => ({
+    historical_event_id: h.event_id,
+    attributes: sameActor ? ["SAME_EVENT_TYPE", "SAME_COUNTRY", "SAME_ACTOR"] : ["SAME_EVENT_TYPE", "SAME_COUNTRY"],
+  }));
+}
+
+/**
+ * The backfill plan: events in the given order (oldest first), each filling its free slots, with
+ * link counts updated as it goes so later events spread to less-used entries.
+ */
+export function planAutoLinks(
+  events: readonly AutoEvent[],
+  historical: readonly AutoEvent[],
+  state: {
+    existingByEvent: ReadonlyMap<string, readonly string[]>;
+    linkCounts: ReadonlyMap<string, number>;
+    removedPairs: ReadonlySet<string>;
+  },
+): Map<string, Array<{ historical_event_id: string; attributes: ReferenceAttribute[] }>> {
+  const counts = new Map(state.linkCounts);
+  const plan = new Map<string, Array<{ historical_event_id: string; attributes: ReferenceAttribute[] }>>();
+  for (const e of events) {
+    const existing = state.existingByEvent.get(e.event_id) ?? [];
+    const excluded = new Set(existing);
+    for (const h of historical) if (state.removedPairs.has(`${e.event_id}:${h.event_id}`)) excluded.add(h.event_id);
+    const links = rankAutoLinks(e, historical, { slots: MAX_REFERENCES - existing.length, linkCounts: counts, excluded });
+    for (const l of links) counts.set(l.historical_event_id, (counts.get(l.historical_event_id) ?? 0) + 1);
+    plan.set(e.event_id, links);
+  }
+  return plan;
 }
 
