@@ -57,11 +57,15 @@ export const COMPARISON_WORDING = [
 /**
  * The fixed caveat shown wherever historical and current events sit side by side (the compare
  * page, the digest's Historical Context section). It necessarily uses a word from
- * COMPARISON_WORDING, so findComparisonWording skips this exact sentence and nothing else.
+ * COMPARISON_WORDING, so findComparisonWording skips this exact sentence; the references heading below is the
+ * only other exempt string.
  */
 export const SIMILARITY_CAVEAT = "Similarity in nature does not mean the same outcome will follow.";
 
-export const COMPARISON_EXEMPT = [SIMILARITY_CAVEAT];
+/** Heading of the reviewer-approved references box on an event page. */
+export const REFERENCES_HEADING = "Historical record: similar in nature";
+
+export const COMPARISON_EXEMPT = [SIMILARITY_CAVEAT, REFERENCES_HEADING];
 
 /** The first comparison wording found in the text (the exact exempt sentence excluded), or null. */
 export function findComparisonWording(text: string): string | null {

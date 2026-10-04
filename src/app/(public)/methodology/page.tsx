@@ -539,6 +539,20 @@ export default function MethodologyPage() {
             It does not show the rows when the historical window holds fewer than
             4 events or 2 sources.
           </p>
+          <Subhead>Historical references on event pages</Subhead>
+          <p>
+            A published event page can list up to three published entries from the
+            historical record under &ldquo;Historical record: similar in nature&rdquo;.
+            Each one is approved by a named reviewer, and the page states only the
+            attributes the two share, from a fixed list: same event type, same
+            country, same actor, same kind of activity. Event type, country and actor
+            are checked against both entries in code. An entry is shown only while
+            both events are published. A historical headline is shown only if it
+            passes the same wording check as the rest of the page; otherwise the
+            entry&rsquo;s date, type and a link are shown instead. Every reference
+            ends with the same caveat: similarity in nature does not mean the same
+            outcome will follow.
+          </p>
           <p className="border-l-2 border-teal-blue pl-3 text-foreground">
             Similar historical behavior does not imply identical future outcomes.
           </p>
@@ -627,6 +641,11 @@ export default function MethodologyPage() {
                 Historical comparisons are descriptive. They show counts of
                 recorded events by type and period. The AI does not write them,
                 and they imply no outcome.
+              </p>
+              <p>
+                For historical references on event pages, the AI only suggests
+                entries from the historical record. A person approves each one,
+                and the AI writes no public text.
               </p>
             </div>
           </div>

@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import {
   COMPARISON_EXEMPT,
+  REFERENCES_HEADING,
   findBannedPhrase,
   findComparisonWording,
   SIMILARITY_CAVEAT,
@@ -282,7 +283,7 @@ test("the notes block holds only the trimmed lines; removed sentences appear now
   );
   assert.equal(HOW_TO_READ.length, 3);
   assert.equal(HOW_TO_READ[0], "Choose a start month and a length of 1 to 6 months for each window.");
-  assert.deepEqual(COMPARISON_EXEMPT, [SIMILARITY_CAVEAT]);
+  assert.deepEqual(COMPARISON_EXEMPT, [SIMILARITY_CAVEAT, REFERENCES_HEADING]);
   const source = ["src/app/(public)/historical/compare/page.tsx", "src/lib/historical-compare.ts", "src/lib/banned-phrases.ts"]
     .map((p) => readFileSync(join(process.cwd(), p), "utf8"))
     .join("\n");

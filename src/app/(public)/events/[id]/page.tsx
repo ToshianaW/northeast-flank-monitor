@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { formatEventDate, formatUtcTime } from "@/components/event-log-entry";
 import { LabelHelp } from "@/components/label-help";
 import { PageShell } from "@/components/page-shell";
+import { SimilarInNature } from "@/components/historical/similar-in-nature";
 import { Badge } from "@/components/ui/badge";
 import {
   CONFIDENCE_LEVEL_LABELS,
@@ -20,6 +21,8 @@ import {
   listPublicEventSources,
   type PublicEventSource,
 } from "@/lib/public-events";
+import { listApprovedReferences } from "@/lib/historical-references";
+import { referenceLine } from "@/lib/historical-references-rules";
 import { isStateOfficialSource, SOURCE_TYPE_LABELS } from "@/lib/source-labels";
 
 export const metadata = { title: "Event" };
@@ -110,11 +113,14 @@ function SourceItem({ source }: { source: PublicEventSource }) {
 export default async function EventPage({ params }: PageProps<"/events/[id]">) {
   await connection();
   const { id } = await params;
-  const [event, sources] = await Promise.all([
+  const [event, sources, references] = await Promise.all([
     getPublishedEvent(id),
     listPublicEventSources(id),
+    // Approved links only, with both events PUBLISHED at read time (migration 0010).
+    listApprovedReferences(id),
   ]);
   if (!event) notFound();
+  const referenceLines = references.map((r) => referenceLine(r, event));
 
   const location = [
     event.location_name,
@@ -271,6 +277,7 @@ export default async function EventPage({ params }: PageProps<"/events/[id]">) {
               },
             ]}
           />
+          <SimilarInNature lines={referenceLines} />
           <section className="border-t border-border pt-5">
             <h2 className="meta-label">
               Sources
