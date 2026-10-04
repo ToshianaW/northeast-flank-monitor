@@ -220,14 +220,6 @@ function Subhead({ children }: { children: React.ReactNode }) {
   return <h3 className="meta-label mt-2">{children}</h3>;
 }
 
-function Planned() {
-  return (
-    <span className="ml-2 inline-block border border-slate-indigo px-1.5 py-0.5 align-middle font-mono text-[0.65rem] tracking-wide text-text-secondary uppercase">
-      Planned
-    </span>
-  );
-}
-
 export default function MethodologyPage() {
   const n = (id: (typeof SECTIONS)[number]["id"]) =>
     SECTIONS.findIndex((s) => s.id === id) + 1;
@@ -665,13 +657,12 @@ export default function MethodologyPage() {
               Europe or North America are counted in cards beside the map. Counts
               reflect reporting, not intensity of activity.
             </li>
-          </ul>
-          <Subhead>
-            Planned
-            <Planned />
-          </Subhead>
-          <ul className="list-disc pl-5">
-            <li>Air activity page</li>
+            <li>
+              The air activity page lists published air, air-defence, airfield,
+              airspace, drone and missile events, plus deployments that involve
+              aircraft, by month and area, with the same safety rules as the map.
+              Weekly counts appear only once there is enough data.
+            </li>
           </ul>
           <div className="border border-border bg-surface-dark px-4 py-3">
             <p className="meta-label mb-2">AI disclosure</p>

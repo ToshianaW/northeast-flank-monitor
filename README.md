@@ -101,13 +101,14 @@ Roadmap: `docs/mvp-plan.md` §4. Decisions that override the plan: `docs/decisio
 | 2.6 | Pipeline on GitHub Actions (`.github/workflows/daily.yml`): collect, extract, dedup every 4 hours (00:00, 04:00 … 20:00 UTC); manual dry runs; counts-only logs |
 | 2.7 | Claude-drafted daily digest (`npm run digest`): PUBLISHED events for one UTC day into a DRAFT digest; every sentence cites its events (`[ref …]` markers, numbered links on the public page); code checks for unknown or missing references, banned phrases, section names, and placement of unverified events; `.github/workflows/digest.yml` at 05:00 UTC. The digest opens with a short Summary (at most 2 sentences, 45 words) that leaves out unverified and contradicted events; code adds a sentence pointing to them |
 
-**Phase 3 — Monitoring features: in progress**
+**Phase 3 — Monitoring features: complete**
 
 | Step | What exists |
 | --- | --- |
 | 3.1 | Regional map (`/map`, Map in the sidebar, thumbnail on the dashboard): MapLibre with no tile server, Natural Earth outlines (`scripts/build-theater-geo.mts` → `public/geo/theater.geojson`). One dot per area with published items at a fixed, hand-set anchor (`data/map-anchors.json`), sized and coloured by count step on an amber-to-orange scale; no per-event markers or positions (decision #14). Clicking an area zooms to it with one dot per admin-1 region; a side panel lists its items. Items are placed at display time by the place they concern (`data/gazetteer.json`, `src/lib/placement.ts`), with "Outside the theater" cards (Russia elsewhere, Ukraine, Western Europe incl. EU/NATO institutions, North America), a Theater-wide list, and "Location unclear". Layers All (default), Activity, Statements; 7/30/90-day windows in the URL; Tier 4-only items from the last 72 hours are left off. Counts table for keyboard and screen readers. CSP adds only `worker-src 'self'` |
 | 3.2 | Exercise tracker: admin list/create/edit with all spec §17 fields, attached sources, and linking published events; reviewer name on every save, logged in the append-only `exercise_actions` table (migration 0007). Public `/exercises` grouped by status and `/exercises/[id]` with announced and observed dates; only published exercises are public, and a published exercise needs a source. Dashboard panel lists active, extended, and concluding exercises. Statuses never change on their own when a date passes |
 | 3.3 | Post-exercise reset widget on the exercise page: personnel, equipment, temporary infrastructure, follow-on activity, and overall status. Unknown shows as "not enough open-source evidence" in a neutral tone. A reset status other than Unknown needs evidence (a source with an excerpt, or a linked published event dated on or after the exercise's end); FULL_RESET also needs all three dimensions returned or removed. Enforced in the form and by database triggers |
+| 3.4 | Air Activity page (`/air-activity`): published air, air-defence, airfield, airspace, drone and missile events (the Activity Index air dimension) plus NATO or Russian deployments whose headline or summary names aircraft; counts by type and area, a list by month and area, weekly counts once there are 20 events over 8 complete weeks. Same rules as the map (published only, 72-hour Tier 4 hold, area-level placement, no coordinates); no historical data |
 
 **Phase 4 — Historical dataset: in progress**
 
@@ -128,7 +129,6 @@ Roadmap: `docs/mvp-plan.md` §4. Decisions that override the plan: `docs/decisio
 
 **Phase 7 — Public data tools: in progress** (7.1–7.2: JSON API and CSV export of published events, `/data`).
 
-**Next:** step 3.4 (Air Activity page).
 
 ## License
 
