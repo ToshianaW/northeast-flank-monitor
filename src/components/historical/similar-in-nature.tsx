@@ -39,6 +39,7 @@ export function SimilarInNature({ lines }: { lines: ReferenceLine[] }) {
               </>
             )}
             <span className="mt-0.5 block text-sm text-text-secondary">{l.shared}</span>
+            {l.note ? <span className="mt-0.5 block text-xs text-text-muted">{l.note}</span> : null}
           </li>
         ))}
       </ul>

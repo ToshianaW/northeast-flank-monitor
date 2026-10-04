@@ -543,9 +543,14 @@ export default function MethodologyPage() {
           <p>
             A published event page can list up to three published entries from the
             historical record under &ldquo;Historical record: similar in nature&rdquo;.
-            Each one is approved by a named reviewer, and the page states only the
-            attributes the two share, from a fixed list: same event type, same
-            country, same actor, same kind of activity. Event type, country and actor
+            The page states only the attributes the two share, from a fixed list:
+            same event type, same country, same actor, same kind of activity. Most
+            links are made automatically by code when an event is published: entries
+            with the same event type and the same country, preferring the same actor,
+            then entries linked least often so the same few do not appear everywhere.
+            These are marked &ldquo;Linked automatically by event type and country.&rdquo;
+            A reviewer can remove any link, and a removed link is not added again.
+            Other links are approved by a named reviewer. Event type, country and actor
             are checked against both entries in code. An entry is shown only while
             both events are published. A historical headline is shown only if it
             passes the same wording check as the rest of the page; otherwise the
@@ -643,9 +648,11 @@ export default function MethodologyPage() {
                 and they imply no outcome.
               </p>
               <p>
-                For historical references on event pages, the AI only suggests
-                entries from the historical record. A person approves each one,
-                and the AI writes no public text.
+                Historical references on event pages are linked by code without
+                AI. An optional AI step, switched off by default, can only suggest
+                entries from the historical record; a person approves each one,
+                such links say &ldquo;AI-suggested, reviewer-approved&rdquo;, and the
+                AI writes no public text.
               </p>
             </div>
           </div>
