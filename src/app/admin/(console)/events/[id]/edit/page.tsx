@@ -88,7 +88,8 @@ export default async function EditEventPage({
           eventSources.length > 0
             ? eventSources.map((row) => ({
                 source_id: row.source_id,
-                article_url: row.article_url,
+                article_url: row.article_url ?? "",
+                source_label: row.source_label ?? "",
                 relationship: row.relationship,
                 excerpt: row.excerpt ?? "",
               }))
@@ -96,13 +97,14 @@ export default async function EditEventPage({
                 {
                   source_id: "",
                   article_url: "",
+                  source_label: "",
                   relationship: "SUPPORTS" as const,
                   excerpt: "",
                 },
               ]
         }
         initialPrimaryIndex={primaryIndex >= 0 ? primaryIndex : 0}
-        sourceOptions={currentSourceOptions(sources, eventSources.map((r) => r.source_id)).map((s) => ({ id: s.id, name: s.name }))}
+        sourceOptions={currentSourceOptions(sources, eventSources.map((r) => r.source_id), { allowLiveStatement: true }).map((s) => ({ id: s.id, name: s.name }))}
         exerciseOptions={exercises}
       />
       <ReferencePanel

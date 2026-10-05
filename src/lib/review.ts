@@ -180,7 +180,8 @@ export type ReviewEventSource = {
   reliability: Reliability;
   source_type: SourceType;
   source_country: string | null;
-  article_url: string;
+  /** Null for a live statement with no link yet. */
+  article_url: string | null;
   excerpt: string | null;
   relationship: SourceRelationship;
   is_primary: boolean;
@@ -198,7 +199,7 @@ export async function getReviewEventDetail(eventId: string): Promise<{
       [eventId],
     ),
     getPool().query<ReviewEventSource>(
-      `SELECT s.id AS source_id, s.name, s.tier, s.reliability, s.source_type, s.source_country,
+      `SELECT s.id AS source_id, coalesce(es.source_label, s.name) AS name, s.tier, s.reliability, s.source_type, s.source_country,
               es.article_url, es.excerpt, es.relationship, es.is_primary
        FROM event_sources es
        JOIN sources s ON s.id = es.source_id
@@ -453,13 +454,13 @@ async function refreshPrimarySourceSnapshot(
 ) {
   const { rows } = await client.query<{
     name: string;
-    article_url: string;
+    article_url: string | null;
     source_type: string;
     source_country: string | null;
     source_language: string | null;
     reliability: Reliability;
   }>(
-    `SELECT s.name, es.article_url, s.source_type, s.source_country, s.source_language, s.reliability
+    `SELECT coalesce(es.source_label, s.name) AS name, es.article_url, s.source_type, s.source_country, s.source_language, s.reliability
      FROM event_sources es
      JOIN sources s ON s.id = es.source_id
      WHERE es.event_id = $1 AND es.is_primary
@@ -534,12 +535,13 @@ export async function mergeEventInto(
 
     const { rows: moving } = await client.query<{
       source_id: string;
-      article_url: string;
+      article_url: string | null;
+      source_label: string | null;
       relationship: string;
       is_primary: boolean;
       excerpt: string | null;
     }>(
-      `SELECT source_id, article_url, relationship, is_primary, excerpt
+      `SELECT source_id, article_url, source_label, relationship, is_primary, excerpt
        FROM event_sources WHERE event_id = $1`,
       [sourceEventId],
     );
@@ -555,9 +557,10 @@ export async function mergeEventInto(
     for (const row of moving) {
       const { rows: dupRows } = await client.query(
         `SELECT 1 FROM event_sources
-         WHERE event_id = $1 AND source_id = $2 AND article_url = $3
+         WHERE event_id = $1 AND source_id = $2 AND article_url IS NOT DISTINCT FROM $3
+           AND source_label IS NOT DISTINCT FROM $4
          LIMIT 1`,
-        [targetEventId, row.source_id, row.article_url],
+        [targetEventId, row.source_id, row.article_url, row.source_label],
       );
       if (dupRows.length > 0) continue;
 
@@ -567,8 +570,8 @@ export async function mergeEventInto(
 
       await client.query(
         `INSERT INTO event_sources
-           (event_id, source_id, article_url, relationship, is_primary, excerpt)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+           (event_id, source_id, article_url, relationship, is_primary, excerpt, source_label)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
           targetEventId,
           row.source_id,
@@ -576,6 +579,7 @@ export async function mergeEventInto(
           row.relationship,
           isPrimary,
           row.excerpt,
+          row.source_label,
         ],
       );
     }

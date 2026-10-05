@@ -88,6 +88,9 @@ export async function deleteSourceAction(formData: FormData): Promise<void> {
     if (result.reason === "historical") {
       redirect("/admin/sources?delete_blocked=historical");
     }
+    if (result.reason === "reserved") {
+      redirect("/admin/sources?delete_blocked=reserved");
+    }
     if (result.reason === "in_use") {
       redirect("/admin/sources?delete_blocked=1");
     }

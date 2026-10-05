@@ -2,6 +2,7 @@ import "server-only";
 import { getPool } from "@/lib/db";
 import { countHistoricalSourceReferences } from "@/lib/historical";
 import {
+  isLiveStatementSource,
   RELIABILITY_VALUES,
   SOURCE_TYPE_VALUES,
   type Reliability,
@@ -192,10 +193,21 @@ export function refusedTierChangeEvents(error: unknown): string[] | null {
   return message.split(":").pop()!.split(",").map((s) => s.trim()).filter((s) => UUID_RE.test(s));
 }
 
-/** Current events and exercises may not cite historical-only sources. */
-export function currentSourceOptions(sources: Source[], keepIds: Iterable<string> = []): Source[] {
+/**
+ * Current events and exercises may not cite historical-only sources. The reserved live-statement
+ * source is offered for events only (exercise_sources still requires a URL).
+ */
+export function currentSourceOptions(
+  sources: Source[],
+  keepIds: Iterable<string> = [],
+  options: { allowLiveStatement?: boolean } = {},
+): Source[] {
   const keep = new Set(keepIds);
-  return sources.filter((s) => !s.historical_only || keep.has(s.id));
+  return sources.filter(
+    (s) =>
+      (!s.historical_only || keep.has(s.id)) &&
+      (options.allowLiveStatement || !isLiveStatementSource(s.id)),
+  );
 }
 
 export type SourceReferenceCounts = {
@@ -223,10 +235,11 @@ export async function getSourceReferenceCounts(
 
 export type DeleteSourceResult =
   | { ok: true }
-  | { ok: false; reason: "not_found" | "in_use" | "historical"; counts?: SourceReferenceCounts };
+  | { ok: false; reason: "not_found" | "in_use" | "historical" | "reserved"; counts?: SourceReferenceCounts };
 
 export async function deleteSource(id: string): Promise<DeleteSourceResult> {
   if (!UUID_RE.test(id)) return { ok: false, reason: "not_found" };
+  if (isLiveStatementSource(id)) return { ok: false, reason: "reserved" };
 
   const counts = await getSourceReferenceCounts(id);
   if (!counts) return { ok: false, reason: "not_found" };

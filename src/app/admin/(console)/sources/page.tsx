@@ -67,7 +67,9 @@ export default async function AdminSourcesPage({
         >
           {delete_blocked === "historical"
             ? "This source is cited by the historical record (events or their review history) and cannot be deleted."
-            : "This source is linked to events, exercises, or review history and cannot be deleted."}
+            : delete_blocked === "reserved"
+              ? "This is the reserved live-statement source (statements seen live on air). It cannot be deleted."
+              : "This source is linked to events, exercises, or review history and cannot be deleted."}
         </p>
       ) : null}
       {delete_error ? (

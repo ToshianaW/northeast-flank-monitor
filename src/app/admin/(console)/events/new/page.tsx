@@ -29,12 +29,13 @@ export default async function NewEventPage() {
           {
             source_id: "",
             article_url: "",
+            source_label: "",
             relationship: "SUPPORTS",
             excerpt: "",
           },
         ]}
         initialPrimaryIndex={0}
-        sourceOptions={currentSourceOptions(sources).map((s) => ({ id: s.id, name: s.name }))}
+        sourceOptions={currentSourceOptions(sources, [], { allowLiveStatement: true }).map((s) => ({ id: s.id, name: s.name }))}
         exerciseOptions={exercises}
       />
     </section>

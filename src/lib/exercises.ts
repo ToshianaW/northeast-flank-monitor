@@ -21,6 +21,7 @@ import {
 } from "@/lib/exercise-rules";
 import { getEvent, toDateParam } from "@/lib/events";
 import { logEditReviewAction } from "@/lib/review";
+import { isLiveStatementSource } from "@/lib/source-labels";
 import { getSource } from "@/lib/sources";
 
 export type Exercise = {
@@ -352,6 +353,8 @@ export async function validateExerciseForm(
       if (!source) errors[`${prefix}_source_id`] = "Source not found.";
       else if (source.historical_only) {
         errors[`${prefix}_source_id`] = "This source is historical-only and cannot support current exercises.";
+      } else if (isLiveStatementSource(source.id)) {
+        errors[`${prefix}_source_id`] = "Live statements can be attached to events only.";
       }
     }
 

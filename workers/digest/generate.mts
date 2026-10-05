@@ -140,7 +140,7 @@ async function run(): Promise<never> {
     tier: number | null;
     relationship: SourceRelationship;
   }>(
-    `SELECT es.event_id, s.name, s.tier, es.relationship
+    `SELECT es.event_id, coalesce(es.source_label, s.name) AS name, s.tier, es.relationship
      FROM event_sources es JOIN sources s ON s.id = es.source_id
      WHERE es.event_id = ANY($1::uuid[])
      ORDER BY es.is_primary DESC, s.tier ASC NULLS LAST, s.name`,

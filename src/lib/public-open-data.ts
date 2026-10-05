@@ -44,7 +44,7 @@ type SourceRow = {
   source_type: SourceType;
   source_country: string | null;
   tier: number | null;
-  article_url: string;
+  article_url: string | null;
   relationship: string;
   is_primary: boolean;
   excerpt: string | null;
@@ -124,7 +124,7 @@ export async function loadOpenDataPage(query: Query, now: Date): Promise<OpenDat
   const ids = page.map((k) => k.row.event_id);
   const { rows: sources } = ids.length
     ? await pool.query<SourceRow>(
-        `SELECT es.event_id, s.name, s.home_url, s.source_type, s.source_country, s.tier,
+        `SELECT es.event_id, coalesce(es.source_label, s.name) AS name, s.home_url, s.source_type, s.source_country, s.tier,
                 es.article_url, es.relationship, es.is_primary, es.excerpt
          FROM event_sources es JOIN sources s ON s.id = es.source_id
          WHERE es.event_id = ANY($1::uuid[])

@@ -19,7 +19,7 @@ test("approval stores the chosen confidence and records the old one", async () =
   try {
     await client.query("BEGIN");
     const { rows: [source] } = await client.query<{ id: string }>(
-      "SELECT id FROM sources WHERE tier BETWEEN 1 AND 3 ORDER BY name LIMIT 1",
+      "SELECT id FROM sources WHERE tier BETWEEN 1 AND 3 AND id <> '1100e000-0000-4000-8000-000000000001' ORDER BY name LIMIT 1",
     );
     assert.ok(source, "registry needs at least one Tier 1-3 source for this test");
 

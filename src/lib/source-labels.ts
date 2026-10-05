@@ -30,6 +30,20 @@ export const RELIABILITY_LABELS: Record<Reliability, string> = {
   UNRATED: "Unrated",
 };
 
+/**
+ * Reserved registry source (migration 0013) for a statement seen live before any registry source
+ * reports it. Each event_sources row on it carries its own source_label; the URL is optional.
+ * Events only: exercises and historical events cannot cite it.
+ */
+export const LIVE_STATEMENT_SOURCE_ID = "1100e000-0000-4000-8000-000000000001";
+
+export function isLiveStatementSource(sourceId: string | null | undefined): boolean {
+  return sourceId?.toLowerCase() === LIVE_STATEMENT_SOURCE_ID;
+}
+
+/** Shown where a live statement has no link. */
+export const LIVE_STATEMENT_NO_LINK = "Live broadcast — no link yet";
+
 /** Spec §§26–29 */
 export const TIER_LABELS: Record<1 | 2 | 3 | 4, string> = {
   1: "Tier 1 — Official primary sources",

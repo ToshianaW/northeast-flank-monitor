@@ -17,7 +17,7 @@ const { insertEvent, toDateParam, validateEventForm } = await import("./events")
 after(() => getPool().end());
 
 // Validation requires a supporting source; borrow any registry row (read only).
-const { rows: [anySource] } = await getPool().query<{ id: string }>("SELECT id FROM sources LIMIT 1");
+const { rows: [anySource] } = await getPool().query<{ id: string }>("SELECT id FROM sources WHERE NOT historical_only AND id <> '1100e000-0000-4000-8000-000000000001' LIMIT 1");
 
 function draftForm(date: string): FormData {
   const fd = new FormData();

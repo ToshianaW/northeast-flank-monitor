@@ -88,7 +88,7 @@ export async function processXQueue(db: Queryable, opts: XQueueOptions): Promise
             CASE o.item_kind
               WHEN 'event' THEN COALESCE(
                 (SELECT es.article_url FROM event_sources es
-                  WHERE es.event_id = e.event_id AND es.relationship = 'SUPPORTS'
+                  WHERE es.event_id = e.event_id AND es.relationship = 'SUPPORTS' AND es.article_url IS NOT NULL
                   ORDER BY es.is_primary DESC, es.created_at ASC LIMIT 1),
                 e.source_url)
               ELSE (SELECT xs.article_url FROM exercise_sources xs

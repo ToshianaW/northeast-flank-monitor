@@ -29,7 +29,7 @@ import {
   SOURCE_RELATIONSHIP_VALUES,
 } from "@/lib/event-labels";
 import type { EventField, EventFormValues, EventSourceFormRow } from "@/lib/events";
-import { COUNTRY_SUGGESTIONS } from "@/lib/source-labels";
+import { COUNTRY_SUGGESTIONS, isLiveStatementSource } from "@/lib/source-labels";
 import { ReviewerField } from "@/components/admin/reviewer-field";
 
 type SourceOption = { id: string; name: string };
@@ -73,9 +73,126 @@ function FieldError({ message, id }: { message?: string; id: string }) {
 const emptySourceRow = (): EventSourceFormRow => ({
   source_id: "",
   article_url: "",
+  source_label: "",
   relationship: "SUPPORTS",
   excerpt: "",
 });
+
+const LIVE_STATEMENT_NAME = "Live statement (broadcast)";
+
+function SourceRow({
+  index,
+  row,
+  isPrimary,
+  sourceOptions,
+  sourceError,
+}: {
+  index: number;
+  row: EventSourceFormRow;
+  isPrimary: boolean;
+  sourceOptions: SourceOption[];
+  sourceError: (field: string) => string | undefined;
+}) {
+  const [sourceId, setSourceId] = useState(row.source_id);
+  const isLive = isLiveStatementSource(sourceId);
+
+  return (
+    <div className="grid gap-3 border border-border/80 bg-surface-raised p-3">
+      <p className="text-xs font-medium text-text-muted">Source {index + 1}</p>
+      <div className="grid gap-5 sm:grid-cols-2">
+        <div className="grid gap-2">
+          <Label htmlFor={`es_${index}_source_id`}>Registry source</Label>
+          <NativeSelect
+            id={`es_${index}_source_id`}
+            name={`es_${index}_source_id`}
+            defaultValue={row.source_id}
+            onChange={(e) => setSourceId(e.target.value)}
+            className="w-full"
+          >
+            <NativeSelectOption value="">Choose…</NativeSelectOption>
+            {sourceOptions.map((source) => (
+              <NativeSelectOption key={source.id} value={source.id}>
+                {source.name}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+          <FieldError id={`es_${index}_source_id-error`} message={sourceError("source_id")} />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor={`es_${index}_relationship`}>Relationship</Label>
+          <NativeSelect
+            id={`es_${index}_relationship`}
+            name={`es_${index}_relationship`}
+            defaultValue={row.relationship}
+            className="w-full"
+          >
+            {SOURCE_RELATIONSHIP_VALUES.map((value) => (
+              <NativeSelectOption key={value} value={value}>
+                {SOURCE_RELATIONSHIP_LABELS[value]}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+          <FieldError
+            id={`es_${index}_relationship-error`}
+            message={sourceError("relationship")}
+          />
+        </div>
+      </div>
+      {isLive ? (
+        <div className="grid gap-2">
+          <Label htmlFor={`es_${index}_source_label`}>Who said it / where you saw it</Label>
+          <Input
+            id={`es_${index}_source_label`}
+            name={`es_${index}_source_label`}
+            defaultValue={row.source_label}
+            maxLength={300}
+            placeholder="President Trump — live remarks, White House (seen on Fox News, 14:05 ET)"
+            aria-invalid={sourceError("source_label") ? true : undefined}
+          />
+          <FieldError
+            id={`es_${index}_source_label-error`}
+            message={sourceError("source_label")}
+          />
+        </div>
+      ) : null}
+      <div className="grid gap-2">
+        <Label htmlFor={`es_${index}_article_url`}>
+          {isLive ? "Link (optional, e.g. a clip once posted)" : "Article URL"}
+        </Label>
+        <Input
+          id={`es_${index}_article_url`}
+          name={`es_${index}_article_url`}
+          type="url"
+          defaultValue={row.article_url}
+          placeholder="https://"
+        />
+        <FieldError id={`es_${index}_article_url-error`} message={sourceError("article_url")} />
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor={`es_${index}_excerpt`}>Excerpt</Label>
+        <Textarea
+          id={`es_${index}_excerpt`}
+          name={`es_${index}_excerpt`}
+          rows={2}
+          defaultValue={row.excerpt}
+        />
+        {isLive ? (
+          <p className="text-xs text-text-muted">The speaker&apos;s words, as close to verbatim as you can.</p>
+        ) : null}
+      </div>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="radio"
+          name="es_primary_index"
+          value={String(index)}
+          defaultChecked={isPrimary}
+          className="size-4 accent-teal-blue"
+        />
+        Primary source for this event
+      </label>
+    </div>
+  );
+}
 
 export function EventForm({
   action,
@@ -492,90 +609,24 @@ export function EventForm({
           Link registry sources to this event. Mark one primary; it must SUPPORT,
           not CONTRADICT.
         </p>
+        <p className="text-xs text-text-muted">
+          Saw it live before any outlet wrote it up? Choose &ldquo;{LIVE_STATEMENT_NAME}&rdquo;
+          and type who said it and where you saw it. It counts as a Tier 1 official
+          source, so use it only when the event reports the speaker&apos;s own words.
+          Add the registry source once outlets publish the story.
+        </p>
         <FieldError id="es_0_source_id-error" message={sourceError(0, "source_id")} />
 
         <div className="grid gap-4">
           {sourceRows.map((row, index) => (
-            <div
+            <SourceRow
               key={index}
-              className="grid gap-3 border border-border/80 bg-surface-raised p-3"
-            >
-              <p className="text-xs font-medium text-text-muted">Source {index + 1}</p>
-              <div className="grid gap-5 sm:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label htmlFor={`es_${index}_source_id`}>Registry source</Label>
-                  <NativeSelect
-                    id={`es_${index}_source_id`}
-                    name={`es_${index}_source_id`}
-                    defaultValue={row.source_id}
-                    className="w-full"
-                  >
-                    <NativeSelectOption value="">Choose…</NativeSelectOption>
-                    {sourceOptions.map((source) => (
-                      <NativeSelectOption key={source.id} value={source.id}>
-                        {source.name}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                  <FieldError
-                    id={`es_${index}_source_id-error`}
-                    message={sourceError(index, "source_id")}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor={`es_${index}_relationship`}>Relationship</Label>
-                  <NativeSelect
-                    id={`es_${index}_relationship`}
-                    name={`es_${index}_relationship`}
-                    defaultValue={row.relationship}
-                    className="w-full"
-                  >
-                    {SOURCE_RELATIONSHIP_VALUES.map((value) => (
-                      <NativeSelectOption key={value} value={value}>
-                        {SOURCE_RELATIONSHIP_LABELS[value]}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                  <FieldError
-                    id={`es_${index}_relationship-error`}
-                    message={sourceError(index, "relationship")}
-                  />
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor={`es_${index}_article_url`}>Article URL</Label>
-                <Input
-                  id={`es_${index}_article_url`}
-                  name={`es_${index}_article_url`}
-                  type="url"
-                  defaultValue={row.article_url}
-                  placeholder="https://"
-                />
-                <FieldError
-                  id={`es_${index}_article_url-error`}
-                  message={sourceError(index, "article_url")}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor={`es_${index}_excerpt`}>Excerpt</Label>
-                <Textarea
-                  id={`es_${index}_excerpt`}
-                  name={`es_${index}_excerpt`}
-                  rows={2}
-                  defaultValue={row.excerpt}
-                />
-              </div>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="es_primary_index"
-                  value={String(index)}
-                  defaultChecked={index === primaryIndex}
-                  className="size-4 accent-teal-blue"
-                />
-                Primary source for this event
-              </label>
-            </div>
+              index={index}
+              row={row}
+              isPrimary={index === primaryIndex}
+              sourceOptions={sourceOptions}
+              sourceError={(field) => sourceError(index, field)}
+            />
           ))}
         </div>
 

@@ -29,6 +29,7 @@ import { getReviewerName } from "@/lib/reviewer";
 import {
   isStateOfficialSource,
   isTier4OnlySupport,
+  LIVE_STATEMENT_NO_LINK,
   RELIABILITY_LABELS,
   SOURCE_TYPE_LABELS,
 } from "@/lib/source-labels";
@@ -114,15 +115,19 @@ function PrimarySourceBox({ source }: { source: ReviewEventSource | undefined })
             <Badge className="bg-slate-indigo text-foreground">State / official source</Badge>
           ) : null}
         </div>
-        <a
-          href={source.article_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 border border-teal-blue/60 px-3 py-1.5 text-sm text-teal-blue hover:bg-teal-blue/10"
-        >
-          Open article
-          <ExternalLink className="size-3.5" aria-hidden />
-        </a>
+        {source.article_url ? (
+          <a
+            href={source.article_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 border border-teal-blue/60 px-3 py-1.5 text-sm text-teal-blue hover:bg-teal-blue/10"
+          >
+            Open article
+            <ExternalLink className="size-3.5" aria-hidden />
+          </a>
+        ) : (
+          <span className="text-sm text-text-muted">{LIVE_STATEMENT_NO_LINK}</span>
+        )}
       </div>
       {source.excerpt ? (
         <blockquote className="mt-3 border-l-2 border-teal-blue/60 pl-3 text-sm text-text-secondary">
@@ -163,7 +168,10 @@ export default async function ReviewEventPage({
   const xPost = buildPostText({
     summary: event.summary,
     headline: event.headline,
-    sourceUrl: (supports.find((s) => s.is_primary) ?? supports[0])?.article_url ?? event.source_url,
+    sourceUrl: (() => {
+      const linked = supports.filter((s) => s.article_url);
+      return (linked.find((s) => s.is_primary) ?? linked[0])?.article_url ?? event.source_url;
+    })(),
   });
 
   const warnings = [
@@ -331,8 +339,8 @@ export default async function ReviewEventPage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border align-top">
-                  {sources.map((s) => (
-                    <tr key={`${s.name}-${s.article_url}`}>
+                  {sources.map((s, i) => (
+                    <tr key={`${s.name}-${s.article_url ?? i}`}>
                       <td className="px-3 py-2 font-medium">{s.name}</td>
                       <td className="px-3 py-2 font-mono text-xs">{s.tier ?? "—"}</td>
                       <td className="px-3 py-2">{RELIABILITY_LABELS[s.reliability]}</td>
@@ -347,14 +355,18 @@ export default async function ReviewEventPage({
                       </td>
                       <td className="px-3 py-2 font-mono text-xs">{s.is_primary ? "PRIMARY" : ""}</td>
                       <td className="px-3 py-2">
-                        <a
-                          href={s.article_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="break-all font-mono text-xs text-teal-blue hover:underline"
-                        >
-                          {s.article_url}
-                        </a>
+                        {s.article_url ? (
+                          <a
+                            href={s.article_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="break-all font-mono text-xs text-teal-blue hover:underline"
+                          >
+                            {s.article_url}
+                          </a>
+                        ) : (
+                          <span className="text-xs text-text-muted">{LIVE_STATEMENT_NO_LINK}</span>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-text-secondary">
                         {s.excerpt ? <>&ldquo;{s.excerpt}&rdquo;</> : "—"}

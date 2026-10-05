@@ -18,7 +18,7 @@ import {
   type HistoricalField,
   type HistoricalStatus,
 } from "@/lib/historical-rules";
-import { isTier4OnlySupport } from "@/lib/source-labels";
+import { isLiveStatementSource, isTier4OnlySupport, LIVE_STATEMENT_SOURCE_ID } from "@/lib/source-labels";
 import type { Reliability, SourceType } from "@/lib/source-labels";
 
 /**
@@ -247,6 +247,7 @@ export async function validateHistoricalForm(
     const is_primary = index === primaryIndex;
 
     if (!UUID_RE.test(source_id) || !known.has(source_id)) errors[`${p}_source_id`] = "Choose a registry source.";
+    else if (isLiveStatementSource(source_id)) errors[`${p}_source_id`] = "Live statements can be attached to current events only.";
     if (!isHttpUrl(article_url)) errors[`${p}_article_url`] = "Enter the full article URL.";
     if (archived_url && !isHttpUrl(archived_url)) errors[`${p}_archived_url`] = "Enter a full archive URL.";
     if (!isRealDate(accessed_at)) errors[`${p}_accessed_at`] = "Enter the date you read the source.";
@@ -546,10 +547,11 @@ export function unpublishHistoricalEvent(id: string, reviewer: string, reason: s
   );
 }
 
-/** Every registry source, labelled with its tier, for the historical source picker. */
+/** Every registry source except the live-statement one, labelled with its tier, for the historical source picker. */
 export async function listHistoricalSourceOptions(): Promise<Array<{ id: string; label: string }>> {
   const { rows } = await getPool().query<{ id: string; name: string; tier: number | null; historical_only: boolean }>(
-    `SELECT id, name, tier, historical_only FROM sources ORDER BY tier ASC NULLS LAST, lower(name) ASC`,
+    `SELECT id, name, tier, historical_only FROM sources WHERE id <> $1 ORDER BY tier ASC NULLS LAST, lower(name) ASC`,
+    [LIVE_STATEMENT_SOURCE_ID],
   );
   return rows.map((s) => ({
     id: s.id,

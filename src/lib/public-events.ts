@@ -65,7 +65,8 @@ export type PublicEventSource = {
   source_type: SourceType;
   source_country: string | null;
   tier: number | null;
-  article_url: string;
+  /** Null for a live statement with no link yet. */
+  article_url: string | null;
   relationship: SourceRelationship;
   is_primary: boolean;
   excerpt: string | null;
@@ -178,7 +179,7 @@ export async function listPublicEventSources(
 ): Promise<PublicEventSource[]> {
   if (!UUID_RE.test(eventId)) return [];
   const { rows } = await getPool().query<PublicEventSource>(
-    `SELECT s.name, s.home_url, s.source_type, s.source_country, s.tier,
+    `SELECT coalesce(es.source_label, s.name) AS name, s.home_url, s.source_type, s.source_country, s.tier,
             es.article_url, es.relationship, es.is_primary, es.excerpt
      FROM event_sources es
      JOIN events e ON e.event_id = es.event_id

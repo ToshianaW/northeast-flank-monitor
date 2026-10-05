@@ -23,7 +23,7 @@ import {
 } from "@/lib/public-events";
 import { listApprovedReferences } from "@/lib/historical-references";
 import { referenceLine } from "@/lib/historical-references-rules";
-import { isStateOfficialSource, SOURCE_TYPE_LABELS } from "@/lib/source-labels";
+import { isStateOfficialSource, LIVE_STATEMENT_NO_LINK, SOURCE_TYPE_LABELS } from "@/lib/source-labels";
 
 export const metadata = { title: "Event" };
 
@@ -93,14 +93,18 @@ function SourceItem({ source }: { source: PublicEventSource }) {
           <span className="font-mono text-xs text-text-muted">PRIMARY</span>
         ) : null}
       </div>
-      <a
-        href={source.article_url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mt-1 block break-all font-mono text-xs link"
-      >
-        {source.article_url}
-      </a>
+      {source.article_url ? (
+        <a
+          href={source.article_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-1 block break-all font-mono text-xs link"
+        >
+          {source.article_url}
+        </a>
+      ) : (
+        <p className="mt-1 font-mono text-xs text-text-muted">{LIVE_STATEMENT_NO_LINK}</p>
+      )}
       {source.excerpt ? (
         <blockquote className="mt-2 max-w-3xl border-l-2 border-border pl-3 text-base text-text-secondary">
           {source.excerpt}
@@ -286,9 +290,9 @@ export default async function EventPage({ params }: PageProps<"/events/[id]">) {
               </span>
             </h2>
             <ul className="divide-y divide-border">
-              {sources.map((source) => (
+              {sources.map((source, i) => (
                 <SourceItem
-                  key={`${source.name}-${source.article_url}`}
+                  key={`${source.name}-${source.article_url ?? i}`}
                   source={source}
                 />
               ))}

@@ -18,7 +18,7 @@ import {
   type ReviewStatus,
   type SourceRelationship,
 } from "@/lib/event-labels";
-import type { Reliability, SourceType } from "@/lib/source-labels";
+import { isLiveStatementSource, type Reliability, type SourceType } from "@/lib/source-labels";
 import { getSource, type Source } from "@/lib/sources";
 
 export type Event = {
@@ -84,7 +84,10 @@ export type EventListItem = Pick<
 export type EventSourceRow = {
   id: string;
   source_id: string;
-  article_url: string;
+  /** Null only for a live statement (migration 0013). */
+  article_url: string | null;
+  /** Who said it and where it was seen; set only on the live-statement source. */
+  source_label: string | null;
   relationship: SourceRelationship;
   is_primary: boolean;
   excerpt: string | null;
@@ -93,6 +96,7 @@ export type EventSourceRow = {
 export type EventSourceFormRow = {
   source_id: string;
   article_url: string;
+  source_label: string;
   relationship: SourceRelationship;
   excerpt: string;
 };
@@ -349,6 +353,7 @@ export function eventSourceRowsFromFormData(formData: FormData): EventSourceForm
   return sourceRowIndices(formData).map((index) => ({
     source_id: String(formData.get(`es_${index}_source_id`) ?? ""),
     article_url: String(formData.get(`es_${index}_article_url`) ?? ""),
+    source_label: String(formData.get(`es_${index}_source_label`) ?? ""),
     relationship: String(
       formData.get(`es_${index}_relationship`) ?? "SUPPORTS",
     ) as SourceRelationship,
@@ -550,8 +555,19 @@ export async function validateEventForm(
       continue;
     }
 
+    // A live statement names its speaker instead of a registry outlet; its link is optional.
+    const isLive = isLiveStatementSource(source_id);
+    const source_label = isLive ? row.source_label.trim() : "";
+    if (isLive) {
+      if (!source_label) {
+        errors[`${prefix}_source_label`] = "Say who said it and where you saw it.";
+      } else if (source_label.length > 300) {
+        errors[`${prefix}_source_label`] = "Keep this under 300 characters.";
+      }
+    }
+
     if (!article_url) {
-      errors[`${prefix}_article_url`] = "Article URL is required.";
+      if (!isLive) errors[`${prefix}_article_url`] = "Article URL is required.";
     } else {
       try {
         const url = new URL(article_url);
@@ -587,6 +603,7 @@ export async function validateEventForm(
       ...row,
       source_id,
       article_url,
+      source_label,
       excerpt: row.excerpt,
       is_primary,
     });
@@ -631,8 +648,8 @@ export async function validateEventForm(
       equipment_type: optionalText(values.equipment_type),
       equipment_quantity: optionalText(values.equipment_quantity),
       activity_description: optionalText(values.activity_description),
-      source_name: primarySource.name,
-      source_url: primaryRow.article_url,
+      source_name: primaryRow.source_label || primarySource.name,
+      source_url: primaryRow.article_url || null,
       source_type: primarySource.source_type,
       source_country: primarySource.source_country,
       source_language: primarySource.source_language,
@@ -729,7 +746,8 @@ function eventInsertParams(
   ];
 }
 
-async function replaceEventSources(
+/** Replaces the event's sources; the caller owns the transaction. */
+export async function replaceEventSources(
   client: import("pg").PoolClient,
   eventId: string,
   sources: EventWritePayload["sources"],
@@ -738,15 +756,16 @@ async function replaceEventSources(
   for (const row of sources) {
     await client.query(
       `INSERT INTO event_sources
-         (event_id, source_id, article_url, relationship, is_primary, excerpt)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+         (event_id, source_id, article_url, relationship, is_primary, excerpt, source_label)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         eventId,
         row.source_id,
-        row.article_url,
+        optionalText(row.article_url),
         row.relationship,
         row.is_primary,
         optionalText(row.excerpt),
+        optionalText(row.source_label),
       ],
     );
   }
@@ -782,7 +801,7 @@ export async function getEvent(id: string): Promise<Event | null> {
 export async function listEventSources(eventId: string): Promise<EventSourceRow[]> {
   if (!UUID_RE.test(eventId)) return [];
   const { rows } = await getPool().query<EventSourceRow>(
-    `SELECT id, source_id, article_url, relationship, is_primary, excerpt
+    `SELECT id, source_id, article_url, source_label, relationship, is_primary, excerpt
      FROM event_sources
      WHERE event_id = $1
      ORDER BY is_primary DESC, created_at ASC`,
