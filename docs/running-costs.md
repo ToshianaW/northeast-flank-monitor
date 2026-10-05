@@ -38,7 +38,7 @@ Model calls (extraction, dedup judge, digest drafting) are paid per token and ca
 | | Rule (in code) | Worst case, 31 days |
 | --- | --- | --- |
 | Extractor | at most $0.12 per run, and at most $0.60 in any rolling 24 hours (`workers/extractor/budget.mts`; spend read from `extraction_runs`) | $18.60 |
-| Digest | at most $0.15 per run, one scheduled run a day; the one automatic retry after a failed check fits inside it | $4.65 |
+| Digest | at most $0.15 per run, one scheduled run a day; the one automatic retry after a failed check fits inside it up to about 30,000 characters of event input (about 39 events; the largest day so far is 11). Above that the retry is refused rather than exceeding the cap | $4.65 |
 | Dedup judge | at most $0.01 per run, 12 runs a day; past the cap, borderline pairs fall back to similarity only | $3.72 |
 | **Total** | | **$26.97** |
 

@@ -75,7 +75,8 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          args=(--ci)
+          # $0.01 per run; past it, borderline pairs are judged on trigram similarity alone.
+          args=(--ci --max-usd 0.01)
           if [ "$DRY_RUN" = "true" ]; then args+=(--no-model); fi
           npm run dedup -- "${args[@]}"
 

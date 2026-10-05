@@ -4,16 +4,20 @@
  * It creates three throwaway DRAFT events, checks how they pair, and deletes them. No model calls.
  */
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { after, test } from "node:test";
 import pg from "pg";
 import {
   BORDERLINE_SIMILARITY,
   classifyPair,
+  DEDUP_MAX_USD,
   findPairs,
   isNoAiOnly,
+  judgeCapReached,
   LIKELY_SIMILARITY,
 } from "./pairs.mjs";
+import { ESTIMATED_CALL_USD } from "./judge.mjs";
 
 if (!process.env.DATABASE_URL && existsSync(".env.local")) process.loadEnvFile(".env.local");
 
@@ -36,6 +40,30 @@ test("classifyPair: no-AI sources are never sent to the model", () => {
 test("classifyPair: --no-model and the spend cap keep borderline pairs visible", () => {
   assert.deepEqual(classifyPair({ ...base, similarity: 0.4, modelUnavailable: "NO_MODEL" }), { kind: "BORDERLINE", skipped: "NO_MODEL" });
   assert.deepEqual(classifyPair({ ...base, similarity: 0.4, modelUnavailable: "SPEND_CAP" }), { kind: "BORDERLINE", skipped: "SPEND_CAP" });
+});
+
+test("dedup cap $0.01: judge calls stop at the cap and later borderline pairs fall back to trigram only", () => {
+  assert.equal(DEDUP_MAX_USD, 0.01);
+  const workflow = readFileSync(join(process.cwd(), ".github/workflows/daily.yml"), "utf8");
+  assert.match(workflow, /args=\(--ci --max-usd 0\.01\)/);
+  // Ten borderline pairs, each judge call costing its full estimate (the worst case).
+  const limits = { maxCalls: 100, maxUsd: DEDUP_MAX_USD, estimatedCallUsd: ESTIMATED_CALL_USD };
+  const totals = { calls: 0, costUsd: 0 };
+  const kinds = Array.from({ length: 10 }, () => {
+    const c = classifyPair({
+      ...base,
+      similarity: 0.4,
+      modelUnavailable: judgeCapReached(totals, limits) ? "SPEND_CAP" : null,
+    });
+    if (c.kind === "ASK_MODEL") {
+      totals.calls++;
+      totals.costUsd += ESTIMATED_CALL_USD;
+    }
+    return c.kind === "BORDERLINE" ? c.skipped : c.kind;
+  });
+  assert.deepEqual(kinds, [...Array(4).fill("ASK_MODEL"), ...Array(6).fill("SPEND_CAP")]);
+  assert.ok(totals.costUsd <= DEDUP_MAX_USD, "never past the cap");
+  assert.equal(judgeCapReached({ calls: 0, costUsd: 0 }, { ...limits, maxUsd: 0.002 }), true, "cap below one call: no calls");
 });
 
 test("isNoAiOnly: every supporting source must be flagged", () => {

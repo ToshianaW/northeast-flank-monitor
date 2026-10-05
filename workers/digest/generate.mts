@@ -31,7 +31,7 @@ import {
   quotedPassages,
   type AliasedEvent,
 } from "./check.mjs";
-import { draftDigest, type ModelCall } from "./draft.mjs";
+import { DIGEST_MAX_TOKENS, DIGEST_MAX_USD, digestWorstCaseUsd, draftDigest, type ModelCall } from "./draft.mjs";
 import { loadDigestEvents } from "./input.mjs";
 import {
   buildUserMessage,
@@ -57,7 +57,7 @@ const { values: args } = parseArgs({
     "dry-run": { type: "boolean", default: false },
     "replace-draft": { type: "boolean", default: false },
     force: { type: "boolean", default: false },
-    "max-usd": { type: "string", default: "0.25" },
+    "max-usd": { type: "string", default: String(DIGEST_MAX_USD) },
     model: { type: "string", default: "claude-sonnet-5-5" },
     ci: { type: "boolean", default: false },
   },
@@ -80,7 +80,7 @@ const PRICES: Record<string, { input: number; output: number }> = {
 };
 const price = PRICES[model];
 if (!price) throw new Error(`no price entry for model "${model}"`);
-const MAX_TOKENS = 8_000;
+const MAX_TOKENS = DIGEST_MAX_TOKENS;
 
 type Status =
   | "CREATED" | "REPLACED" | "DRY_RUN" | "NO_EVENTS" | "EXISTS" | "PUBLISHED_EXISTS" | "EDITED_DRAFT"
@@ -211,10 +211,7 @@ async function run(): Promise<never> {
     call,
     check: (output) => checkDigestOutput(output, aliased, historicalLines),
     maxUsd,
-    worstCaseUsd: (messages) => {
-      const chars = SYSTEM_PROMPT.length + messages.reduce((n, m) => n + m.content.length, 0);
-      return ((chars / 3) * price.input + MAX_TOKENS * price.output) / 1_000_000;
-    },
+    worstCaseUsd: (messages) => digestWorstCaseUsd(SYSTEM_PROMPT, messages, price, MAX_TOKENS),
   });
   costUsd = draft.costUsd;
   attempts = draft.attempts;
@@ -253,7 +250,8 @@ async function run(): Promise<never> {
   }
 
   // 7. Store as DRAFT. DELETE + INSERT for a replacement, so the new draft reads as unedited.
-  const meta: DigestMeta = { generator: "ai", model, prompt_version: PROMPT_VERSION, generated_at: new Date().toISOString() };
+  // cost_usd: what this draft cost (both calls when retried), for the job summary spend line.
+  const meta: DigestMeta = { generator: "ai", model, prompt_version: PROMPT_VERSION, generated_at: new Date().toISOString(), cost_usd: Number(costUsd.toFixed(4)) };
   const sections: Record<string, unknown> = { _meta: meta };
   for (const s of checked.sections) {
     // The code-written Historical Context lines cite no event, so they carry no marker.

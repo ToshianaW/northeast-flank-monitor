@@ -57,7 +57,7 @@ jobs:
           DATABASE_URL_POOLED: ${{ secrets.DATABASE_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          args=(--ci --max-usd 0.25)
+          args=(--ci --max-usd 0.15)
           if [ -n "$DIGEST_DATE" ]; then
             if ! [[ "$DIGEST_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
               echo "date input must be YYYY-MM-DD"; exit 1

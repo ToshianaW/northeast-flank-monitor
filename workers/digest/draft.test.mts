@@ -4,10 +4,20 @@
  * Run: npm test
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
 import { checkDigestOutput, type AliasedEvent } from "./check.mjs";
-import { draftDigest, type ModelCall, type ModelReply, type ModelTurn } from "./draft.mjs";
-import type { DigestOutput } from "./prompt.mjs";
+import {
+  DIGEST_MAX_TOKENS,
+  DIGEST_MAX_USD,
+  digestWorstCaseUsd,
+  draftDigest,
+  type ModelCall,
+  type ModelReply,
+  type ModelTurn,
+} from "./draft.mjs";
+import { SYSTEM_PROMPT, type DigestOutput } from "./prompt.mjs";
 
 const events: AliasedEvent[] = [
   { alias: "E1", eventId: "11111111-1111-4111-8111-111111111111", restricted: false, quotes: [] },
@@ -98,4 +108,74 @@ test("API errors report the class and status only, never the message", async () 
   if (r.ok) return;
   assert.equal(r.status, "MODEL_ERROR");
   assert.equal(r.detail, "Error 529");
+});
+
+// --- The $0.15 cap with the real worst-case formula (Sonnet 5.5: $2 in, $10 out per million) ---
+
+const SONNET = { input: 2, output: 10 };
+/** A user message of about `chars` characters, like the generator's event JSON. */
+const userOf = (chars: number) => `Digest date (UTC): 2026-10-05\n\nPublished events (JSON):\n${"x".repeat(chars)}`;
+/** A failing first answer of realistic length (~7,500 characters, ~2,500 output tokens). */
+const longFailing: DigestOutput = {
+  sections: [
+    {
+      key: "belarus",
+      sentences: [
+        { text: "An attack is imminent.", event_refs: ["E1"] },
+        ...Array.from({ length: 40 }, (_, i) => ({
+          text: `The Belarusian Ministry of Defence said unit ${i + 1} held a scheduled readiness drill at its home garrison, according to the ministry statement.`,
+          event_refs: ["E1"],
+        })),
+      ],
+    },
+  ],
+};
+/** Real first-call cost: input at 3 characters per token, plus the reply's output tokens. */
+const firstCallCost = (user: string, replyText: string) =>
+  (((SYSTEM_PROMPT.length + user.length) / 3) * SONNET.input + (replyText.length / 3) * SONNET.output) / 1_000_000;
+
+async function draftAtCap(userChars: number) {
+  const userMessage = userOf(userChars);
+  const first = reply(longFailing, firstCallCost(userMessage, JSON.stringify(longFailing)));
+  const { call, calls } = stub(first, reply(passing, 0.03));
+  const r = await draftDigest({
+    userMessage,
+    check,
+    call,
+    maxUsd: DIGEST_MAX_USD,
+    worstCaseUsd: (messages) => digestWorstCaseUsd(SYSTEM_PROMPT, messages, SONNET),
+  });
+  return { r, calls, first };
+}
+
+test("digest cap is $0.15 in the script default and the workflow", () => {
+  assert.equal(DIGEST_MAX_USD, 0.15);
+  assert.equal(DIGEST_MAX_TOKENS, 8_000);
+  const workflow = readFileSync(join(process.cwd(), ".github/workflows/digest.yml"), "utf8");
+  assert.match(workflow, /args=\(--ci --max-usd 0\.15\)/);
+});
+
+test("at $0.15 the one retry runs for the largest day so far (11 events, ~8,400 characters)", async () => {
+  const { r, calls, first } = await draftAtCap(8_400);
+  assert.ok(r.ok, "retry made and passed");
+  assert.equal(r.attempts, 2);
+  assert.equal(calls.length, 2);
+  const retryWorst = digestWorstCaseUsd(SYSTEM_PROMPT, calls[1], SONNET);
+  assert.ok(first.costUsd + retryWorst <= DIGEST_MAX_USD, `${first.costUsd} + ${retryWorst}`);
+});
+
+test("at $0.15 the retry still fits a day three times larger (~25,000 characters, ~33 events)", async () => {
+  const { r } = await draftAtCap(25_000);
+  assert.ok(r.ok);
+  assert.equal(r.attempts, 2);
+});
+
+test("on a far larger day the retry is refused before the call, never over the cap", async () => {
+  const { r, calls } = await draftAtCap(45_000);
+  assert.equal(r.ok, false);
+  if (r.ok) return;
+  assert.equal(r.status, "CHECK_FAILED");
+  assert.match(r.detail, /retry would exceed cap/);
+  assert.equal(calls.length, 1);
+  assert.ok(r.costUsd <= DIGEST_MAX_USD);
 });

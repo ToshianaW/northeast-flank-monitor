@@ -14,7 +14,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import pg from "pg";
 import { setOutput } from "../lib/ci.mjs";
 import { ESTIMATED_CALL_USD, JUDGE_MODEL, judgePair, type Verdict } from "./judge.mjs";
-import { classifyPair, findPairs, isNoAiOnly, type ModelSkip } from "./pairs.mjs";
+import { classifyPair, DEDUP_MAX_USD, findPairs, isNoAiOnly, judgeCapReached, type ModelSkip } from "./pairs.mjs";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 const envFile = `${repoRoot}.env.local`;
@@ -24,7 +24,7 @@ const { values: args } = parseArgs({
   options: {
     "dry-run": { type: "boolean", default: false },
     "no-model": { type: "boolean", default: false },
-    "max-usd": { type: "string", default: "0.25" },
+    "max-usd": { type: "string", default: String(DEDUP_MAX_USD) },
     "max-calls": { type: "string", default: "200" },
     subjects: { type: "string", default: "pending" },
     ci: { type: "boolean", default: false },
@@ -75,7 +75,7 @@ let stopReason: "COMPLETED" | "SPEND_CAP" | "ERROR" = "COMPLETED";
 const lines: string[] = [];
 
 for (const p of pairs) {
-  const capReached = totals.calls >= maxCalls || totals.costUsd + ESTIMATED_CALL_USD > maxUsd;
+  const capReached = judgeCapReached(totals, { maxCalls, maxUsd, estimatedCallUsd: ESTIMATED_CALL_USD });
   const c = classifyPair({
     similarity: p.similarity,
     sameArticle: p.same_article,

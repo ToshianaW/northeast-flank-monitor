@@ -45,6 +45,8 @@ export type DigestMeta = {
   model: string;
   prompt_version: string;
   generated_at: string;
+  /** USD for this draft (both calls when retried); absent on digests drafted before it was recorded. */
+  cost_usd?: number;
 };
 
 export type Digest = {

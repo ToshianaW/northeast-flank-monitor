@@ -11,6 +11,21 @@ export type ModelReply = { text: string | null; stopReason: string | null; costU
 
 export type ModelCall = (messages: ModelTurn[]) => Promise<ModelReply>;
 
+/** Per-run spend cap for the digest (docs/running-costs.md): room for the one retry. */
+export const DIGEST_MAX_USD = 0.15;
+export const DIGEST_MAX_TOKENS = 8_000;
+
+/** Worst-case cost of one call: input estimated at 3 characters per token, plus max output. */
+export function digestWorstCaseUsd(
+  system: string,
+  messages: readonly ModelTurn[],
+  price: { input: number; output: number },
+  maxTokens: number = DIGEST_MAX_TOKENS,
+): number {
+  const chars = system.length + messages.reduce((n, m) => n + m.content.length, 0);
+  return ((chars / 3) * price.input + maxTokens * price.output) / 1_000_000;
+}
+
 type Checked = Extract<CheckResult, { ok: true }>;
 
 export type DraftResult =

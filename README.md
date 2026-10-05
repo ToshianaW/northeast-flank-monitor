@@ -68,7 +68,7 @@ npm run digest -- --date 2026-10-01             # writes a DRAFT if no digest ex
 ```
 
 - `--replace-draft` replaces an unedited AI draft; add `--force` (local only) for an edited or manual draft. A published digest is never replaced.
-- `--max-usd` (default 0.25) is checked against the worst case before the call.
+- `--max-usd` (default 0.15, room for the one retry) is checked against the worst case before each call.
 - Needs `DATABASE_URL_POOLED` and `ANTHROPIC_API_KEY`.
 
 ## Progress
