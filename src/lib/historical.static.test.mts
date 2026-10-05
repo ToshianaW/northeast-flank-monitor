@@ -64,6 +64,7 @@ test("the allowlist names no current-facing module", () => {
     "src/app/(public)/map/page.tsx",
     "src/app/(public)/events/[id]/page.tsx",
     "src/app/sitemap.ts",
+    "src/lib/public-sitemap.ts",
     "workers/digest/input.mts",
     "workers/digest/generate.mts",
     "workers/deduplication/pairs.mts",

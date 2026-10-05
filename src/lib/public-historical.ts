@@ -158,3 +158,17 @@ export async function listPublishedByTypeMonth(type: EventType, month: string): 
   );
   return rows;
 }
+
+/** Sitemap: id and last change of every PUBLISHED historical event, newest change first. */
+export async function listPublishedHistoricalForSitemap(
+  limit: number,
+): Promise<Array<{ event_id: string; updated_at: Date }>> {
+  const { rows } = await getPool().query<{ event_id: string; updated_at: Date }>(
+    `SELECT event_id, updated_at FROM historical_events
+     WHERE review_status = 'PUBLISHED'
+     ORDER BY updated_at DESC
+     LIMIT $1`,
+    [limit],
+  );
+  return rows;
+}
