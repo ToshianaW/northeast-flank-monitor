@@ -61,7 +61,8 @@ jobs:
           DATABASE_URL_POOLED: ${{ secrets.DATABASE_URL }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          args=(--limit 80 --max-usd 0.25 --ci)
+          # $0.12 per run, and at most $0.60 in any rolling 24 hours (workers/extractor/budget.mts).
+          args=(--limit 80 --max-usd 0.12 --ci)
           if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
           npm run extract -- "${args[@]}"
 
@@ -106,6 +107,9 @@ jobs:
           EXTRACT_REASON: ${{ steps.extract.outputs.failure_reason }}
           # Rows skipped by rule, e.g. "text_too_long (1)": recorded, not a failure.
           EXTRACT_SKIPPED: ${{ steps.extract.outputs.skipped }}
+          # Budget counts: rows left NEW for a later run, and rows too long for any run.
+          OVER_RUN_CAP: ${{ steps.extract.outputs.over_run_cap }}
+          TOO_LONG_FOR_CAP: ${{ steps.extract.outputs.too_long_for_cap }}
           EXTRACT_COST: ${{ steps.extract.outputs.cost_usd }}
           CANDIDATES: ${{ steps.dedup.outputs.candidates }}
           DEDUP_COST: ${{ steps.dedup.outputs.cost_usd }}
@@ -137,7 +141,9 @@ jobs:
               echo "Collector warnings: $WARNED_SOURCES"
               echo
             fi
-            extract_note="stop: ${STOP_REASON:-–}"
+            if [ "$STOP_REASON" = "DAILY_BUDGET" ]; then extract_note="stop: daily budget reached"; else extract_note="stop: ${STOP_REASON:-–}"; fi
+            if [ "${OVER_RUN_CAP:-0}" != "0" ] && [ -n "$OVER_RUN_CAP" ]; then extract_note="$extract_note; over run cap: $OVER_RUN_CAP"; fi
+            if [ "${TOO_LONG_FOR_CAP:-0}" != "0" ] && [ -n "$TOO_LONG_FOR_CAP" ]; then extract_note="$extract_note; too long for cap: $TOO_LONG_FOR_CAP"; fi
             if [ -n "$EXTRACT_REASON" ]; then extract_note="$extract_note; row errors: $EXTRACT_REASON"; fi
             if [ -n "$EXTRACT_SKIPPED" ]; then extract_note="$extract_note; skipped: $EXTRACT_SKIPPED"; fi
             echo "Steps: collect ${COLLECT_OUTCOME:-not run} · extract ${EXTRACT_OUTCOME:-not run} ($extract_note) · dedup ${DEDUP_OUTCOME:-not run}"

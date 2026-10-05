@@ -34,6 +34,7 @@ import {
   type ExtractionOutput,
 } from "./prompt.mjs";
 import { validateEvent, type ValidatedEvent } from "./validate.mjs";
+import { DAILY_BUDGET_USD, effectiveCap, PER_RUN_CAP_USD, rowBudgetDecision } from "./budget.mjs";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 const envFile = `${repoRoot}.env.local`;
@@ -49,7 +50,7 @@ const { values: args } = parseArgs({
   options: {
     "dry-run": { type: "boolean", default: false },
     limit: { type: "string", default: "100" },
-    "max-usd": { type: "string", default: "0.25" },
+    "max-usd": { type: "string", default: String(PER_RUN_CAP_USD) },
     model: { type: "string", default: "claude-sonnet-5-5" },
     ci: { type: "boolean", default: false },
   },
@@ -142,10 +143,39 @@ if (dryRun) {
   selected = eligible.slice(0, rowLimit);
 }
 
+// Rolling 24-hour budget (budget.mts): this run may spend min(--max-usd, budget − last 24 h).
+const { rows: [{ spent }] } = await pool.query<{ spent: number }>(
+  `SELECT coalesce(sum(cost_usd), 0)::float AS spent FROM extraction_runs
+   WHERE started_at > now() - interval '24 hours'`,
+);
+const spent24h = spent;
+const budget = effectiveCap(maxUsd, DAILY_BUDGET_USD, spent24h);
+
+// Daily budget reached: stop cleanly before recording a run or calling the model. Rows stay NEW
+// for a later run; nothing was spent, so there is no extraction_runs row (its CHECKs need a cap
+// above zero and a known stop reason). Exit 0: this is the budget working, not a failure.
+if (budget.exhausted) {
+  console.log(`daily budget reached: $${spent24h.toFixed(4)} spent in the last 24 h (budget $${DAILY_BUDGET_USD.toFixed(2)}); no model calls, ${eligible.length} eligible rows stay NEW`);
+  if (ci) {
+    setOutput("completed", "true");
+    setOutput("stop_reason", "DAILY_BUDGET");
+    setOutput("drafts_created", 0);
+    setOutput("drafts_would_create", 0);
+    setOutput("cost_usd", "0.0000");
+    setOutput("failure_reason", "");
+    setOutput("skipped", "");
+    setOutput("over_run_cap", 0);
+    setOutput("too_long_for_cap", 0);
+    setOutput("spent_24h", spent24h.toFixed(4));
+  }
+  await pool.end();
+  process.exit(0);
+}
+
 const { rows: runRows } = await pool.query<{ id: string }>(
   `INSERT INTO extraction_runs (model, prompt_version, dry_run, row_limit, spend_cap_usd)
    VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-  [model, PROMPT_VERSION, dryRun, rowLimit, maxUsd],
+  [model, PROMPT_VERSION, dryRun, rowLimit, budget.cap.toFixed(4)],
 );
 const runId = runRows[0].id;
 
@@ -168,6 +198,10 @@ const skips: Array<{ raw_document_id: string; kind: RowSkipKind; chars: number }
 const results: RowResult[] = [];
 let stopReason: "COMPLETED" | "ROW_LIMIT" | "SPEND_CAP" | "ERROR" =
   !dryRun && eligible.length > rowLimit ? "ROW_LIMIT" : "COMPLETED";
+/** Rows left NEW because they did not fit what was left of this run's cap. */
+let overRunCap = 0;
+/** Rows marked SKIPPED because their estimate alone exceeds the per-run cap. */
+let tooLongForCap = 0;
 
 /** Conservative pre-call estimate so a run does not start a row it cannot afford. */
 function estimateRowCost(row: Row): number {
@@ -353,10 +387,28 @@ async function writeRow(client: PoolClient, r: RowResult): Promise<void> {
 const client = await pool.connect();
 try {
   for (const row of selected) {
-    // A row over the text limit costs nothing (no model call), so it never trips the cap.
-    if (!skipKindFor(row.raw_text ?? "") && totals.costUsd + estimateRowCost(row) > maxUsd) {
-      stopReason = "SPEND_CAP";
-      break;
+    // A row over the text limit costs nothing (no model call), so the caps do not apply to it.
+    if (!skipKindFor(row.raw_text ?? "")) {
+      const decision = rowBudgetDecision(estimateRowCost(row), totals.costUsd, budget.cap, maxUsd);
+      if (decision === "too_long_for_cap") {
+        // Could never fit a run: SKIPPED with the reason so it does not come back every run.
+        tooLongForCap++;
+        if (!dryRun) {
+          await client.query(
+            `UPDATE raw_documents SET status = 'SKIPPED',
+               metadata = metadata || jsonb_build_object('skip_reason', 'text_too_long_for_cap', 'run_cap_usd', $2::numeric)
+             WHERE id = $1 AND status = 'NEW'`,
+            [row.id, maxUsd],
+          );
+        }
+        continue;
+      }
+      if (decision === "over_run_cap") {
+        // Does not fit what is left of this run; stays NEW. Later, smaller rows may still fit.
+        overRunCap++;
+        if (stopReason === "COMPLETED") stopReason = "SPEND_CAP";
+        continue;
+      }
     }
     totals.rowsSeen++;
 
@@ -479,8 +531,11 @@ console.log(
   `events: ${totals.eventsProposed} proposed, ${totals.eventsRejected} dropped by validation, ${dryRun ? `${totals.eventsProposed - totals.eventsRejected} would be created` : `${totals.eventsCreated} created`}`,
 );
 console.log(
-  `tokens: ${totals.inputTokens} in, ${totals.cacheReadTokens} cache read, ${totals.cacheWriteTokens} cache write, ${totals.outputTokens} out · cost $${totals.costUsd.toFixed(4)} (cap $${maxUsd.toFixed(2)})`,
+  `tokens: ${totals.inputTokens} in, ${totals.cacheReadTokens} cache read, ${totals.cacheWriteTokens} cache write, ${totals.outputTokens} out · cost $${totals.costUsd.toFixed(4)} (cap $${budget.cap.toFixed(4)}: min of $${maxUsd.toFixed(2)} per run and $${DAILY_BUDGET_USD.toFixed(2)} − $${spent24h.toFixed(4)} spent in the last 24 h)`,
 );
+if (overRunCap || tooLongForCap) {
+  console.log(`budget: ${overRunCap} over run cap (left NEW) · ${tooLongForCap} too long for the per-run cap (SKIPPED)`);
+}
 for (const e of errors) console.log(`error ${e.raw_document_id}: ${e.error}`);
 for (const k of skips) console.log(`skipped ${k.raw_document_id}: ${k.kind} (${k.chars} chars, limit ${MAX_TEXT_CHARS})`);
 if (reviewPath) console.log(`review file: ${reviewPath}`);
@@ -493,6 +548,9 @@ if (ci) {
   // Why the step exits 1 (labels and counts only), for the job summary.
   setOutput("failure_reason", failureReason(errors));
   setOutput("skipped", skippedSummary(skips));
+  setOutput("over_run_cap", overRunCap);
+  setOutput("too_long_for_cap", tooLongForCap);
+  setOutput("spent_24h", spent24h.toFixed(4));
 }
 // Real errors (API, model, database, validation) fail the step; skips do not.
 process.exitCode = exitCodeFor(errors);
