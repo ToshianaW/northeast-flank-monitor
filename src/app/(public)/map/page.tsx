@@ -1,3 +1,4 @@
+import { pageMetadata } from "@/lib/site-metadata";
 import { connection } from "next/server";
 import { MapControls } from "@/components/map/map-controls";
 import { MapLegend } from "@/components/map/map-legend";
@@ -6,7 +7,7 @@ import { RegionTable } from "@/components/map/region-table";
 import { PageShell } from "@/components/page-shell";
 import { loadMapData, parseMapParams } from "@/lib/map-data";
 
-export const metadata = { title: "Map" };
+export const metadata = pageMetadata("/map", "Map", "Map of reported activity on NATO's northeastern flank, counted by area, never by position.");
 
 export default async function MapPage({ searchParams }: PageProps<"/map">) {
   await connection();

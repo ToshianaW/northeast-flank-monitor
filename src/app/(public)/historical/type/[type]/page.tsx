@@ -1,3 +1,4 @@
+import { pageMetadata } from "@/lib/site-metadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
@@ -17,7 +18,10 @@ import {
 } from "@/lib/historical-rules";
 import { getHistoricalCoverage, getTypeMonthCounts, listPublishedByTypeMonth } from "@/lib/public-historical";
 
-export const metadata = { title: "Historical comparison" };
+export async function generateMetadata({ params }: PageProps<"/historical/type/[type]">) {
+  const { type } = await params;
+  return pageMetadata(`/historical/type/${encodeURIComponent(type)}`, "Historical comparison", "Published historical events of one type, by month.");
+}
 
 export default async function HistoricalTypePage({ params, searchParams }: PageProps<"/historical/type/[type]">) {
   await connection();

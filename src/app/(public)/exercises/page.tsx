@@ -1,3 +1,4 @@
+import { pageMetadata } from "@/lib/site-metadata";
 import { connection } from "next/server";
 import { ExerciseLogEntry } from "@/components/exercise-log-entry";
 import { ListFilterForm } from "@/components/list-filter-form";
@@ -7,7 +8,7 @@ import type { ExerciseStatus } from "@/lib/event-labels";
 import { filterOptions, matchesFilters, parseListFilters, SHOW_STEP } from "@/lib/list-filters";
 import { listPublishedExercises } from "@/lib/public-exercises";
 
-export const metadata = { title: "Exercises" };
+export const metadata = pageMetadata("/exercises", "Exercises", "Military exercises on NATO's northeastern flank: announced and observed dates, status and post-exercise reset.");
 
 const GROUPS: Array<{ id: string; label: string; statuses: ExerciseStatus[] }> = [
   { id: "under-way", label: "Under way", statuses: ["ACTIVE", "EXTENDED", "CONCLUDING"] },

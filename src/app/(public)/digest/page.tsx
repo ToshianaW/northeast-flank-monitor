@@ -1,3 +1,4 @@
+import { pageMetadata } from "@/lib/site-metadata";
 import Link from "next/link";
 import { connection } from "next/server";
 import { DigestView, formatDigestDate } from "@/components/digest-view";
@@ -10,7 +11,7 @@ import {
   listPublishedEventHeadlines,
 } from "@/lib/digests";
 
-export const metadata = { title: "Daily digest" };
+export const metadata = pageMetadata("/digest", "Daily digest", "The latest reviewed daily digest of observable military activity on NATO's northeastern flank.");
 
 export default async function DigestPage() {
   await connection();

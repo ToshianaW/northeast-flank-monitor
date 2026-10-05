@@ -1,3 +1,4 @@
+import { pageMetadata } from "@/lib/site-metadata";
 import Link from "next/link";
 import { PageShell } from "@/components/page-shell";
 import {
@@ -9,7 +10,7 @@ import {
   MAX_RANGE_DAYS,
 } from "@/lib/open-data";
 
-export const metadata = { title: "Open data" };
+export const metadata = pageMetadata("/data", "Open data", "Download published events as JSON or CSV, with sources and licence.");
 
 const EXAMPLES = [
   "/api/events",

@@ -1,10 +1,11 @@
+import { pageMetadata } from "@/lib/site-metadata";
 import Link from "next/link";
 import { connection } from "next/server";
 import { EventLogEntry } from "@/components/event-log-entry";
 import { PageShell } from "@/components/page-shell";
 import { LATEST_WINDOW_HOURS, listRecentPublishedEvents } from "@/lib/public-events";
 
-export const metadata = { title: "Latest" };
+export const metadata = pageMetadata("/latest", "Latest", "Published events from the last 48 hours on NATO's northeastern flank.");
 
 export default async function LatestPage() {
   await connection();

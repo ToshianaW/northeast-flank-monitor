@@ -1,3 +1,4 @@
+import { pageMetadata } from "@/lib/site-metadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
@@ -11,7 +12,10 @@ import {
   listPublishedEventHeadlines,
 } from "@/lib/digests";
 
-export const metadata = { title: "Daily digest" };
+export async function generateMetadata({ params }: PageProps<"/digest/[date]">) {
+  const { date } = await params;
+  return pageMetadata(`/digest/${encodeURIComponent(date)}`, "Daily digest", "A reviewed daily digest of observable military activity on NATO's northeastern flank.");
+}
 
 export default async function DigestByDatePage({
   params,

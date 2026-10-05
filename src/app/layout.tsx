@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/site-metadata";
+import { SITE_URL } from "@/lib/site-url";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,12 +15,24 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "Northeast Flank Monitor",
-    template: "%s · Northeast Flank Monitor",
+    default: `${SITE_NAME} — ${SITE_DESCRIPTION}`,
+    template: `%s | ${SITE_NAME}`,
   },
-  description:
-    "Open-source monitoring of military activity across NATO's northeastern flank. Observe behavior. Track the baseline. Compare historically.",
+  description: `${SITE_DESCRIPTION}. Observe behavior. Track the baseline. Compare historically.`,
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    url: "/",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+  },
+  // Rendered only when GOOGLE_SITE_VERIFICATION is set.
+  verification: process.env.GOOGLE_SITE_VERIFICATION?.trim()
+    ? { google: process.env.GOOGLE_SITE_VERIFICATION.trim() }
+    : undefined,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -1,3 +1,4 @@
+import { pageMetadata } from "@/lib/site-metadata";
 import Link from "next/link";
 import { connection } from "next/server";
 import { EventLogEntry } from "@/components/event-log-entry";
@@ -8,7 +9,7 @@ import { COUNTS_NOTE, groupByMonth, minimumDataText, SAFETY_NOTE, weeklyCounts }
 import { filterOptions, matchesFilters, parseListFilters, SHOW_STEP } from "@/lib/list-filters";
 import { loadAirActivity } from "@/lib/public-air-activity";
 
-export const metadata = { title: "Air Activity" };
+export const metadata = pageMetadata("/air-activity", "Air Activity", "Reviewed reports of military air activity on NATO's northeastern flank, placed by area.");
 
 export default async function AirActivityPage({ searchParams }: PageProps<"/air-activity">) {
   await connection();

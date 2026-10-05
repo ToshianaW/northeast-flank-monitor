@@ -1,3 +1,4 @@
+import { pageMetadata } from "@/lib/site-metadata";
 import Link from "next/link";
 import { connection } from "next/server";
 import { ArrowLeft } from "lucide-react";
@@ -43,7 +44,7 @@ import {
 import { getPublishedCoverage, listPublishedEventsBetween, type PublicEvent } from "@/lib/public-events";
 import { getHistoricalCoverage, listPublishedHistorical, type PublicHistoricalEvent } from "@/lib/public-historical";
 
-export const metadata = { title: "Side-by-side view" };
+export const metadata = pageMetadata("/historical/compare", "Side-by-side view", "Current and historical events side by side for two periods of the same length.");
 
 type Row = CompareRow<PublicHistoricalEvent, PublicEvent>;
 

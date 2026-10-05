@@ -1,3 +1,4 @@
+import { pageMetadata } from "@/lib/site-metadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
@@ -27,7 +28,10 @@ import {
 } from "@/lib/public-historical";
 import { isStateOfficialSource, SOURCE_TYPE_LABELS } from "@/lib/source-labels";
 
-export const metadata = { title: "Historical event" };
+export async function generateMetadata({ params }: PageProps<"/historical/[id]">) {
+  const { id } = await params;
+  return pageMetadata(`/historical/${encodeURIComponent(id)}`, "Historical event", "A published historical event, with its sources, for comparison with current activity.");
+}
 
 type Field = { label: string; value: string | null | undefined };
 

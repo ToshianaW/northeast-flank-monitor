@@ -1,3 +1,4 @@
+import { pageMetadata } from "@/lib/site-metadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
@@ -25,7 +26,10 @@ import { listApprovedReferences } from "@/lib/historical-references";
 import { referenceLine } from "@/lib/historical-references-rules";
 import { isStateOfficialSource, LIVE_STATEMENT_NO_LINK, SOURCE_TYPE_LABELS } from "@/lib/source-labels";
 
-export const metadata = { title: "Event" };
+export async function generateMetadata({ params }: PageProps<"/events/[id]">) {
+  const { id } = await params;
+  return pageMetadata(`/events/${encodeURIComponent(id)}`, "Event", "A reviewed event on NATO's northeastern flank, with its sources, confidence and reset status.");
+}
 
 type Field = { label: string; value: string | null | undefined };
 

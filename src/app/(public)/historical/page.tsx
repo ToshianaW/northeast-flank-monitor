@@ -1,3 +1,4 @@
+import { pageMetadata } from "@/lib/site-metadata";
 import Link from "next/link";
 import { connection } from "next/server";
 import { ContextTimeline } from "@/components/historical/context-timeline";
@@ -7,7 +8,7 @@ import { emptyGroupText, groupTypeSummaries, monthSpan, typeSlug, type TypeSumma
 import { getTypeMonthCounts } from "@/lib/public-historical";
 import { PRELUDE_TIMELINE } from "@/content/ukraine-prelude-timeline";
 
-export const metadata = { title: "Historical comparison" };
+export const metadata = pageMetadata("/historical", "Historical comparison", "Published historical events by type and month, for comparison with current activity.");
 
 function TypeCards({ id, title, summaries }: { id: "activity" | "statements"; title: string; summaries: TypeSummary[] }) {
   return (

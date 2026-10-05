@@ -1,3 +1,4 @@
+import { pageMetadata } from "@/lib/site-metadata";
 import { connection } from "next/server";
 import { PageShell } from "@/components/page-shell";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +9,7 @@ import {
 } from "@/lib/source-labels";
 import { listSources, type Source } from "@/lib/sources";
 
-export const metadata = { title: "Sources" };
+export const metadata = pageMetadata("/sources", "Sources", "The source registry: every outlet and official source, with its tier, type and reliability.");
 
 type Group = { key: string; title: string; sources: Source[] };
 

@@ -1,3 +1,4 @@
+import { pageMetadata } from "@/lib/site-metadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
@@ -16,7 +17,10 @@ import {
 } from "@/lib/public-exercises";
 import { isStateOfficialSource, SOURCE_TYPE_LABELS } from "@/lib/source-labels";
 
-export const metadata = { title: "Exercise" };
+export async function generateMetadata({ params }: PageProps<"/exercises/[id]">) {
+  const { id } = await params;
+  return pageMetadata(`/exercises/${encodeURIComponent(id)}`, "Exercise", "A military exercise on NATO's northeastern flank, with its dates, status, sources and linked events.");
+}
 
 const NOT_REPORTED = "Not reported";
 

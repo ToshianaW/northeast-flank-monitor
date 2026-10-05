@@ -1,3 +1,4 @@
+import { pageMetadata } from "@/lib/site-metadata";
 import Link from "next/link";
 import { PageShell } from "@/components/page-shell";
 import { LabelHelp } from "@/components/label-help";
@@ -24,7 +25,7 @@ import {
   WINDOW_WEEKS,
 } from "@/lib/activity-index";
 
-export const metadata = { title: "Methodology" };
+export const metadata = pageMetadata("/methodology", "Methodology", "How sources are tiered, how confidence is assessed, and how events are reviewed before publication.");
 
 const SECTIONS = [
   { id: "core-question", title: "The core question" },

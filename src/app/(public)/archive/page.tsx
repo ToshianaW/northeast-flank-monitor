@@ -1,3 +1,4 @@
+import { pageMetadata } from "@/lib/site-metadata";
 import Link from "next/link";
 import { connection } from "next/server";
 import { ArchiveFilters } from "@/components/archive-filters";
@@ -11,7 +12,7 @@ import {
   parseArchiveFilters,
 } from "@/lib/public-events";
 
-export const metadata = { title: "Archive" };
+export const metadata = pageMetadata("/archive", "Archive", "Every published event, filterable by date, country, actor, type, confidence and source type.");
 
 export default async function ArchivePage({ searchParams }: PageProps<"/archive">) {
   await connection();

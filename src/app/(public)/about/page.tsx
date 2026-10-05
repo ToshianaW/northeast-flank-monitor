@@ -1,7 +1,8 @@
+import { pageMetadata } from "@/lib/site-metadata";
 import Link from "next/link";
 import { PageShell } from "@/components/page-shell";
 
-export const metadata = { title: "About" };
+export const metadata = pageMetadata("/about", "About", "What Northeast Flank Monitor is, who runs it, and how it reports military activity on NATO's northeastern flank.");
 
 const REPOSITORY_URL = "https://github.com/ToshianaW/northeast-flank-monitor";
 const ISSUES_URL = `${REPOSITORY_URL}/issues`;
