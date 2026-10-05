@@ -84,7 +84,7 @@ Roadmap: `docs/mvp-plan.md` §4. Decisions that override the plan: `docs/decisio
 | 1.4 | Admin manual event create/edit with all spec §24 fields and attached sources |
 | 1.5 | Review queue: approve, reject, merge, edit; append-only review log; only published events are public |
 | 1.6 | Public `/latest` feed and stable `/events/[id]` pages |
-| 1.7 | Homepage: last update, Regional Activity placeholder (no score), 24-hour snapshot, latest events |
+| 1.7 | Homepage: last update, Regional Activity panel (now the Activity Index, step 6.2), 24-hour snapshot, latest events |
 | 1.8 | Manually written daily digest: admin editor, public `/digest` and `/digest/[date]`, homepage panel |
 | 1.9 | Public `/archive` with date, country, actor, type, confidence, and source-type filters |
 | 1.10 | Public `/methodology` and `/about` pages |
@@ -110,25 +110,39 @@ Roadmap: `docs/mvp-plan.md` §4. Decisions that override the plan: `docs/decisio
 | 3.3 | Post-exercise reset widget on the exercise page: personnel, equipment, temporary infrastructure, follow-on activity, and overall status. Unknown shows as "not enough open-source evidence" in a neutral tone. A reset status other than Unknown needs evidence (a source with an excerpt, or a linked published event dated on or after the exercise's end); FULL_RESET also needs all three dimensions returned or removed. Enforced in the form and by database triggers |
 | 3.4 | Air Activity page (`/air-activity`): published air, air-defence, airfield, airspace, drone and missile events (the Activity Index air dimension) plus NATO or Russian deployments whose headline or summary names aircraft; a list by month (3 at a time, with Show more) and a country and month search, weekly counts once there are 20 events over 8 complete weeks. Same rules as the map (published only, 72-hour Tier 4 hold, area-level placement, no coordinates); no historical data |
 
-**Phase 4 — Historical dataset: in progress**
+**Phase 4 — Historical dataset: in progress** (the record spans the whole period but is partial)
 
 | Step | What exists |
 | --- | --- |
 | 4.0 | Separate historical tables (migration 0008: `historical_events`, `historical_event_sources`, `historical_review_actions`), so no current-facing query can return a historical row (isolation and static tests). Database rules: a published historical event needs a supporting Tier 1–3 source, excerpts are 20 words or fewer, a source's tier cannot be changed if that would leave a published historical event Tier 4-only. Admin `/admin/historical` (own queue; reviewer name on every save, approve, reject and unpublish; phase tag admin-only). Public `/historical` by month with a period filter and `/historical/[id]`, each with a coverage note. Historical-only sources are never collected, hidden from current pickers, and labelled on `/sources` |
-| 4.1 | Context band and type-and-month views on `/historical`; manual candidate suggester (`npm run historical:suggest`, spend cap, verbatim-excerpt and date checks, never scheduled) with source and archive probes that read robots.txt and terms first; admin import page (`/admin/historical/import`) that saves ticked candidates as drafts for review |
+| 4.1–4.3 | 139 published historical events from August 2020 to February 2022 (4–8 per month), entered and reviewed by hand. Phase tags (Phase 0–4) are reviewer metadata in admin only, never shown publicly or used for predictions. Tools: Context band and type-and-month views on `/historical`; manual candidate suggester (`npm run historical:suggest`, spend cap, verbatim-excerpt and date checks, never scheduled) with source and archive probes that read robots.txt and terms first; admin import page (`/admin/historical/import`) that saves ticked candidates as drafts for review |
 
 **Phase 5 — Historical compare: in progress**
 
 | Step | What exists |
 | --- | --- |
-| 5.1 | **Built:** Side-by-side view (`/historical/compare`), in the sidebar under the expandable Historical Comparison entry with Overview (`/historical`). Published historical and current events for two windows, each a start month plus a length of 1–6 months (default Jan–Feb 2021 against last and this month; current events start at Aug 2026), with Earlier / Later on the historical side, as counts and linked lists per event type, with coverage and comparability notes. Descriptive only: no phase labels, markers, trend arrows, scores or percentages (the spec §22 indicator matrix is not built). Rows are withheld when the historical window has fewer than 4 events or 2 sources (`src/lib/historical-compare.ts`) |
-| 5.2 | Digest Historical Context written by code, not the model: for each of the day's event types, how many published historical events were recorded and in which months, plus the partial-record caveat. Falls back to the fixed line below the threshold or if a line fails its grammar, banned-phrase or comparison-wording check. No-model preview: `npm run digest:historical-preview -- [--date YYYY-MM-DD]` |
-| 5.3 | Reviewer-controlled "similar in nature" links on event pages (migrations 0010 and 0011): up to 3 published historical entries per published event. For physical-activity types, code links entries with the same event type and country when an event is published (no AI; `npm run references:backfill` plans the same for existing events, `-- --write` to apply); statements are never linked automatically. A reviewer can remove any link and it is never re-added; every link and unlink is logged; links are removed when either event is unpublished. An optional AI suggestion step is off unless `REFERENCES_AI_SUGGEST=on`. |
+| 5.1 | Side-by-side view (`/historical/compare`), in the sidebar under the expandable Historical Comparison entry with Overview (`/historical`). Published historical and current events for two windows, each a start month plus a length of 1–6 months (default Jan–Feb 2021 against last and this month; current events start at Aug 2026), with Earlier / Later on the historical side, as counts and linked lists per event type, with coverage and comparability notes. Descriptive only: no phase labels, markers, trend arrows, scores or percentages (the spec §22 indicator matrix is not built). Rows are withheld when the historical window has fewer than 4 events or 2 sources (`src/lib/historical-compare.ts`) |
+| 5.2 | Not built: synchronized dual timelines. The side-by-side view lists both windows by event type instead. |
+| 5.3 | Not built: the indicator matrix (spec §22). Its labels (HIGH, RISING) would read as an assessment, so the compare page stays descriptive. |
+| 5.4 | Replaced by descriptive, code-written comparisons; the model writes no comparison text. **Digest Historical Context**, written by code, not the model: for each of the day's event types, how many published historical events were recorded and in which months, plus the partial-record caveat. Falls back to the fixed line below the threshold or if a line fails its grammar, banned-phrase or comparison-wording check. No-model preview: `npm run digest:historical-preview -- [--date YYYY-MM-DD]`. **Event pages**: reviewer-controlled "similar in nature" links (migrations 0010 and 0011), up to 3 published historical entries per published event. For physical-activity types, code links entries with the same event type and country when an event is published (no AI; `npm run references:backfill` plans the same for existing events, `-- --write` to apply); statements are never linked automatically. A reviewer can remove any link and it is never re-added; every link and unlink is logged; links are removed when either event is unpublished. An optional AI suggestion step is off unless `REFERENCES_AI_SUGGEST=on`. |
 
-**Phase 6 — Activity Index: collecting baseline** (formula in `docs/scoring.md`; migration 0012).
+**Phase 6 — Activity Index: collecting baseline**
 
-**Phase 7 — Public data tools: in progress** (7.1–7.2: JSON API and CSV export of published events, `/data`).
+| Step | What exists |
+| --- | --- |
+| 6.1 | Formula documented in `docs/scoring.md` (`activity-index-v1`): the last 4 complete weeks against the previous 8, published current events only, statements excluded, only sources registered before the baseline began; band words (more than usual / within the usual range / fewer than usual), never a score. Historical data never enters. |
+| 6.2 | Computed live for the dashboard's Regional Activity panel, which shows "Collecting baseline" and the spec disclaimer until 12 complete weeks exist (first possible value 28 Dec 2026). `activity_index_snapshots` (migration 0012, append-only) stores computed results via `npm run index:snapshot`, which is not scheduled yet. |
 
+**Phase 7 — Public data tools: in progress**
+
+| Step | What exists |
+| --- | --- |
+| 7.1 | Public read-only JSON API `GET /api/events` (area, type, date range, layer; keyset pagination; CDN-cached; CORS), documented on `/data` and in `docs/data.md` |
+| 7.2 | CSV export `GET /api/events.csv` (at most 2,000 rows, formula escaping, a licence column on every row) |
+| 7.3 | Not built: source export |
+| 7.4 | Licence chosen (MIT, decision 21); public Methodology and `/data` pages; data licence CC BY 4.0 for summaries and metadata. Contributor docs (`docs/contributing.md`) are still a stub. |
+
+**Next:** source export (7.3) and contributor docs (7.4); schedule `npm run index:snapshot` weekly once the Activity Index has a value.
 
 ## License
 
