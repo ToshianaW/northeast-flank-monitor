@@ -182,3 +182,9 @@ test("output carries no coordinates or article text", () => {
   const json = JSON.stringify(buildMapData(rows, { days: 30, layer: "all", now: NOW }));
   assert.ok(!json.includes("SECRET") && !json.includes("54.5") && !json.includes("latitude"));
 });
+
+test("the dashboard thumbnail loads the same view /map opens on (default window and layer)", () => {
+  const home = readFileSync("src/app/(public)/page.tsx", "utf8");
+  assert.ok(home.includes("loadMapData({ days: DEFAULT_MAP_WINDOW, layer: DEFAULT_MAP_LAYER })"));
+  assert.deepEqual(parseMapParams({}), { days: 30, layer: "all" });
+});

@@ -14,7 +14,7 @@ import {
   listPublishedEvents,
 } from "@/lib/public-events";
 import {
-  DASHBOARD_MAP_LAYER,
+  DEFAULT_MAP_LAYER,
   DEFAULT_MAP_WINDOW,
   loadMapData,
   loadTheaterGeo,
@@ -52,7 +52,7 @@ export default async function HomePage() {
     listPublishedEvents(FEED_SIZE),
     getLatestPublishedDigest(),
     listUnderWayExercises(),
-    loadMapData({ days: DEFAULT_MAP_WINDOW, layer: DASHBOARD_MAP_LAYER }),
+    loadMapData({ days: DEFAULT_MAP_WINDOW, layer: DEFAULT_MAP_LAYER }),
     loadTheaterGeo(),
     getActivityIndex(),
   ]);
