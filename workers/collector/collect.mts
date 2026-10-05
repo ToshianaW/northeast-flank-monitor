@@ -29,7 +29,8 @@ import { errorMessage, HttpClient, RobotsDisallowedError } from "./fetch.mjs";
 import { collectGdelt, type GdeltConfig } from "./gdelt.mjs";
 import { collectListing, type ListingConfig } from "./listing.mjs";
 import { buildRegistry, type RegistryRow } from "./registry.mjs";
-import { domainOf, storeDocument, urlExists, type CollectedDoc, type StoreOutcome } from "./store.mjs";
+import { RETRY_WINDOW_HOURS, RETRYABLE_REASONS, retryFullText, type RetryCounts, type StoredRow } from "./retry.mjs";
+import { contentHash, domainOf, storeDocument, urlExists, type CollectedDoc, type StoreOutcome } from "./store.mjs";
 
 type CollectorConfig = {
   user_agent: string;
@@ -265,6 +266,45 @@ for (const query of config.gdelt.queries) {
     ),
   );
 }
+
+// One retry for recent full-text failures that can be temporary (retry.mts), after new items,
+// within what is left of the same page cap. A recovered row gets the article text and goes back
+// to NEW so the extractor reads it; any other outcome only marks the row as retried.
+const scopeByKey = new Map<string, FullTextScope>([
+  ...config.feeds.map((f): [string, FullTextScope] => [f.key, fullTextScope(f.source, f.full_text, f.full_text_free_only)]),
+  ...config.listings.map((l): [string, FullTextScope] => [l.key, fullTextScope(l.source, l.full_text)]),
+]);
+let retryCounts: RetryCounts = { retried: 0, recovered: 0, capped: 0 };
+try {
+  const { rows: retryRows } = await client.query<StoredRow>(
+    `SELECT id, url, collector_key, title, fetched_at, raw_text, status::text AS status, metadata
+     FROM raw_documents
+     WHERE fetched_at > now() - make_interval(hours => $1)
+       AND metadata->>'full_text_error' = ANY($2::text[])
+       AND NOT (metadata ? 'full_text_retried')
+       AND status <> 'SKIPPED'
+     ORDER BY fetched_at, id`,
+    [RETRY_WINDOW_HOURS, [...RETRYABLE_REASONS]],
+  );
+  const retry = await retryFullText(http, retryRows, (key) => scopeByKey.get(key), fullTextLimits, pageBudget, new Date());
+  retryCounts = retry.counts;
+  for (const u of retry.updates) {
+    if (u.recovered) {
+      const title = retryRows.find((r) => r.id === u.id)?.title ?? null;
+      await client.query(
+        `UPDATE raw_documents
+         SET raw_text = $2, text_kind = 'FULL_TEXT', content_hash = $3, metadata = $4::jsonb, status = 'NEW'
+         WHERE id = $1`,
+        [u.id, u.rawText, contentHash(title, u.rawText), JSON.stringify(u.metadata)],
+      );
+    } else {
+      await client.query(`UPDATE raw_documents SET metadata = $2::jsonb WHERE id = $1`, [u.id, JSON.stringify(u.metadata)]);
+    }
+  }
+} catch (error) {
+  // A retry problem never fails the run: new items are already stored.
+  console.log(`Full-text retry skipped: ${shortReason(errorMessage(error))}`);
+}
 await client.end();
 
 // Summary: counts only, never row text.
@@ -306,6 +346,9 @@ const fullTextReasons = formatFullTextReasons(fullTextTotal.reasons);
 console.log(
   `Full text: ${config.fetch_full_text ? "on" : "off"} · ${fullTextTotal.attempted} attempted · ${fullTextTotal.fetched} succeeded · ${fullTextTotal.failed} fell back (${fullTextReasons}) · ${fullTextTotal.paywalled} paywalled, not fetched · ${fullTextTotal.capped} over the cap of ${config.full_text_max_pages} pages`,
 );
+console.log(
+  `Full-text retry: retried ${retryCounts.retried} · recovered ${retryCounts.recovered}${retryCounts.capped ? ` · ${retryCounts.capped} left for a later run (page cap)` : ""}`,
+);
 
 // A few failing sources are warnings; the run fails only when more than half fail.
 // (A database or config failure throws earlier and exits non-zero.)
@@ -334,6 +377,8 @@ if (args.ci) {
   setOutput("full_text_paywalled", fullTextTotal.paywalled);
   // Reason labels and counts only (never URLs or titles).
   setOutput("full_text_reasons", fullTextReasons);
+  setOutput("full_text_retried", retryCounts.retried);
+  setOutput("full_text_recovered", retryCounts.recovered);
 }
 if (tooManyFailed) process.exitCode = 1;
 

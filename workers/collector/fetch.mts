@@ -35,12 +35,12 @@ export class HttpClient {
     return Math.max(override ?? this.perHostIntervalMs, crawlDelay);
   }
 
-  private async rawGet(url: string, intervalMs: number): Promise<Response> {
+  private async rawGet(url: string, intervalMs: number, redirect: RequestRedirect = "follow"): Promise<Response> {
     const { host } = new URL(url);
     await this.waitTurn(host, intervalMs);
     return fetch(url, {
       headers: { "User-Agent": this.userAgent, Accept: "*/*" },
-      redirect: "follow",
+      redirect,
       signal: AbortSignal.timeout(this.timeoutMs),
     });
   }
@@ -76,17 +76,33 @@ export class HttpClient {
     }
   }
 
-  /** robots.txt check, per-host rate limit, then GET. Non-2xx responses are returned, not thrown. */
-  async get(url: string, options: { minIntervalMs?: number } = {}): Promise<{ status: number; body: string }> {
-    await this.assertAllowed(url);
-    const { host, origin } = new URL(url);
-    const interval = this.intervalFor(origin, options.minIntervalMs);
-    const res = await this.rawGet(url, interval);
-    const body = await res.text();
-    // Count the gap from when the response finished, not when the request started:
-    // slow responses would otherwise let the next request start too soon.
-    this.nextSlot.set(host, Math.max(this.nextSlot.get(host) ?? 0, Date.now() + interval));
-    return { status: res.status, body };
+  /**
+   * robots.txt check, per-host rate limit, then GET. Non-2xx responses are returned, not thrown.
+   * redirect "follow" (default) lets fetch follow any redirect. "same-host" follows up to 3
+   * redirects only when they stay on the same host, checking robots.txt and the rate limit for
+   * each hop; a redirect to another host is returned as-is (3xx).
+   */
+  async get(
+    url: string,
+    options: { minIntervalMs?: number; redirect?: "follow" | "same-host" } = {},
+  ): Promise<{ status: number; body: string }> {
+    let current = url;
+    for (let hop = 0; ; hop++) {
+      await this.assertAllowed(current);
+      const { host, origin } = new URL(current);
+      const interval = this.intervalFor(origin, options.minIntervalMs);
+      const sameHost = options.redirect === "same-host";
+      const res = await this.rawGet(current, interval, sameHost ? "manual" : "follow");
+      const body = await res.text();
+      // Count the gap from when the response finished, not when the request started:
+      // slow responses would otherwise let the next request start too soon.
+      this.nextSlot.set(host, Math.max(this.nextSlot.get(host) ?? 0, Date.now() + interval));
+      const location = res.headers.get("location");
+      if (!sameHost || res.status < 300 || res.status >= 400 || !location || hop >= 3) return { status: res.status, body };
+      const next = new URL(location, current);
+      if (next.host !== host) return { status: res.status, body };
+      current = next.toString();
+    }
   }
 }
 

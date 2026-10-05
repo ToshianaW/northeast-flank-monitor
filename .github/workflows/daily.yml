@@ -96,6 +96,9 @@ jobs:
           FT_REASONS: ${{ steps.collect.outputs.full_text_reasons }}
           FT_PAYWALLED: ${{ steps.collect.outputs.full_text_paywalled }}
           FT_CAPPED: ${{ steps.collect.outputs.full_text_capped }}
+          # One retry of recent temporary full-text failures (counts only).
+          FT_RETRIED: ${{ steps.collect.outputs.full_text_retried }}
+          FT_RECOVERED: ${{ steps.collect.outputs.full_text_recovered }}
           DRAFTS: ${{ steps.extract.outputs.drafts_created }}
           WOULD_CREATE: ${{ steps.extract.outputs.drafts_would_create }}
           STOP_REASON: ${{ steps.extract.outputs.stop_reason }}
@@ -124,7 +127,7 @@ jobs:
             echo "| | |"
             echo "|---|---|"
             echo "| Rows collected | ${NEW_ROWS:-–} |"
-            echo "| Full-text pages | attempted ${FT_ATTEMPTED:-–} · succeeded ${FT_FETCHED:-–} · fell back ${FT_FAILED:-–} (${FT_REASONS:-–}) · paywalled, not fetched ${FT_PAYWALLED:-–} · over cap ${FT_CAPPED:-–} |"
+            echo "| Full-text pages | attempted ${FT_ATTEMPTED:-–} · succeeded ${FT_FETCHED:-–} · fell back ${FT_FAILED:-–} (${FT_REASONS:-–}) · paywalled, not fetched ${FT_PAYWALLED:-–} · over cap ${FT_CAPPED:-–} · retried ${FT_RETRIED:-–} · recovered ${FT_RECOVERED:-–} |"
             echo "| Sources failed | ${FAILED_SOURCES:-–} of ${TOTAL_SOURCES:-–} |"
             echo "| Drafts created | $drafts |"
             echo "| Duplicate candidates found | ${CANDIDATES:-–} |"

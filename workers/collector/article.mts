@@ -156,13 +156,14 @@ export function extractArticleText(html: string): string | null {
 }
 
 export async function fetchFullText(
-  http: HttpClient,
+  http: Pick<HttpClient, "get">,
   url: string,
   limits: FullTextLimits,
+  options: { redirect?: "follow" | "same-host" } = {},
 ): Promise<{ ok: true; text: string } | { ok: false; reason: FullTextFailure }> {
   let res: { status: number; body: string };
   try {
-    res = await http.get(url);
+    res = await http.get(url, options.redirect ? { redirect: options.redirect } : {});
   } catch (error) {
     if (error instanceof RobotsDisallowedError) return { ok: false, reason: "robots" };
     // HttpClient aborts with AbortSignal.timeout, which rejects with a TimeoutError.

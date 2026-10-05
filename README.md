@@ -50,7 +50,8 @@ npm run collect
 - Configuration: `data/sources/collector.json` (feeds, listings, GDELT queries, keyword and region filters, full-text opt-ins, skip lists, rate limits).
 - Needs `DATABASE_URL` (the direct connection) in `.env.local` or the environment.
 - Honors robots.txt, identifies itself as `NortheastFlankMonitor-collector/0.1`, and waits between requests to the same host (GDELT: at least 6 s after each response).
-- Prints one summary line per source and a full-text line (counts only); exits with code 1 only if more than half of the sources failed.
+- Retries the article fetch once for rows from the last 24 hours whose first attempt failed with `no_article_body`, `too_short` or `timeout` (never robots refusals, paywalled items or skipped sources; same-host redirects only; within the same 30-page cap, after new items). A recovered row gets the full text and goes back to NEW for the extractor; the row records `full_text_retried`.
+- Prints one summary line per source, a full-text line and a retry line (counts only); exits with code 1 only if more than half of the sources failed.
 - GDELT data is used under its terms, which require citing the GDELT Project with a link to https://www.gdeltproject.org/.
 
 ## Open data API
