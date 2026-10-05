@@ -374,3 +374,33 @@ export async function getPublishedCoverage(
     months: months.rows,
   };
 }
+
+/**
+ * Where a merged-away event now lives: follows MERGE review actions (a target may itself have
+ * been merged later) to a PUBLISHED event. Null when the id was never merged, or the chain ends
+ * at an event that is not public.
+ */
+export async function getMergedIntoPublishedEvent(id: string): Promise<string | null> {
+  if (!UUID_RE.test(id)) return null;
+  const { rows } = await getPool().query<{ event_id: string }>(
+    `WITH RECURSIVE chain (event_id, depth) AS (
+       SELECT ra.merged_into_event_id, 1
+       FROM events e
+       JOIN review_actions ra ON ra.event_id = e.event_id AND ra.action = 'MERGE'
+       WHERE e.event_id = $1 AND e.review_status = 'MERGED'
+       UNION
+       SELECT ra.merged_into_event_id, c.depth + 1
+       FROM chain c
+       JOIN events e ON e.event_id = c.event_id AND e.review_status = 'MERGED'
+       JOIN review_actions ra ON ra.event_id = e.event_id AND ra.action = 'MERGE'
+       WHERE c.depth < 10
+     )
+     SELECT c.event_id
+     FROM chain c JOIN events e ON e.event_id = c.event_id
+     WHERE e.review_status = 'PUBLISHED'
+     ORDER BY c.depth DESC
+     LIMIT 1`,
+    [id],
+  );
+  return rows[0]?.event_id ?? null;
+}

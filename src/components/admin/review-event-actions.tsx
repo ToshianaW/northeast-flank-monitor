@@ -30,7 +30,37 @@ import {
   type ConfidenceSuggestion,
 } from "@/lib/confidence-suggestion";
 
-type MergeTarget = { event_id: string; headline: string; event_date: string };
+type MergeTarget = { event_id: string; headline: string; event_date: string; review_status: ReviewStatus };
+
+function MergeTargetSelect({
+  targets,
+  defaultValue,
+}: {
+  targets: MergeTarget[];
+  defaultValue?: string;
+}) {
+  const selected = defaultValue && targets.some((t) => t.event_id === defaultValue) ? defaultValue : "";
+  return (
+    <div className="grid gap-2">
+      <Label htmlFor="target_event_id">Target event</Label>
+      <NativeSelect
+        key={selected}
+        id="target_event_id"
+        name="target_event_id"
+        required
+        defaultValue={selected}
+        className="w-full"
+      >
+        <NativeSelectOption value="">Choose…</NativeSelectOption>
+        {targets.map((target) => (
+          <NativeSelectOption key={target.event_id} value={target.event_id}>
+            {target.event_date} — {target.headline}
+          </NativeSelectOption>
+        ))}
+      </NativeSelect>
+    </div>
+  );
+}
 
 type Props = {
   eventId: string;
@@ -212,30 +242,56 @@ export function ReviewEventActions({
               reviewerDefault={reviewerDefault}
               submitLabel="Merge into target"
             >
-              <div className="grid gap-2">
-                <Label htmlFor="target_event_id">Target event</Label>
-                <NativeSelect
-                  key={defaultMergeTarget ?? ""}
-                  id="target_event_id"
-                  name="target_event_id"
-                  required
-                  defaultValue={defaultMergeTarget ?? ""}
-                  className="w-full"
-                >
-                  <NativeSelectOption value="">Choose…</NativeSelectOption>
-                  {mergeTargets.map((target) => (
-                    <NativeSelectOption key={target.event_id} value={target.event_id}>
-                      {target.event_date} — {target.headline}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              </div>
+              <MergeTargetSelect targets={mergeTargets} defaultValue={defaultMergeTarget} />
+            </ActionForm>
+          </div>
+        </div>
+      ) : reviewStatus === "PUBLISHED" ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ActionForm
+            action={rejectEventAction}
+            eventId={eventId}
+            reviewerDefault={reviewerDefault}
+            submitLabel="Remove from site"
+          >
+            <p className="text-xs text-text-muted">
+              Takes the event off every public page, the map, the sitemap and open data. It stays
+              here as Rejected, with its history. Nothing is deleted.
+            </p>
+            <div className="grid gap-2">
+              <Label htmlFor="reject_reason">Reason for removal</Label>
+              <Input
+                id="reject_reason"
+                name="reject_reason"
+                required
+                minLength={3}
+                maxLength={500}
+              />
+            </div>
+          </ActionForm>
+
+          <div id="merge" className="grid">
+            <ActionForm
+              action={mergeEventAction}
+              eventId={eventId}
+              reviewerDefault={reviewerDefault}
+              submitLabel="Merge into target"
+            >
+              <p className="text-xs text-text-muted">
+                Moves this event&apos;s sources to the target and takes this event off the site.
+                Its public link redirects to the target.
+              </p>
+              <MergeTargetSelect
+                targets={mergeTargets.filter((t) => t.review_status === "PUBLISHED")}
+                defaultValue={defaultMergeTarget}
+              />
             </ActionForm>
           </div>
         </div>
       ) : (
         <p className="text-sm text-text-secondary">
-          Approve, reject, and merge are only available for draft or pending events.
+          This event is {reviewStatus === "MERGED" ? "merged away" : "rejected"}; there are no
+          actions left for it.
         </p>
       )}
     </div>

@@ -1,6 +1,6 @@
 import { pageMetadata } from "@/lib/site-metadata";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { connection } from "next/server";
 import { ArrowLeft } from "lucide-react";
 import { formatEventDate, formatUtcTime } from "@/components/event-log-entry";
@@ -18,6 +18,7 @@ import {
   SOURCE_RELATIONSHIP_LABELS,
 } from "@/lib/event-labels";
 import {
+  getMergedIntoPublishedEvent,
   getPublishedEvent,
   listPublicEventSources,
   type PublicEventSource,
@@ -127,7 +128,12 @@ export default async function EventPage({ params }: PageProps<"/events/[id]">) {
     // Approved links only, with both events PUBLISHED at read time (migration 0010).
     listApprovedReferences(id),
   ]);
-  if (!event) notFound();
+  if (!event) {
+    // A merged-away event lives on as the event it was merged into.
+    const mergedInto = await getMergedIntoPublishedEvent(id);
+    if (mergedInto) permanentRedirect(`/events/${mergedInto}`);
+    notFound();
+  }
   const referenceLines = references.map((r) => referenceLine(r, event));
 
   const location = [

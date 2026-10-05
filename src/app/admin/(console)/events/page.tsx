@@ -85,7 +85,14 @@ export default async function AdminEventsPage({
                       {REVIEW_STATUS_LABELS[event.review_status]}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="whitespace-nowrap text-right">
+                    <Link
+                      href={`/admin/review/${event.event_id}`}
+                      className={buttonVariants({ variant: "ghost", size: "sm" })}
+                      title="Approve, reject, remove from site, or merge"
+                    >
+                      Review
+                    </Link>
                     <Link
                       href={`/admin/events/${event.event_id}/edit`}
                       className={buttonVariants({ variant: "outline", size: "sm" })}

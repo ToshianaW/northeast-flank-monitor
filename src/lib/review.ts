@@ -1,6 +1,7 @@
 import "server-only";
 import { getPool } from "@/lib/db";
 import type { ConfidenceLevel, EventType, SourceRelationship } from "@/lib/event-labels";
+import { exerciseConstraintMessage } from "@/lib/exercise-rules";
 import {
   isTier4OnlySupport,
   TIER4_ONLY_MESSAGE,
@@ -370,6 +371,10 @@ export async function approveEvent(
   }
 }
 
+/** Raised by the 0007 trigger when the event is the last evidence for a linked exercise's reset status. */
+export const LINKED_EXERCISE_EVIDENCE_ERROR =
+  "This event is the last evidence for its linked exercise's reset status. Set those statuses back to Unknown on the exercise first, or unlink the exercise.";
+
 export async function rejectEvent(
   eventId: string,
   reviewer: string,
@@ -393,12 +398,14 @@ export async function rejectEvent(
       await client.query("ROLLBACK");
       return { ok: false, error: "Event not found." };
     }
+    // A published event is removed from the site the same way: REJECTED, logged, never deleted.
     if (
       event.review_status !== "DRAFT" &&
-      event.review_status !== "PENDING_REVIEW"
+      event.review_status !== "PENDING_REVIEW" &&
+      event.review_status !== "PUBLISHED"
     ) {
       await client.query("ROLLBACK");
-      return { ok: false, error: "Only draft or pending events can be rejected." };
+      return { ok: false, error: "Only draft, pending or published events can be rejected or removed." };
     }
 
     const sourceIds = await listSourceIdsForEvent(eventId);
@@ -422,6 +429,7 @@ export async function rejectEvent(
     return { ok: true };
   } catch (error) {
     await client.query("ROLLBACK");
+    if (exerciseConstraintMessage(error)) return { ok: false, error: LINKED_EXERCISE_EVIDENCE_ERROR };
     throw error;
   } finally {
     client.release();
@@ -513,10 +521,11 @@ export async function mergeEventInto(
     }
     if (
       sourceEvent.review_status !== "DRAFT" &&
-      sourceEvent.review_status !== "PENDING_REVIEW"
+      sourceEvent.review_status !== "PENDING_REVIEW" &&
+      sourceEvent.review_status !== "PUBLISHED"
     ) {
       await client.query("ROLLBACK");
-      return { ok: false, error: "Only draft or pending events can be merged away." };
+      return { ok: false, error: "Only draft, pending or published events can be merged away." };
     }
 
     const { rows: targetRows } = await client.query<Event>(
@@ -531,6 +540,11 @@ export async function mergeEventInto(
     if (targetEvent.review_status === "MERGED") {
       await client.query("ROLLBACK");
       return { ok: false, error: "Cannot merge into an event that is already merged away." };
+    }
+    // A published event's page redirects to its target, so the target must be public too.
+    if (sourceEvent.review_status === "PUBLISHED" && targetEvent.review_status !== "PUBLISHED") {
+      await client.query("ROLLBACK");
+      return { ok: false, error: "A published event can only be merged into another published event." };
     }
 
     const { rows: moving } = await client.query<{
@@ -584,17 +598,18 @@ export async function mergeEventInto(
       );
     }
 
-    await client.query(`DELETE FROM event_sources WHERE event_id = $1`, [
-      sourceEventId,
-    ]);
-
     const sourceIds = moving.map((r) => r.source_id);
     const auditBefore = eventToAuditJson(sourceEvent);
 
+    // Status first, so a published source event never exists without sources, even briefly.
     await client.query(
       `UPDATE events SET review_status = 'MERGED' WHERE event_id = $1`,
       [sourceEventId],
     );
+
+    await client.query(`DELETE FROM event_sources WHERE event_id = $1`, [
+      sourceEventId,
+    ]);
 
     await refreshPrimarySourceSnapshot(client, targetEventId);
 
@@ -612,6 +627,7 @@ export async function mergeEventInto(
     return { ok: true };
   } catch (error) {
     await client.query("ROLLBACK");
+    if (exerciseConstraintMessage(error)) return { ok: false, error: LINKED_EXERCISE_EVIDENCE_ERROR };
     throw error;
   } finally {
     client.release();
@@ -620,13 +636,14 @@ export async function mergeEventInto(
 
 export async function listMergeTargetOptions(
   excludeEventId: string,
-): Promise<{ event_id: string; headline: string; event_date: Date }[]> {
+): Promise<{ event_id: string; headline: string; event_date: Date; review_status: Event["review_status"] }[]> {
   const { rows } = await getPool().query<{
     event_id: string;
     headline: string;
     event_date: Date;
+    review_status: Event["review_status"];
   }>(
-    `SELECT event_id, headline, event_date
+    `SELECT event_id, headline, event_date, review_status
      FROM events
      WHERE event_id <> $1 AND review_status <> 'MERGED'
      ORDER BY event_date DESC, headline ASC

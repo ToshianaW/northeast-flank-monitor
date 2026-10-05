@@ -25,7 +25,7 @@ export const metadata = { title: "Review queue" };
 const ACTION_MESSAGES = {
   submitted: "Submitted for review.",
   approved: "Event published.",
-  rejected: "Event rejected.",
+  rejected: "Event rejected (or removed from the site, if it was published).",
   merged: "Event merged away; source links moved to the target.",
 } as const;
 

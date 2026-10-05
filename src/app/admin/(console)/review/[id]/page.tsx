@@ -248,7 +248,7 @@ export default async function ReviewEventPage({
                   {d.model_reason ? (
                     <p className="mt-0.5 text-xs text-text-secondary">Model: {d.model_reason}</p>
                   ) : null}
-                  {canModerate ? (
+                  {canModerate || (event.review_status === "PUBLISHED" && d.other_review_status === "PUBLISHED") ? (
                     <Link
                       href={`/admin/review/${id}?mergeTarget=${d.other_event_id}#merge`}
                       className="mt-1 inline-block text-xs text-teal-blue hover:underline"
@@ -401,6 +401,7 @@ export default async function ReviewEventPage({
               event_id: t.event_id,
               headline: t.headline,
               event_date: t.event_date.toISOString().slice(0, 10),
+              review_status: t.review_status,
             }))}
             editHref={editHref}
             defaultMergeTarget={
