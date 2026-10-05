@@ -80,9 +80,21 @@ jobs:
           if [ "$DRY_RUN" = "true" ]; then args+=(--no-model); fi
           npm run dedup -- "${args[@]}"
 
+      # Recorded API spend for the summary (read-only, no model calls). It can never fail the job:
+      # the script prints "API spend: unavailable" on any error, and this step continues on error.
+      - name: Spend
+        id: spend
+        if: ${{ always() }}
+        continue-on-error: true
+        timeout-minutes: 2
+        env:
+          DATABASE_URL_POOLED: ${{ secrets.DATABASE_URL }}
+        run: npm run spend:report -- --ci
+
       - name: Job summary
         if: ${{ always() }}
         env:
+          SPEND_LINE: ${{ steps.spend.outputs.line }}
           EVENT: ${{ github.event_name }}
           SCHEDULE: ${{ github.event.schedule }}
           COLLECT_OUTCOME: ${{ steps.collect.outcome }}
@@ -137,6 +149,8 @@ jobs:
             echo "| Drafts created | $drafts |"
             echo "| Duplicate candidates found | ${CANDIDATES:-–} |"
             echo "| Cost (extract + dedup) | $cost |"
+            echo
+            echo "${SPEND_LINE:-API spend: unavailable}"
             echo
             if [ -n "$WARNED_SOURCES" ]; then
               echo "Collector warnings: $WARNED_SOURCES"

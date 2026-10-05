@@ -42,7 +42,7 @@ Model calls (extraction, dedup judge, digest drafting) are paid per token and ca
 | Dedup judge | at most $0.01 per run, 12 runs a day; past the cap, borderline pairs fall back to similarity only | $3.72 |
 | **Total** | | **$26.97** |
 
-Manual reruns add at most $0.15 (digest) or $0.01 (dedup) each; manual extractor runs stay inside the same rolling 24-hour budget. The optional reference suggestion step is off by default ($0.02 per click when on). The open-data API, the map, the Activity Index and automatic historical links make no model calls. Each pipeline run's job summary shows "API spend: last 24 h · last 30 days" from the recorded costs.
+Manual reruns add at most $0.15 (digest) or $0.01 (dedup) each; manual extractor runs stay inside the same rolling 24-hour budget. The optional reference suggestion step is off by default ($0.02 per click when on). The open-data API, the map, the Activity Index and automatic historical links make no model calls. Each pipeline run's job summary shows "API spend: last 24 h · last 30 days" from the recorded costs (extraction_runs, dedup_runs and each AI digest's `_meta.cost_usd`). Digests drafted before 5 October 2026, and digest runs that end without a saved draft, have no recorded cost; the line says how many digests it leaves out. If the query fails, the line reads "API spend: unavailable" and the job carries on.
 
 **Outside backstops** (set in the Anthropic Console, not in code):
 
