@@ -7,9 +7,9 @@ on:
   schedule:
     # Times are UTC. GitHub cron does not follow daylight saving, so the
     # local time of each run shifts by an hour when the clocks change.
-    # Every 4 hours at :17 past 00, 04, 08, 12, 16 and 20 UTC. Minute 17, not 0, avoids the
+    # Every 2 hours at :17 past each even hour (00:17, 02:17 … 22:17 UTC). Minute 17, not 0, avoids the
     # top-of-hour peak when GitHub delays or drops scheduled runs.
-    - cron: "17 */4 * * *"
+    - cron: "17 */2 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -111,7 +111,7 @@ jobs:
           DEDUP_COST: ${{ steps.dedup.outputs.cost_usd }}
         run: |
           case "$EVENT:$SCHEDULE" in
-            "schedule:17 */4 * * *") run="Scheduled every 4 hours at :17 (started $(date -u +%H:%M) UTC)" ;;
+            "schedule:17 */2 * * *") run="Scheduled every 2 hours at :17 (started $(date -u +%H:%M) UTC)" ;;
             schedule:*) run="Scheduled ($SCHEDULE UTC)" ;;
             *) run="Manual" ;;
           esac
