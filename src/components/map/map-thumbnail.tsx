@@ -65,7 +65,7 @@ export function MapThumbnail({ data, geo }: { data: MapData; geo: RegionFeatureC
 
   return (
     <div>
-      <Link href="/map" className="block overflow-hidden rounded-xl border border-border bg-background transition-colors hover:border-foam">
+      <Link href={`/map?days=${data.days}&layer=${data.layer}`} className="block overflow-hidden rounded-xl border border-border bg-background transition-colors hover:border-foam">
         <svg
           viewBox={`0 0 ${WIDTH} ${height}`}
           className="h-auto w-full"
@@ -96,7 +96,7 @@ export function MapThumbnail({ data, geo }: { data: MapData; geo: RegionFeatureC
       </Link>
       <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
         <MapLegend layer={data.layer} days={data.days} compact />
-        <Link href="/map" className="btn-pill">
+        <Link href={`/map?days=${data.days}&layer=${data.layer}`} className="btn-pill">
           Open the map →
         </Link>
       </div>

@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { ACTIVITY_TYPES, EVENT_TYPE_VALUES, STATEMENT_TYPES } from "./event-labels";
 import {
   buildMapData,
+  DASHBOARD_MAP_WINDOW,
   parseMapParams,
   shadeStep,
   type MapEventRow,
@@ -183,8 +184,14 @@ test("output carries no coordinates or article text", () => {
   assert.ok(!json.includes("SECRET") && !json.includes("54.5") && !json.includes("latitude"));
 });
 
-test("the dashboard thumbnail loads the same view /map opens on (default window and layer)", () => {
+test("the dashboard thumbnail shows the last 7 days on the /map layer, and links to that view", () => {
   const home = readFileSync("src/app/(public)/page.tsx", "utf8");
-  assert.ok(home.includes("loadMapData({ days: DEFAULT_MAP_WINDOW, layer: DEFAULT_MAP_LAYER })"));
-  assert.deepEqual(parseMapParams({}), { days: 30, layer: "all" });
+  assert.ok(home.includes("loadMapData({ days: DASHBOARD_MAP_WINDOW, layer: DEFAULT_MAP_LAYER })"));
+  assert.equal(DASHBOARD_MAP_WINDOW, 7);
+  assert.equal(parseMapParams({}).layer, "all");
+  // The thumbnail's links open /map on the same window and layer.
+  const thumb = readFileSync("src/components/map/map-thumbnail.tsx", "utf8");
+  assert.equal(thumb.split("href={`/map?days=${data.days}&layer=${data.layer}`}").length - 1, 2);
+  assert.ok(!thumb.includes('href="/map"'));
+  assert.deepEqual(parseMapParams({ days: "7", layer: "all" }), { days: 7, layer: "all" });
 });

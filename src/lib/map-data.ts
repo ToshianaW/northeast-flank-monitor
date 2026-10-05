@@ -29,10 +29,12 @@ import { isTier4OnlySupport } from "@/lib/source-labels";
 export const MAP_WINDOWS = [7, 30, 90] as const;
 export type MapWindow = (typeof MAP_WINDOWS)[number];
 export const DEFAULT_MAP_WINDOW: MapWindow = 30;
+/** The dashboard thumbnail shows the last 7 days; its links open /map on the same view. */
+export const DASHBOARD_MAP_WINDOW: MapWindow = 7;
 
 export const MAP_LAYERS = ["activity", "statements", "all"] as const;
 export type MapLayer = (typeof MAP_LAYERS)[number];
-/** /map opens on All, and the dashboard thumbnail shows the same view so the two always agree. */
+/** /map opens on All; the dashboard thumbnail uses the same layer. */
 export const DEFAULT_MAP_LAYER: MapLayer = "all";
 
 /** Tier 4-only items this recent are left off the map entirely (decision 11). */
