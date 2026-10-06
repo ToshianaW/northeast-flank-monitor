@@ -5,9 +5,17 @@ export type ListingConfig = {
   key: string;
   source: string;
   url: string;
-  parser: "govpl";
-  section_id: string;
+  /**
+   * govpl: a gov.pl ministry page section (section_id). drupal-news: Drupal news cards
+   * (<article class="node--type-news">, mil.lv). dated-path: links whose path carries the date,
+   * /lv/<section>/YYYY-MM-DD/<slug> (sargs.lv), limited to `sections`.
+   */
+  parser: "govpl" | "drupal-news" | "dated-path";
+  /** govpl only. */
+  section_id?: string;
   link_prefix: string;
+  /** dated-path only: the path sections to keep (for example ["latvija", "nato"]). */
+  sections?: string[];
   language: string;
   time_zone: string;
   /** Stored as usual, but marked so later steps never send the text to an AI model. */
@@ -58,6 +66,58 @@ function parseGovPl(html: string, sectionId: string, linkPrefix: string) {
   return cards;
 }
 
+type Card = { path: string; title: string; day: string | null };
+
+const cleanTitle = (html: string) => decodeEntities(html.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+
+/**
+ * Drupal news view (mil.lv/lv/zinas): <article class="node node--type-news …"> with
+ * <h2><a href="/lv/zinas/…">Title</a></h2> and <div class="date">DD.MM.YYYY</div>.
+ */
+export function parseDrupalNews(html: string, linkPrefix: string): Card[] {
+  const cards: Card[] = [];
+  for (const block of html.split(/<article\b[^>]*node--type-news/).slice(1)) {
+    const link = block.match(/<h2[^>]*>\s*<a href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/);
+    if (!link || !link[1].startsWith(linkPrefix)) continue;
+    const date = block.match(/class="date">\s*(\d{2})\.(\d{2})\.(\d{4})\s*</);
+    cards.push({ path: link[1], title: cleanTitle(link[2]), day: date ? `${date[3]}-${date[2]}-${date[1]}` : null });
+  }
+  return cards;
+}
+
+/**
+ * Pages whose article links carry the date in the path (sargs.lv):
+ * <a href="/lv/<section>/YYYY-MM-DD/<slug>" rel="bookmark">Title</a>. Only `sections` are kept;
+ * each article once, with the first non-empty title.
+ */
+export function parseDatedPath(html: string, linkPrefix: string, sections: readonly string[]): Card[] {
+  const byPath = new Map<string, Card>();
+  const re = /<a href="([^"#?]+)"[^>]*rel="bookmark"[^>]*>([\s\S]*?)<\/a>/g;
+  for (const m of html.matchAll(re)) {
+    const path = m[1];
+    if (!path.startsWith(linkPrefix)) continue;
+    const parts = path.slice(linkPrefix.length).split("/");
+    const [section, day] = parts;
+    if (!sections.includes(section) || !/^\d{4}-\d{2}-\d{2}$/.test(day ?? "") || parts.length < 3) continue;
+    const title = cleanTitle(m[2]);
+    const existing = byPath.get(path);
+    if (!existing) byPath.set(path, { path, title, day });
+    else if (!existing.title && title) existing.title = title;
+  }
+  return [...byPath.values()].filter((c) => c.title);
+}
+
+function parseCards(html: string, listing: ListingConfig): Card[] {
+  switch (listing.parser) {
+    case "govpl":
+      return parseGovPl(html, listing.section_id ?? "", listing.link_prefix);
+    case "drupal-news":
+      return parseDrupalNews(html, listing.link_prefix);
+    case "dated-path":
+      return parseDatedPath(html, listing.link_prefix, listing.sections ?? []);
+  }
+}
+
 export async function collectListing(
   http: HttpClient,
   listing: ListingConfig,
@@ -68,7 +128,7 @@ export async function collectListing(
   const res = await http.get(listing.url);
   if (res.status < 200 || res.status >= 300) throw new Error(`listing returned HTTP ${res.status}`);
 
-  const cards = parseGovPl(res.body, listing.section_id, listing.link_prefix);
+  const cards = parseCards(res.body, listing);
   if (cards.length === 0) throw new Error("no news cards found; the page layout may have changed");
 
   const sinceDay = dayIn(listing.time_zone, since);

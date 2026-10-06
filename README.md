@@ -41,7 +41,7 @@ Each migration runs in a single transaction, so a failure leaves the database un
 
 ## Collector
 
-Fetches the last 48 hours from configured feeds, two gov.pl news listings (Polish MoD and RCB), and the GDELT DOC API into the private `raw_documents` table (migration 0003). For sources whose robots.txt and terms allow it (decisions 16, 17 and 19), the article page of each item that passed the keyword and region filters is read for full text, at most 30 pages a run. Nothing in `raw_documents` is shown on the site.
+Fetches the last 48 hours from configured feeds, five news listings (gov.pl pages of the Polish MoD, RCB and Interior Ministry, the Latvian armed forces news list and Sargs.lv), and the GDELT DOC API into the private `raw_documents` table (migration 0003). For sources whose robots.txt and terms allow it (decisions 16, 17, 19 and 25), the article page of each item that passed the keyword and region filters is read for full text, at most 30 pages a run. Nothing in `raw_documents` is shown on the site.
 
 ```bash
 npm run collect
@@ -94,7 +94,7 @@ Roadmap: `docs/mvp-plan.md` §4. Decisions that override the plan: `docs/decisio
 
 | Step | What exists |
 | --- | --- |
-| 2.1 | Source collector (`npm run collect`): 31 feeds, 2 gov.pl listings, and GDELT into the private `raw_documents` table (migration 0003); robots.txt, rate limits, URL and content dedup, keyword and region filters (English, Polish, Lithuanian, Latvian and Russian stems), full text for 16 opted-in feeds and listings, `no_ai_processing` and `lead_only` flags, skip lists |
+| 2.1 | Source collector (`npm run collect`): 33 feeds, 5 listings (3 gov.pl pages, the Latvian armed forces news list and Sargs.lv), and GDELT into the private `raw_documents` table (migration 0003); robots.txt, rate limits, URL and content dedup, keyword and region filters (English, Polish, Lithuanian, Latvian and Russian stems), full text for 16 opted-in feeds and listings, `no_ai_processing` and `lead_only` flags, skip lists |
 | 2.2 | Claude extraction (`npm run extract`): eligible `raw_documents` rows to validated DRAFT events (UNVERIFIED, one SUPPORTS source) for human review; predictive-language and excerpt checks; spend caps ($0.12 per run, `--max-usd`, and at most $0.60 in any rolling 24 hours; a row that does not fit waits for a later run instead of stopping the queue); `extraction_runs` log (migration 0004) |
 | 2.3 | Duplicate suggestions (`npm run dedup`): same type and country within 2 days, URL match or headline trigram similarity, one Haiku call for borderline pairs; shown on the review page with a pre-selected merge target; never merged automatically (migration 0005) |
 | 2.4 | Covered by human review (decision #12): `contradiction_flag`, notes, and CONTRADICTS sources are set by the reviewer; no automated contradiction detection |

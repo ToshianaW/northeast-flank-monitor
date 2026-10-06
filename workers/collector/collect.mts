@@ -254,7 +254,15 @@ for (const listing of config.listings) {
     await run(
       listing.key,
       "LISTING",
-      () => collectListing(http, listing, sourceIdFor(listing.source), since, matchers.region),
+      // Latvian, Lithuanian or Russian listings match region stems in their own language.
+      () =>
+        collectListing(
+          http,
+          listing,
+          sourceIdFor(listing.source),
+          since,
+          (matchers.regionByLanguage as Record<string, typeof matchers.region>)[listing.language] ?? matchers.region,
+        ),
       fullTextScope(listing.source, listing.full_text),
     ),
   );

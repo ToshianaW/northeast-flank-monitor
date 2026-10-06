@@ -686,6 +686,28 @@
       "keyword_filter": false,
       "no_ai_processing": false,
       "full_text": true
+    },
+    {
+      "key": "mil-ee-en",
+      "source": "Estonian Defence Forces",
+      "url": "https://mil.ee/en/feed/",
+      "_comment": "Estonian Defence Forces news in English (decision 25). Estonia-specific military news, so no keyword or region filter. Terms silent (privacy page only); robots.txt allows our client and Anthropic's crawlers.",
+      "language": "English",
+      "keyword_filter": false,
+      "no_ai_processing": false,
+      "full_text": true
+    },
+    {
+      "key": "milmag",
+      "source": "MILMAG",
+      "url": "https://milmag.pl/feed/",
+      "_comment": "Polish defence magazine (decision 25, enabled by the project owner on the decision 17 basis: our own summary, an excerpt of at most 20 words and a link; any removal request honoured). Covers the global defence industry, so the Polish keyword stems and a region term are required.",
+      "language": "Polish",
+      "keyword_filter": false,
+      "polish_filter": true,
+      "region_filter": true,
+      "no_ai_processing": false,
+      "full_text": true
     }
   ],
   "listings": [
@@ -713,6 +735,46 @@
       "language": "Polish",
       "time_zone": "Europe/Warsaw",
       "no_ai_processing": false,
+      "full_text": true
+    },
+    {
+      "key": "govpl-mswia",
+      "source": "Polish Ministry of Interior and Administration",
+      "url": "https://www.gov.pl/web/mswia",
+      "_comment": "Interior ministry news from the 'Aktualnosci' section (decision 25). It also covers police, fire and civil matters, so a region term (for example Białoruś, Litwa) is required in the title. gov.pl text is CC BY-SA 4.0 (decision 16).",
+      "parser": "govpl",
+      "section_id": "Aktualnosci",
+      "link_prefix": "/web/mswia/",
+      "language": "Polish",
+      "time_zone": "Europe/Warsaw",
+      "no_ai_processing": false,
+      "region_filter": true,
+      "full_text": true
+    },
+    {
+      "key": "mil-lv",
+      "source": "Latvian National Armed Forces",
+      "url": "https://www.mil.lv/lv/zinas",
+      "_comment": "Latvian National Armed Forces news list (decision 25); the site has no news feed. Latvia-specific military news, so no region filter. Terms silent (privacy and cookie pages only); robots.txt allows our client and Anthropic's crawlers.",
+      "parser": "drupal-news",
+      "link_prefix": "/lv/zinas/",
+      "language": "Latvian",
+      "time_zone": "Europe/Riga",
+      "no_ai_processing": false,
+      "full_text": true
+    },
+    {
+      "key": "sargs-lv",
+      "source": "Sargs.lv (Latvian Ministry of Defence portal)",
+      "url": "https://www.sargs.lv/lv",
+      "_comment": "Latvian MoD news portal, front page (no feed). Enabled by the project owner on the decision 17 basis (decision 25): 'Portāla „Sargs.lv” lietotāji drīkst izmantot informāciju bez portāla redakcijas atļaujas tikai nekomerciāliem nolūkiem ..., norādot atsauci uz portālu' (non-commercial use with attribution). News sections only (no podcasts or video), and each title needs a Latvian region term (for example Latvija, Lietuva, Baltkrievija).",
+      "parser": "dated-path",
+      "link_prefix": "/lv/",
+      "sections": ["latvija", "nato", "arvalstis", "pasaule"],
+      "language": "Latvian",
+      "time_zone": "Europe/Riga",
+      "no_ai_processing": false,
+      "region_filter": true,
       "full_text": true
     }
   ],

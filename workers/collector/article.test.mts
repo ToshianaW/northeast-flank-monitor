@@ -128,10 +128,12 @@ test("collector.json: exactly the approved sources opt in; the refused ones stay
   const all = [...config.feeds, ...config.listings];
   const optedIn = all.filter((f: { full_text?: boolean }) => f.full_text).map((f: { key: string }) => f.key).sort();
   assert.deepEqual(optedIn, [
-    "15min-lt", "certlv-en", "defence24", "err-news", "estonianworld", "euronews", "govpl-mon", "govpl-rcb",
-    "kyivindependent-news", "portalmorski", "rmf24-fakty", "rp-konflikty", "rp-radar-zbrojeniowy", "rp-swiat", "rp-wojsko",
-    "wargov-news",
+    "15min-lt", "certlv-en", "defence24", "err-news", "estonianworld", "euronews", "govpl-mon", "govpl-mswia", "govpl-rcb",
+    "kyivindependent-news", "mil-ee-en", "mil-lv", "milmag", "portalmorski", "rmf24-fakty", "rp-konflikty", "rp-radar-zbrojeniowy",
+    "rp-swiat", "rp-wojsko", "sargs-lv", "wargov-news",
   ]);
+  // Round 5 (decision 25): not enabled, never collected.
+  assert.ok(!all.some((f: { url: string }) => /bbn\.gov\.pl|gov\.pl\/web\/border/.test(f.url)));
   for (const f of all.filter((x: { key: string }) => x.key.startsWith("rp-"))) assert.equal(f.full_text_free_only, true, f.key);
   const refused = all.filter((f: { url: string; source: string }) =>
     /jauns\.lv|ve\.lt|lsm\.lv|lrvk\.lrv\.lt|aif\.ru|mil\.by|kremlin\.ru|theins\.ru|radio\.lublin\.pl|zerkalo\.io|kaliningrad-news\.ru|defence-industry\.eu/.test(f.url) ||

@@ -321,3 +321,70 @@ test("listing region filter: titles without a region term are stored as SKIPPED"
   const unfiltered = await collectListing(http, { ...listing, region_filter: false }, "source-id", new Date("2026-10-01T00:00:00Z"), region);
   assert.ok(unfiltered.every((d) => d.skipReason === undefined));
 });
+
+test("mil.lv news cards (drupal-news): title, link and DD.MM.YYYY date; older cards dropped", async () => {
+  const card = (slug: string, title: string, date: string) =>
+    `<div class="views-row"><article class="node node--type-news node--view-mode-search"> <h2> <a href="/lv/zinas/${slug}" rel="bookmark">${title}</a> </h2> <div class="node__content"> <div class="date">${date}</div> </div> </article></div>`;
+  const html = `<p>Found 5699 results</p>${card("zemessargi-macibas", "1. Rīgas brigādes zemessargi aizvadīs mācības", "06.10.2026")}${card("morana-ligums", "Latvija paraksta līgumu par Morana iegādi", "02.10.2026")}${card("vecs", "Old item", "20.09.2026")}`;
+  const http = { get: async () => ({ status: 200, body: html }) } as unknown as HttpClient;
+  const listing = {
+    key: "mil-lv-test",
+    source: "Latvian National Armed Forces",
+    url: "https://www.mil.lv/lv/zinas",
+    parser: "drupal-news" as const,
+    link_prefix: "/lv/zinas/",
+    language: "Latvian",
+    time_zone: "Europe/Riga",
+    no_ai_processing: false,
+  };
+  const docs = await collectListing(http, listing, "source-id", new Date("2026-10-01T00:00:00Z"));
+  assert.deepEqual(
+    docs.map((d) => [d.url, d.title, d.metadata.listing_date]),
+    [
+      ["https://www.mil.lv/lv/zinas/zemessargi-macibas", "1. Rīgas brigādes zemessargi aizvadīs mācības", "2026-10-06"],
+      ["https://www.mil.lv/lv/zinas/morana-ligums", "Latvija paraksta līgumu par Morana iegādi", "2026-10-02"],
+    ],
+  );
+});
+
+test("sargs.lv (dated-path): news sections only, date from the path, Latvian region filter", async () => {
+  const link = (path: string, title: string) =>
+    `<h2><a href="${path}" rel="bookmark"><span class="field field--name-title">${title}</span></a></h2><a href="${path}" rel="bookmark"></a>`;
+  const html = [
+    link("/lv/latvija/2026-10-06/brunoti-migrantu-pavadoni", "Bruņoti migrantu pavadoņi draud NBS karavīriem uz Latvijas–Baltkrievijas robežas"),
+    link("/lv/pasaule/2026-10-06/tramps-baze-lietuva", "Tramps apsvērs pastāvīgas ASV militārās bāzes izveidi Lietuvā"),
+    link("/lv/pasaule/2026-10-06/tuvie-austrumi", "Situācija Tuvajos Austrumos"),
+    link("/lv/podkasti/2026-10-06/drosi-ir-zinat", "Droši ir zināt: podkāsts"),
+    link("/lv/kategorija/podkasti", "Podkāsti"),
+  ].join("");
+  const http = { get: async () => ({ status: 200, body: html }) } as unknown as HttpClient;
+  const listing = {
+    key: "sargs-test",
+    source: "Sargs.lv (Latvian Ministry of Defence portal)",
+    url: "https://www.sargs.lv/lv",
+    parser: "dated-path" as const,
+    link_prefix: "/lv/",
+    sections: ["latvija", "nato", "arvalstis", "pasaule"],
+    language: "Latvian",
+    time_zone: "Europe/Riga",
+    no_ai_processing: false,
+    region_filter: true,
+  };
+  const lvConfig = JSON.parse(readFileSync("data/sources/collector.json", "utf8")) as {
+    region_terms: string[];
+    region_terms_pl: string[];
+    region_terms_lv: string[];
+  };
+  const latvianRegion = makeRegionMatcher(lvConfig.region_terms, lvConfig.region_terms_pl, lvConfig.region_terms_lv);
+  const docs = await collectListing(http, listing, "source-id", new Date("2026-10-01T00:00:00Z"), latvianRegion);
+  assert.deepEqual(
+    docs.map((d) => [d.url.replace("https://www.sargs.lv", ""), d.skipReason ?? "kept"]),
+    [
+      ["/lv/latvija/2026-10-06/brunoti-migrantu-pavadoni", "kept"],
+      ["/lv/pasaule/2026-10-06/tramps-baze-lietuva", "kept"],
+      ["/lv/pasaule/2026-10-06/tuvie-austrumi", "no_region_match"],
+    ],
+    "podcasts and category pages are dropped; each article once",
+  );
+  assert.equal(docs[0].metadata.listing_date, "2026-10-06");
+});
