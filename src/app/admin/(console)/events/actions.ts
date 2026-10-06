@@ -15,12 +15,27 @@ import {
   type EventSourceFormRow,
   type EventWritePayload,
 } from "@/lib/events";
+import { syncExerciseFromEvent } from "@/lib/exercise-from-event";
 import { exerciseConstraintMessage } from "@/lib/exercise-rules";
 import { logEditReviewAction, payloadHasSupportsSource } from "@/lib/review";
 import {
+  getReviewerName,
   requireReviewerName,
   reviewerFromForm,
 } from "@/lib/reviewer";
+
+/** Decision 26: a published Exercise-type event gets its exercise. A failure never undoes the save. */
+async function syncExerciseQuietly(eventId: string, reviewer: string) {
+  try {
+    const result = await syncExerciseFromEvent(eventId, reviewer);
+    if (result.status === "CREATED" || result.status === "LINKED") {
+      console.log(`exercise from event: ${result.status}`);
+      revalidatePath("/admin/exercises");
+    }
+  } catch (error) {
+    console.error(`exercise from event failed (${(error as { code?: string }).code ?? "error"})`);
+  }
+}
 
 const LINKED_EXERCISE_EVIDENCE_ERROR =
   "This event is the last evidence for its linked exercise's reset status. Set those statuses back to Unknown first, or keep the exercise link and date.";
@@ -140,6 +155,9 @@ export async function updateEventAction(
       }
       const updated = await updateEvent(id, payload, existing.review_status);
       if (!updated) throw new Error(`Event ${id} not found`);
+      if (existing.review_status === "PUBLISHED") {
+        await syncExerciseQuietly(id, reviewerForEdit ?? (await getReviewerName()) ?? "admin");
+      }
     },
     {
       preserveReviewStatus: existing.review_status,

@@ -421,6 +421,8 @@ export default async function ReviewEventPage({
               review_status: t.review_status,
             }))}
             editHref={editHref}
+            isExerciseType={event.event_type === "EXERCISE"}
+            linkedExerciseId={event.exercise_id}
             defaultMergeTarget={
               typeof mergeTarget === "string" && mergeTargets.some((t) => t.event_id === mergeTarget)
                 ? mergeTarget

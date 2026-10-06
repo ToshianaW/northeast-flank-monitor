@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import {
   approveEventAction,
+  createExerciseFromEventAction,
   mergeEventAction,
   rejectEventAction,
   searchMergeTargetsAction,
@@ -130,6 +131,9 @@ type Props = {
   editHref: string;
   /** Pre-selects the merge target (from a "Possible duplicate" link). Merging still needs a click. */
   defaultMergeTarget?: string;
+  /** Exercise-type events link to (or create) an exercise record (decision 26). */
+  isExerciseType?: boolean;
+  linkedExerciseId?: string | null;
 };
 
 function ActionForm({
@@ -240,6 +244,8 @@ export function ReviewEventActions({
   mergeTargets,
   editHref,
   defaultMergeTarget,
+  isExerciseType = false,
+  linkedExerciseId = null,
 }: Props) {
   const canModerate =
     reviewStatus === "DRAFT" || reviewStatus === "PENDING_REVIEW";
@@ -258,6 +264,35 @@ export function ReviewEventActions({
           Saves from edit log an EDIT review action when opened from this review page.
         </p>
       </div>
+
+      {isExerciseType ? (
+        linkedExerciseId ? (
+          <p className="text-sm">
+            <Link href={`/admin/exercises/${linkedExerciseId}/edit`} className="text-teal-blue hover:underline">
+              Linked exercise: open it →
+            </Link>
+          </p>
+        ) : reviewStatus === "PUBLISHED" ? (
+          <div className="max-w-xl">
+            <ActionForm
+              action={createExerciseFromEventAction}
+              eventId={eventId}
+              reviewerDefault={reviewerDefault}
+              submitLabel="Create exercise from this event"
+            >
+              <p className="text-xs text-text-muted">
+                Links this event to the exercise with the same name, or creates one from the
+                event (name, status, country, dates, units, summary and sources) and opens it so
+                you can check it. Approving an Exercise-type event does this automatically.
+              </p>
+            </ActionForm>
+          </div>
+        ) : (
+          <p className="text-xs text-text-muted">
+            Approving this Exercise-type event also links or creates its exercise.
+          </p>
+        )
+      ) : null}
 
       {canModerate ? (
         <div className="grid gap-4 lg:grid-cols-2">

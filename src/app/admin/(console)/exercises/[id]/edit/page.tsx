@@ -30,7 +30,7 @@ export default async function EditExercisePage({
   await requireAdminPage();
   await connection();
   const { id } = await params;
-  const { saved, linked: linkedSaved } = await searchParams;
+  const { saved, linked: linkedSaved, fromEvent } = await searchParams;
 
   const [exercise, exerciseSources, sources, linked, linkable, reviewerDefault] =
     await Promise.all([
@@ -57,6 +57,17 @@ export default async function EditExercisePage({
           </Link>
         ) : null}
       </div>
+
+      {fromEvent === "created" || fromEvent === "linked" ? (
+        <p
+          role="status"
+          className="mb-6 max-w-4xl border border-operational-teal/40 bg-operational-teal/10 px-3 py-2 text-sm text-foreground"
+        >
+          {fromEvent === "created"
+            ? `Exercise created from the event and linked to it${exercise.review_status === "PUBLISHED" ? " and published" : ". It is a draft because the event had no linked source to copy: add one and publish"}. Check the details below.`
+            : "The event is now linked to this exercise, which already had the same name."}
+        </p>
+      ) : null}
 
       {saved || linkedSaved ? (
         <p

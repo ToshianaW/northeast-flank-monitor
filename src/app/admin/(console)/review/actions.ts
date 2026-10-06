@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin-session";
 import { CONFIDENCE_LEVEL_VALUES, type ConfidenceLevel } from "@/lib/event-labels";
 import { getEvent } from "@/lib/events";
+import { syncExerciseFromEvent } from "@/lib/exercise-from-event";
 import {
   approveEvent,
   mergeEventInto,
@@ -85,6 +86,15 @@ export async function approveEventAction(
     console.error(`historical references: automatic linking failed (${(error as { code?: string }).code ?? "error"})`);
   }
 
+  // Decision 26: a published Exercise-type event gets its exercise (linked by name, or created
+  // from the event). A failure here never undoes the approval; the button on the review page retries.
+  try {
+    const exercise = await syncExerciseFromEvent(eventId, reviewer.name);
+    if (exercise.status === "CREATED" || exercise.status === "LINKED") console.log(`exercise from event: ${exercise.status}`);
+  } catch (error) {
+    console.error(`exercise from event failed (${(error as { code?: string }).code ?? "error"})`);
+  }
+
   await persistReviewer(reviewer.name);
   revalidatePath("/admin/review");
   revalidatePath(`/admin/review/${eventId}`);
@@ -138,4 +148,28 @@ export async function searchMergeTargetsAction(eventId: string, query: string): 
   const event = await getEvent(eventId);
   if (!event) return [];
   return searchMergeTargets(eventId, query, { publishedOnly: event.review_status === "PUBLISHED" });
+}
+
+/** "Create exercise from this event": links or creates the exercise, then opens it for review. */
+export async function createExerciseFromEventAction(
+  eventId: string,
+  _prev: ReviewActionState,
+  formData: FormData,
+): Promise<ReviewActionState> {
+  await requireAdmin();
+  const reviewer = reviewerOrError(formData);
+  if ("error" in reviewer) return { error: reviewer.error };
+
+  const result = await syncExerciseFromEvent(eventId, reviewer.name);
+  if (result.status === "NOT_FOUND") return { error: "Event not found." };
+  if (result.status === "NOT_EXERCISE") return { error: "Only events of type Exercise create an exercise." };
+  if (result.status === "NOT_PUBLISHED") return { error: "Approve and publish the event first." };
+  if (!("exerciseId" in result)) return { error: "Could not create the exercise." };
+
+  await persistReviewer(reviewer.name);
+  revalidatePath("/admin/exercises");
+  revalidatePath(`/admin/review/${eventId}`);
+  revalidatePath("/exercises");
+  revalidatePath("/");
+  redirect(`/admin/exercises/${result.exerciseId}/edit?fromEvent=${result.status === "CREATED" ? "created" : "linked"}`);
 }
