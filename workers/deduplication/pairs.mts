@@ -87,7 +87,7 @@ export function isNoAiOnly(supportNames: string[] | null, noAiSources: ReadonlyS
 export type ModelSkip = "NO_AI_SOURCE" | "NO_MODEL" | "SPEND_CAP";
 
 /** Per-run spend cap for the judge (docs/running-costs.md); past it, pairs fall back to trigram only. */
-export const DEDUP_MAX_USD = 0.01;
+export const DEDUP_MAX_USD = 0.005;
 
 /** True when another judge call could take the run past its call or spend cap. */
 export function judgeCapReached(

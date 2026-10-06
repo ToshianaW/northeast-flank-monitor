@@ -37,12 +37,12 @@ Model calls (extraction, dedup judge, digest drafting) are paid per token and ca
 
 | | Rule (in code) | Worst case, 31 days |
 | --- | --- | --- |
-| Extractor | at most $0.12 per run, and at most $0.60 in any rolling 24 hours (`workers/extractor/budget.mts`; spend read from `extraction_runs`) | $18.60 |
+| Extractor | at most $0.12 per run, and at most $0.60 in any rolling 24 hours however many runs there are (`workers/extractor/budget.mts`; spend read from `extraction_runs`) | $18.60 |
 | Digest | at most $0.15 per run, one scheduled run a day; the one automatic retry after a failed check fits inside it up to about 30,000 characters of event input (about 39 events; the largest day so far is 11). Above that the retry is refused rather than exceeding the cap | $4.65 |
-| Dedup judge | at most $0.01 per run, 12 runs a day; past the cap, borderline pairs fall back to similarity only | $3.72 |
+| Dedup judge | at most $0.005 per run, 24 runs a day (room for two calls at the $0.0025 worst-case estimate per call); past the cap, borderline pairs fall back to similarity only | $3.72 |
 | **Total** | | **$26.97** |
 
-Manual reruns add at most $0.15 (digest) or $0.01 (dedup) each; manual extractor runs stay inside the same rolling 24-hour budget. The optional reference suggestion step is off by default ($0.02 per click when on). The open-data API, the map, the Activity Index and automatic historical links make no model calls. Each pipeline run's job summary shows "API spend: last 24 h · last 30 days" from the recorded costs (extraction_runs, dedup_runs and each AI digest's `_meta.cost_usd`). Digests drafted before 5 October 2026, and digest runs that end without a saved draft, have no recorded cost; the line says how many digests it leaves out. If the query fails, the line reads "API spend: unavailable" and the job carries on.
+Manual reruns add at most $0.15 (digest) or $0.005 (dedup) each; manual extractor runs stay inside the same rolling 24-hour budget. The optional reference suggestion step is off by default ($0.02 per click when on). The open-data API, the map, the Activity Index and automatic historical links make no model calls. Each pipeline run's job summary shows "API spend: last 24 h · last 30 days" from the recorded costs (extraction_runs, dedup_runs and each AI digest's `_meta.cost_usd`). Digests drafted before 5 October 2026, and digest runs that end without a saved draft, have no recorded cost; the line says how many digests it leaves out. If the query fails, the line reads "API spend: unavailable" and the job carries on.
 
 **Outside backstops** (set in the Anthropic Console, not in code):
 

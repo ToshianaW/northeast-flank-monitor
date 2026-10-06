@@ -42,10 +42,12 @@ test("classifyPair: --no-model and the spend cap keep borderline pairs visible",
   assert.deepEqual(classifyPair({ ...base, similarity: 0.4, modelUnavailable: "SPEND_CAP" }), { kind: "BORDERLINE", skipped: "SPEND_CAP" });
 });
 
-test("dedup cap $0.01: judge calls stop at the cap and later borderline pairs fall back to trigram only", () => {
-  assert.equal(DEDUP_MAX_USD, 0.01);
+test("dedup cap $0.005: at least one judge call per run, then later borderline pairs fall back to trigram only", () => {
+  assert.equal(DEDUP_MAX_USD, 0.005);
   const workflow = readFileSync(join(process.cwd(), ".github/workflows/daily.yml"), "utf8");
-  assert.match(workflow, /args=\(--ci --max-usd 0\.01\)/);
+  assert.match(workflow, /args=\(--ci --max-usd 0\.005\)/);
+  // Hourly: 24 runs × $0.005 × 31 days = $3.72 worst case (docs/running-costs.md).
+  assert.match(workflow, /cron: "17 \* \* \* \*"/);
   // Ten borderline pairs, each judge call costing its full estimate (the worst case).
   const limits = { maxCalls: 100, maxUsd: DEDUP_MAX_USD, estimatedCallUsd: ESTIMATED_CALL_USD };
   const totals = { calls: 0, costUsd: 0 };
@@ -61,7 +63,8 @@ test("dedup cap $0.01: judge calls stop at the cap and later borderline pairs fa
     }
     return c.kind === "BORDERLINE" ? c.skipped : c.kind;
   });
-  assert.deepEqual(kinds, [...Array(4).fill("ASK_MODEL"), ...Array(6).fill("SPEND_CAP")]);
+  assert.ok(ESTIMATED_CALL_USD <= DEDUP_MAX_USD, "the cap allows at least one call");
+  assert.deepEqual(kinds, [...Array(2).fill("ASK_MODEL"), ...Array(8).fill("SPEND_CAP")]);
   assert.ok(totals.costUsd <= DEDUP_MAX_USD, "never past the cap");
   assert.equal(judgeCapReached({ calls: 0, costUsd: 0 }, { ...limits, maxUsd: 0.002 }), true, "cap below one call: no calls");
 });

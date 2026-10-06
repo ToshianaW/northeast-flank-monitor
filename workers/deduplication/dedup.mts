@@ -163,7 +163,7 @@ await client.end();
 
 console.log(`\nDedup run ${runId}${dryRun ? " (DRY RUN: no candidates written)" : ""} · subjects: ${subjects} · stop: ${stopReason}`);
 console.log(
-  `pairs: ${pairs.length} considered, ${totals.likely} likely, ${totals.borderline} borderline · model calls ${totals.calls} · cost $${totals.costUsd.toFixed(4)} (cap $${maxUsd.toFixed(2)})`,
+  `pairs: ${pairs.length} considered, ${totals.likely} likely, ${totals.borderline} borderline · model calls ${totals.calls} · cost $${totals.costUsd.toFixed(4)} (cap $${maxUsd.toFixed(3)})`,
 );
 // Pair lines carry headlines of unreviewed events: kept out of public CI logs.
 if (!ci) for (const line of lines) console.log(line);
