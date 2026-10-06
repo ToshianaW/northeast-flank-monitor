@@ -271,6 +271,10 @@ export function EventForm({
         <div className="grid gap-2">
           <Label htmlFor="summary">Summary</Label>
           <Textarea {...fieldProps("summary")} rows={4} />
+          <p className="text-xs text-text-muted">
+            Also the X post. Lead with the key fact (who did what, where, attributed) and keep it
+            to about 240 characters; a longer summary posts only its first whole sentences.
+          </p>
           <FieldError id="summary-error" message={errors.summary} />
         </div>
         <div className="grid gap-5 sm:grid-cols-2">

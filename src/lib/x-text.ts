@@ -54,8 +54,37 @@ export function truncateToWeight(text: string, budget: number): string {
   return `${out.replace(/[\s,;:.–-]+$/u, "")}…`;
 }
 
+/** Abbreviations whose period does not end a sentence ("U.S.", "Gen.", "No."). */
+const NOT_SENTENCE_END = /(?:\b[A-Z]\.|\b(?:Mr|Mrs|Ms|Dr|Gen|Lt|Col|Maj|Capt|Sgt|Adm|Brig|St|No|vs|approx|e\.g|i\.e)\.)["'”)]?$/;
+
+export function splitSentences(text: string): string[] {
+  const out: string[] = [];
+  for (const piece of text.split(/(?<=[.!?]["'”)]?)\s+(?=["'“(]?[A-Z0-9])/u)) {
+    if (out.length > 0 && NOT_SENTENCE_END.test(out[out.length - 1])) out[out.length - 1] += ` ${piece}`;
+    else out.push(piece);
+  }
+  return out;
+}
+
+/**
+ * The longest run of whole sentences from the start of `text` within `budget` weighted
+ * characters, or null when even the first sentence is too long. The summary leads with its hook,
+ * so a long summary still posts as a complete sentence instead of stopping mid-thought.
+ */
+export function fitWholeSentences(text: string, budget: number): string | null {
+  let out = "";
+  for (const sentence of splitSentences(text)) {
+    const next = out ? `${out} ${sentence}` : sentence;
+    if (weightedLength(next) > budget) break;
+    out = next;
+  }
+  return out || null;
+}
+
 /**
  * Summary (or headline when there is no summary), a line break, and the source link.
+ * A summary too long for the post keeps its whole leading sentences; only a single overlong
+ * sentence is cut at a word boundary with "…".
  * Refused when there is no http(s) source link, or the text has predictive wording or coordinates.
  */
 export function buildPostText(input: PostInput): PostText {
@@ -72,7 +101,9 @@ export function buildPostText(input: PostInput): PostText {
   if (phrase) return { ok: false, reason: `predictive wording ("${phrase}")` };
   if (COORDINATES.test(body)) return { ok: false, reason: "coordinates in the text" };
   // Budget: 280 minus the link (23) and the line break (1).
-  const text = `${truncateToWeight(body, MAX_WEIGHT - LINK_WEIGHT - 1)}\n${url.href}`;
+  const budget = MAX_WEIGHT - LINK_WEIGHT - 1;
+  const fitted = weightedLength(body) <= budget ? body : (fitWholeSentences(body, budget) ?? truncateToWeight(body, budget));
+  const text = `${fitted}\n${url.href}`;
   return { ok: true, text };
 }
 

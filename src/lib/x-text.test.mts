@@ -3,7 +3,16 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildPostText, digestPostInput, MAX_WEIGHT, postWeight, truncateToWeight, weightedLength } from "./x-text";
+import {
+  buildPostText,
+  digestPostInput,
+  fitWholeSentences,
+  MAX_WEIGHT,
+  postWeight,
+  splitSentences,
+  truncateToWeight,
+  weightedLength,
+} from "./x-text";
 
 test("daily digest: dated label, Summary without reference markers, link to the digest page", () => {
   const digest = {
@@ -51,6 +60,21 @@ test("long summaries are cut at a word boundary and the post stays within 280", 
   assert.ok(body.endsWith("…"));
   assert.match(body, /word\d+…$/, "ends on a whole word");
   assert.ok(r.text.endsWith(url), "the link is kept whole");
+});
+
+test("a long summary posts its whole leading sentences (the hook), never a cut-off sentence", () => {
+  const hook = "Russia moved Iskander launchers to Kaliningrad Oblast, Lithuania's defence ministry said.";
+  const second = "The ministry said the U.S. Army and Gen. Smith's staff were briefed on 3 October.";
+  const filler = `It added that ${"further routine details ".repeat(12).trim()}.`;
+  const r = buildPostText({ summary: `${hook} ${second} ${filler}`, headline: "H", sourceUrl: url });
+  assert.ok(r.ok);
+  assert.equal(r.text, `${hook} ${second}\n${url}`, "abbreviations do not end a sentence");
+  assert.ok(postWeight(r.text) <= MAX_WEIGHT);
+  assert.deepEqual(splitSentences("Talks with the U.S. ended. No. 5 Brigade moved."), [
+    "Talks with the U.S. ended.",
+    "No. 5 Brigade moved.",
+  ]);
+  assert.equal(fitWholeSentences(`${"x".repeat(300)}. Short.`, 100), null, "first sentence too long: caller cuts it");
 });
 
 test("weights: Latin and Cyrillic count 1, emoji and CJK count 2", () => {

@@ -1,7 +1,7 @@
 import { EVENT_TYPE_VALUES, type EventType } from "@/lib/event-labels";
 
 /** Bump whenever SYSTEM_PROMPT or OUTPUT_SCHEMA changes; stored on every run and event. */
-export const PROMPT_VERSION = "extract-v2";
+export const PROMPT_VERSION = "extract-v3";
 
 export const DOCUMENT_KINDS = [
   "NEWS_REPORT",
@@ -117,7 +117,11 @@ OFFICIAL STATEMENTS
 WORDING
 - Neutral, factual, restrained. No words characterising intent or threat (for example "aggressive", "provocative", "alarming", "massive", "unprecedented") unless quoted and attributed.
 - No predictive or speculative language. Do not say what may, could, or will happen, what an activity signals or means, or whether conflict is likely. Do not describe intent. Predictions in the document are not events.
-- headline: at most 15 words, in English. summary: 1 to 3 sentences in English, reporting only what the document states, with attribution.
+- headline: at most 15 words, in English.
+- summary: in English, 1 to 3 short sentences and at most 240 characters in total, reporting only what the document states, with attribution. It is also posted on X, so it must grab attention through substance, not style:
+  - The first sentence is the hook and must stand on its own: the single most newsworthy concrete fact (who did what, where, with numbers or named units when the document gives them), with attribution. Lead with the action, in active voice; no preamble such as "According to a report published on...".
+  - Add a second or third sentence only for the next most important detail. Leave out background the reader does not need.
+  - No questions, exclamation marks, emoji, hashtags, teaser phrases ("breaking", "you won't believe", "here's why"), or cliffhangers. The WORDING rules above still apply.
 
 LOCATIONS
 - location_name: the place as the document names it (for example "Hrodna Oblast", "Kaliningrad Oblast"). Never give coordinates.
