@@ -19,15 +19,12 @@ import { getPool } from "@/lib/db";
 import { formatDigestLine } from "@/lib/digest-refs";
 import { DEFAULT_DIGEST_TITLE, DIGEST_SECTIONS, isValidDigestDate, type DigestMeta } from "@/lib/digests";
 import type { SourceRelationship } from "@/lib/event-labels";
-import { historicalContextLines } from "@/lib/historical-compare";
-import { FULL_PERIOD } from "@/lib/historical-rules";
-import { getHistoricalCoverage, getTypeMonthCounts } from "@/lib/public-historical";
+import { listHistoricalForDigest } from "@/lib/public-historical";
 import { setOutput } from "../lib/ci.mjs";
 import {
   checkDigestOutput,
   decideDigestWrite,
   failureLines,
-  historicalContextSection,
   quotedPassages,
   type AliasedEvent,
 } from "./check.mjs";
@@ -35,10 +32,12 @@ import { DIGEST_MAX_TOKENS, DIGEST_MAX_USD, digestWorstCaseUsd, draftDigest, typ
 import { loadDigestEvents } from "./input.mjs";
 import {
   buildUserMessage,
+  HISTORICAL_INPUT_LIMIT,
   OUTPUT_SCHEMA,
   PROMPT_VERSION,
   SYSTEM_PROMPT,
   type DigestEventInput,
+  type HistoricalEventInput,
 } from "./prompt.mjs";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -93,7 +92,7 @@ let sectionCount = 0;
 let attempts = 0;
 /** The check code that triggered the retry, if there was one. */
 let retriedFor = "";
-/** How the Historical Context section was written: GENERATED, or the fallback reason. */
+/** How Historical Context was written: WRITTEN by the model, OMITTED by it, or NO_HISTORY to compare with. */
 let historicalStatus = "";
 
 /** Ends the run. Thrown rather than process.exit(), which trips a libuv assertion on Windows. */
@@ -169,23 +168,21 @@ async function run(): Promise<never> {
     quotes: quotedPassages(e.summary),
   }));
 
-  // Historical Context, written by code from published historical counts per event type. The
-  // model never sees these counts and cannot write the section. A line that fails its checks
-  // means the fixed line is used; the digest continues.
-  const [typeCounts, historicalCoverage] = await Promise.all([getTypeMonthCounts(), getHistoricalCoverage(FULL_PERIOD)]);
-  const historicalLines = historicalContextLines(
+  // Historical Context (decision 24): the model compares today's events with published historical
+  // events of the same types or countries. Kept small so the retry still fits the spend cap.
+  const historicalRows = await listHistoricalForDigest(
     [...new Set(eventRows.map((e) => e.event_type))],
-    typeCounts,
-    historicalCoverage,
+    [...new Set(eventRows.map((e) => e.country).filter((c): c is string => !!c))],
+    HISTORICAL_INPUT_LIMIT,
   );
-  const historical = historicalContextSection(historicalLines);
-  historicalStatus = historical.fallback ?? "GENERATED";
-  if (historical.fallback === "INVALID_LINE") {
-    // Counts and positions only.
-    console.warn(
-      `warning: historical context line ${historical.badLine} of ${historicalLines!.length} failed its check; using the fixed line (historical events ${historicalCoverage.events}, sources ${historicalCoverage.sources})`,
-    );
-  }
+  const historicalInputs: HistoricalEventInput[] = historicalRows.map((h, i) => ({
+    alias: `H${i + 1}`,
+    event_date: h.event_date,
+    event_type: h.event_type,
+    country: h.country,
+    headline: h.headline,
+    summary: h.summary,
+  }));
 
   // 3–5. Model call and code checks, with one retry on a failed check. The spend cap is checked
   // against the worst case before each call and covers both.
@@ -207,9 +204,9 @@ async function run(): Promise<never> {
     };
   };
   const draft = await draftDigest({
-    userMessage: buildUserMessage(date, inputs),
+    userMessage: buildUserMessage(date, inputs, historicalInputs),
     call,
-    check: (output) => checkDigestOutput(output, aliased, historicalLines),
+    check: (output) => checkDigestOutput(output, aliased, historicalInputs.map((h) => h.alias)),
     maxUsd,
     worstCaseUsd: (messages) => digestWorstCaseUsd(SYSTEM_PROMPT, messages, price, MAX_TOKENS),
   });
@@ -222,6 +219,12 @@ async function run(): Promise<never> {
   const checked = draft.checked;
   retriedFor = draft.failures[0]?.code ?? "";
   sectionCount = checked.sections.length;
+  historicalStatus =
+    historicalInputs.length === 0
+      ? "NO_HISTORY"
+      : checked.sections.find((s) => s.key === "historical_context")?.sentences.some((s) => !s.byCode)
+        ? "WRITTEN"
+        : "OMITTED";
   sentenceCount = checked.sentenceCount;
 
   // 6. Dry run: print each sentence with the headline and summary of every event it cites (local only).

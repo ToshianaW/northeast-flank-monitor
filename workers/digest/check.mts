@@ -3,10 +3,17 @@
  * reports the code and a position (section number, sentence number), never the text; local runs
  * also print the rejected sentences (failureLines).
  */
-import { findBannedPhrase, findComparisonWording } from "@/lib/banned-phrases";
+import { findBannedPhrase } from "@/lib/banned-phrases";
 import { HISTORICAL_CONTEXT_LINE, type DigestSectionKey } from "@/lib/digests";
-import { isHistoricalContextLine } from "@/lib/historical-compare";
-import { CODE_SECTION, LAST_SECTION, MODEL_SECTION_KEYS, SECTION_KEYS, type DigestOutput } from "./prompt.mjs";
+import {
+  HISTORICAL_SECTION,
+  LAST_SECTION,
+  MODEL_SECTION_KEYS,
+  SECTION_KEYS,
+  SECTION_LIMITS,
+  TOPICAL_LIMIT,
+  type DigestOutput,
+} from "./prompt.mjs";
 
 export type CheckCode =
   | "BAD_SECTION"
@@ -18,7 +25,8 @@ export type CheckCode =
   | "DUPLICATE_SENTENCE"
   | "QUALIFIER"
   | "SUMMARY_MISSING"
-  | "SUMMARY_LENGTH";
+  | "SUMMARY_LENGTH"
+  | "SECTION_LENGTH";
 
 const SUMMARY: DigestSectionKey = "executive_summary";
 
@@ -85,7 +93,7 @@ export type CheckResult =
       ok: true;
       /**
        * In DIGEST_SECTIONS order; model sections without sentences are absent. Always includes
-       * historical_context, written by code (historicalContextSection), and the summary ends with
+       * historical_context (the fixed line when the model left it out), and the summary ends with
        * the unverified note when the day has restricted events.
        */
       sections: Array<{ key: DigestSectionKey; sentences: CheckedSentence[] }>;
@@ -95,37 +103,22 @@ export type CheckResult =
     }
   | CheckFailure;
 
-export type HistoricalContext = {
-  lines: string[];
-  /** Why the fixed HISTORICAL_CONTEXT_LINE is used instead of generated lines, or null. */
-  fallback: null | "NOT_GENERATED" | "INVALID_LINE";
-  /** 1-based position of the first failing generated line (INVALID_LINE only). */
-  badLine?: number;
-};
-
-/**
- * The Historical Context section. Only lines built by historicalContextLines() are used, and
- * only if every one matches its grammar and passes the predictive and comparison-wording checks.
- * Anything else falls back to the fixed line; it never throws, so the digest continues.
- */
-export function historicalContextSection(generated: readonly string[] | null): HistoricalContext {
-  if (!generated || generated.length === 0) return { lines: [HISTORICAL_CONTEXT_LINE], fallback: "NOT_GENERATED" };
-  const bad = generated.findIndex(
-    (line) => !isHistoricalContextLine(line) || findBannedPhrase(line) !== null || findComparisonWording(line) !== null,
-  );
-  if (bad !== -1) return { lines: [HISTORICAL_CONTEXT_LINE], fallback: "INVALID_LINE", badLine: bad + 1 };
-  return { lines: [...generated], fallback: null };
+function limitFor(key: DigestSectionKey): { sentences: number; words: number } | null {
+  if (key === SUMMARY) return null; // checked separately (SUMMARY_LENGTH)
+  return SECTION_LIMITS[key] ?? TOPICAL_LIMIT;
 }
 
 /**
- * `historicalLines` comes from code (historicalContextLines), never from the model's output;
- * null keeps the fixed line.
+ * `historicalAliases` are the H aliases the model was given; only historical_context may cite
+ * them, and each of its sentences must also cite a current event. When the model leaves the
+ * section out, code writes HISTORICAL_CONTEXT_LINE.
  */
 export function checkDigestOutput(
   output: DigestOutput,
   events: readonly AliasedEvent[],
-  historicalLines: readonly string[] | null = null,
+  historicalAliases: readonly string[] = [],
 ): CheckResult {
+  const historical = new Set(historicalAliases);
   const byAlias = new Map(events.map((e) => [e.alias, e]));
   const seenKeys = new Set<string>();
   const checked = new Map<DigestSectionKey, CheckedSentence[]>();
@@ -143,7 +136,6 @@ export function checkDigestOutput(
   // 1. Per-sentence checks.
   for (const [si, section] of output.sections.entries()) {
     const where = (n?: number) => `section ${si + 1}${n === undefined ? "" : ` sentence ${n + 1}`}`;
-    // historical_context is written by code, so the model may not supply it.
     if (!MODEL_SECTION_KEYS.includes(section.key as DigestSectionKey) || seenKeys.has(section.key)) {
       return fail("BAD_SECTION", where());
     }
@@ -156,7 +148,12 @@ export function checkDigestOutput(
       const text = sentence.text.trim();
       if (text === "" || /[[\]\r\n]/.test(sentence.text)) return fail("FORMAT", where(ni), sentence.text);
       if (sentence.event_refs.length === 0) return fail("NO_REF", where(ni), text);
-      const aliases = [...new Set(sentence.event_refs)];
+      // Historical aliases are allowed only in historical_context, and are not linked (they are
+      // not current events); a sentence there still needs a current event.
+      const cited = [...new Set(sentence.event_refs)];
+      const historicalRefs = key === HISTORICAL_SECTION ? cited.filter((a) => historical.has(a)) : [];
+      const aliases = cited.filter((a) => !historicalRefs.includes(a));
+      if (aliases.length === 0) return fail("NO_REF", where(ni), text);
       const refs = aliases.map((a) => byAlias.get(a));
       if (refs.some((r) => !r)) return fail("UNKNOWN_REF", where(ni), text);
       if (findBannedPhrase(text)) return fail("BANNED_PHRASE", where(ni), text);
@@ -169,6 +166,13 @@ export function checkDigestOutput(
       const checkedSentence = { text, eventIds: refs.map((r) => r!.eventId), aliases };
       positions.set(checkedSentence, where(ni));
       sentences.push(checkedSentence);
+    }
+    const limit = limitFor(key);
+    if (limit) {
+      const words = sentences.reduce((n, s) => n + wordCount(s.text), 0);
+      if (sentences.length > limit.sentences || words > limit.words) {
+        return fail("SECTION_LENGTH", where(), ...sentences.map((s) => s.text));
+      }
     }
     if (sentences.length > 0) checked.set(key, sentences);
   }
@@ -212,10 +216,9 @@ export function checkDigestOutput(
       },
     ]);
   }
-  checked.set(
-    CODE_SECTION,
-    historicalContextSection(historicalLines).lines.map((text) => ({ text, eventIds: [], aliases: [], byCode: true as const })),
-  );
+  if (!checked.has(HISTORICAL_SECTION)) {
+    checked.set(HISTORICAL_SECTION, [{ text: HISTORICAL_CONTEXT_LINE, eventIds: [], aliases: [], byCode: true }]);
+  }
   const sections = SECTION_KEYS.filter((k) => checked.has(k)).map((key) => ({ key, sentences: checked.get(key)! }));
   return { ok: true, sections, sentenceCount, citedEvents: cited.size };
 }

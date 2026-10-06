@@ -141,6 +141,13 @@ export function DigestView({
                 </span>
                 {label}
               </h2>
+              {/* Model-written interpretation (decision 24) cites events; older code-written lines do not. */}
+              {key === "historical_context" && hasMarker(digest.sections[key]) ? (
+                <p className="mb-2 text-xs text-text-muted">
+                  Analysis: an interpretation of today&apos;s events against the historical record,
+                  not a finding. The record is partial.
+                </p>
+              ) : null}
               <div
                 className={`max-w-[68ch] text-base leading-7 ${
                   i === 0 ? "text-foreground" : "text-text-secondary"

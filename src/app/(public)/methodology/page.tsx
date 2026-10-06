@@ -521,9 +521,10 @@ export default function MethodologyPage() {
             covers August 2020 – February 2022. It is kept separate from current
             reporting: historical events never appear in Latest, the Archive, the
             map or the dashboard. The daily digest&rsquo;s Historical Context
-            section states only how many historical events of each of the day&rsquo;s
-            event types were recorded, and in which months. That section is written
-            by code, not by AI.
+            section is analysis: drafted with AI assistance from published historical
+            events of the same types or countries, it offers an interpretation of how
+            the day&rsquo;s activity compares with earlier periods. It is labelled as
+            interpretation, not a finding, and never predicts what will happen.
           </p>
           <p>
             Each historical event is entered and reviewed by a person before it is

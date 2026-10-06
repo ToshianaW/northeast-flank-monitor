@@ -42,9 +42,10 @@ export type DraftResult =
 
 const FIX_HINTS: Record<CheckCode, string> = {
   BAD_SECTION:
-    "A section key is not allowed or is used twice. Use only the allowed keys, each once; never historical_context.",
+    "A section key is not allowed or is used twice. Use only the allowed keys, each once.",
   FORMAT: "A sentence is empty or contains a bracket or a line break.",
-  NO_REF: "A sentence has no event_refs. Every sentence must cite at least one event alias.",
+  NO_REF:
+    "A sentence has no event_refs, or cites only historical aliases. Every sentence must cite at least one current event alias (E1, E2, ...); H aliases are allowed only in historical_context.",
   UNKNOWN_REF: "A sentence cites an alias that is not in the input. Use only the given aliases.",
   BANNED_PHRASE: "A sentence uses predictive or intent-reading language. State only what was reported.",
   PLACEMENT:
@@ -54,6 +55,8 @@ const FIX_HINTS: Record<CheckCode, string> = {
   SUMMARY_MISSING:
     "executive_summary is missing. Write it whenever at least one event is not UNVERIFIED and not contradicted.",
   SUMMARY_LENGTH: "executive_summary is too long. Use one or two sentences and at most 45 words in total.",
+  SECTION_LENGTH:
+    "A section is too long. Topical sections: one or two sentences, at most 50 words in total; contradictions_unverified: three sentences and 70 words; historical_context: four sentences and 90 words. Summarise; do not list events one by one.",
   QUALIFIER:
     "A sentence quotes part of an event summary's quoted passages without the others. Put every quoted passage from that summary in the same sentence, or paraphrase the whole statement without quotation marks and keep the qualifier.",
 };

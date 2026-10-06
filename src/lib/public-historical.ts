@@ -172,3 +172,33 @@ export async function listPublishedHistoricalForSitemap(
   );
   return rows;
 }
+
+/** What the digest model sees for one historical event: public fields only, summary shortened. */
+export type DigestHistoricalEvent = {
+  event_id: string;
+  event_date: string;
+  event_type: EventType;
+  country: string | null;
+  headline: string;
+  summary: string | null;
+};
+
+/**
+ * Published historical events for the digest's Historical Context: those of today's event types
+ * first, then those in today's countries, then the rest, newest first within each, at most `limit`.
+ */
+export async function listHistoricalForDigest(
+  types: readonly EventType[],
+  countries: readonly string[],
+  limit: number,
+): Promise<DigestHistoricalEvent[]> {
+  const { rows } = await getPool().query<DigestHistoricalEvent>(
+    `SELECT event_id, event_date::text AS event_date, event_type, country, headline, left(summary, 300) AS summary
+     FROM historical_events
+     WHERE review_status = 'PUBLISHED'
+     ORDER BY (event_type = ANY($1::event_type[])) DESC, (country = ANY($2::text[])) DESC, event_date DESC
+     LIMIT $3`,
+    [types, countries, limit],
+  );
+  return rows;
+}

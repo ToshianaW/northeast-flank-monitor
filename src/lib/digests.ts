@@ -1,5 +1,5 @@
 import "server-only";
-import { findBannedPhrase, findComparisonWording } from "@/lib/banned-phrases";
+import { findBannedPhrase } from "@/lib/banned-phrases";
 import { getPool } from "@/lib/db";
 import { hasMalformedMarker, hasMarker } from "@/lib/digest-refs";
 import { isHistoricalContextLine } from "@/lib/historical-compare";
@@ -204,13 +204,9 @@ export function checkAiDigestSections(sections: DigestSections): DigestFormError
       errors[key] = `Line ${unreferenced + 1} has no [ref …] marker. Every sentence in an AI-drafted digest must cite its events.`;
       continue;
     }
+    // Historical Context may compare and interpret (decision 24); predictions stay banned everywhere.
     const banned = findBannedPhrase(sections[key]);
-    if (banned) {
-      errors[key] = `Remove the predictive phrase "${banned}".`;
-      continue;
-    }
-    const comparison = key === "historical_context" ? findComparisonWording(sections[key]) : null;
-    if (comparison) errors[key] = `Remove the comparison wording "${comparison}". This section states counts only.`;
+    if (banned) errors[key] = `Remove the predictive phrase "${banned}".`;
   }
   return errors;
 }
