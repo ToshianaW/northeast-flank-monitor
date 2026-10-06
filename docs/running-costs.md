@@ -29,7 +29,7 @@ Per project ([plans](https://neon.com/docs/introduction/plans)): 100 CU-hours of
 
 ## GitHub Actions (public repository)
 
-The pipeline (every 2 hours, 12 runs a day, roughly 3–6 minutes each) and the daily digest run on GitHub-hosted standard runners. "GitHub Actions usage is free … for public repositories that use standard GitHub-hosted runners" ([billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)). Larger runners are always charged and must not be used. If the repository were made private, the Free plan includes 2,000 minutes a month and usage is blocked at the quota when no payment method is on file.
+The pipeline (every hour at :17, 24 runs a day, roughly 3–6 minutes each; runs never overlap, and at most one waits) and the daily digest run on GitHub-hosted standard runners. "GitHub Actions usage is free … for public repositories that use standard GitHub-hosted runners" ([billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)). Larger runners are always charged and must not be used. If the repository were made private, the Free plan includes 2,000 minutes a month and usage is blocked at the quota when no payment method is on file.
 
 ## Anthropic API (not a free tier)
 

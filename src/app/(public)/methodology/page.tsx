@@ -589,7 +589,7 @@ export default function MethodologyPage() {
           <Subhead>Now</Subhead>
           <ul className="list-disc pl-5">
             <li>
-              Sources are collected automatically every 2 hours. Every event is
+              Sources are collected automatically every hour. Every event is
               reviewed by a person before it is published.
             </li>
             <li>
@@ -670,7 +670,7 @@ export default function MethodologyPage() {
             <p className="meta-label mb-2">AI disclosure</p>
             <div className="grid gap-2">
               <p>
-                Sources are collected every 2 hours, and a digest is drafted once
+                Sources are collected every hour, and a digest is drafted once
                 a day with AI assistance under a fixed procedure: collection of
                 recent reporting, structured event extraction, duplicate detection,
                 a curated source registry with tier and reliability labels assigned

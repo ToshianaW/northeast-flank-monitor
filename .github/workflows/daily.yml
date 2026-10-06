@@ -7,9 +7,9 @@ on:
   schedule:
     # Times are UTC. GitHub cron does not follow daylight saving, so the
     # local time of each run shifts by an hour when the clocks change.
-    # Every 2 hours at :17 past each even hour (00:17, 02:17 … 22:17 UTC). Minute 17, not 0, avoids the
+    # Every hour at :17 (00:17, 01:17 … 23:17 UTC). Minute 17, not 0, avoids the
     # top-of-hour peak when GitHub delays or drops scheduled runs.
-    - cron: "17 */2 * * *"
+    - cron: "17 * * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -17,7 +17,8 @@ on:
         type: boolean
         default: false
 
-# Runs never overlap: a run that starts while another is in progress waits for it.
+# Runs never overlap: a run that starts while another is in progress waits for it, and GitHub keeps
+# at most one waiting run per group (a newer one replaces it), so missed hours never stack up.
 concurrency:
   group: daily-pipeline
   cancel-in-progress: false
@@ -128,7 +129,7 @@ jobs:
           DEDUP_COST: ${{ steps.dedup.outputs.cost_usd }}
         run: |
           case "$EVENT:$SCHEDULE" in
-            "schedule:17 */2 * * *") run="Scheduled every 2 hours at :17 (started $(date -u +%H:%M) UTC)" ;;
+            "schedule:17 * * * *") run="Scheduled hourly at :17 (started $(date -u +%H:%M) UTC)" ;;
             schedule:*) run="Scheduled ($SCHEDULE UTC)" ;;
             *) run="Manual" ;;
           esac
