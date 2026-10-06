@@ -134,6 +134,8 @@ type Props = {
   /** Exercise-type events link to (or create) an exercise record (decision 26). */
   isExerciseType?: boolean;
   linkedExerciseId?: string | null;
+  /** The linked exercise's events report a newer status or observed dates than it has. */
+  linkedExerciseHasSuggestion?: boolean;
 };
 
 function ActionForm({
@@ -246,6 +248,7 @@ export function ReviewEventActions({
   defaultMergeTarget,
   isExerciseType = false,
   linkedExerciseId = null,
+  linkedExerciseHasSuggestion = false,
 }: Props) {
   const canModerate =
     reviewStatus === "DRAFT" || reviewStatus === "PENDING_REVIEW";
@@ -267,11 +270,22 @@ export function ReviewEventActions({
 
       {isExerciseType ? (
         linkedExerciseId ? (
-          <p className="text-sm">
+          <div className="grid gap-1 text-sm">
             <Link href={`/admin/exercises/${linkedExerciseId}/edit`} className="text-teal-blue hover:underline">
               Linked exercise: open it →
             </Link>
-          </p>
+            {linkedExerciseHasSuggestion ? (
+              <p className="border-l-2 border-teal-blue pl-3 text-xs text-foreground">
+                Its linked events report a newer status or observed dates than the exercise has.{" "}
+                <Link
+                  href={`/admin/exercises/${linkedExerciseId}/edit#suggested`}
+                  className="text-teal-blue hover:underline"
+                >
+                  Review the suggested update
+                </Link>
+              </p>
+            ) : null}
+          </div>
         ) : reviewStatus === "PUBLISHED" ? (
           <div className="max-w-xl">
             <ActionForm

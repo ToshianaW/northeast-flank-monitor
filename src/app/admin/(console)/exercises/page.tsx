@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { connection } from "next/server";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Table,
@@ -15,7 +16,8 @@ import {
   RESET_STATUS_LABELS,
   REVIEW_STATUS_LABELS,
 } from "@/lib/event-labels";
-import { listExercises } from "@/lib/exercises";
+import { activeExerciseSuggestion, exerciseUpdateReasons } from "@/lib/exercise-rules";
+import { listExercises, listExerciseUpdateEvidence } from "@/lib/exercises";
 
 export const metadata = { title: "Exercises" };
 
@@ -27,7 +29,15 @@ function range(start: Date | null, end: Date | null): string {
 export default async function AdminExercisesPage() {
   await requireAdminPage();
   await connection();
-  const exercises = await listExercises();
+  const [all, evidence] = await Promise.all([listExercises(), listExerciseUpdateEvidence()]);
+  // Exercises that need an update first; otherwise the list keeps its date order.
+  const exercises = all
+    .map((x) => ({
+      ...x,
+      updateReasons: exerciseUpdateReasons(x, activeExerciseSuggestion(x, evidence.get(x.id) ?? [])),
+    }))
+    .sort((a, b) => Number(b.updateReasons.length > 0) - Number(a.updateReasons.length > 0));
+  const needUpdate = exercises.filter((x) => x.updateReasons.length > 0).length;
 
   return (
     <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
@@ -37,6 +47,11 @@ export default async function AdminExercisesPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Exercises</h1>
           <p className="mt-1 text-sm text-text-secondary">
             {exercises.length === 1 ? "1 exercise" : `${exercises.length} exercises`}
+            {needUpdate > 0 ? (
+              <span className="text-foreground">
+                {` · ${needUpdate} need${needUpdate === 1 ? "s" : ""} an update`}
+              </span>
+            ) : null}
           </p>
         </div>
         <Link href="/admin/exercises/new" className={buttonVariants()}>
@@ -70,6 +85,16 @@ export default async function AdminExercisesPage() {
                   <TableCell className="text-xs">{x.actor ?? "—"}</TableCell>
                   <TableCell className="text-xs">
                     {EXERCISE_STATUS_LABELS[x.exercise_status]}
+                    {x.updateReasons.length > 0 ? (
+                      <Badge variant="outline" className="ml-2 border-teal-blue text-foreground">
+                        Needs update
+                      </Badge>
+                    ) : null}
+                    {x.updateReasons.map((reason) => (
+                      <span key={reason} className="mt-1 block text-text-muted">
+                        {reason}
+                      </span>
+                    ))}
                   </TableCell>
                   <TableCell className="text-xs">{REVIEW_STATUS_LABELS[x.review_status]}</TableCell>
                   <TableCell className="font-mono text-xs">

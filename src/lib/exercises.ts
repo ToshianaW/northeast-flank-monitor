@@ -10,7 +10,9 @@ import {
   type ReviewStatus,
 } from "@/lib/event-labels";
 import {
+  activeExerciseSuggestion,
   EXERCISE_REVIEW_STATUS_VALUES,
+  suggestionKey,
   FULL_RESET_ERROR,
   fullResetAllowed,
   hasNonUnknownReset,
@@ -18,6 +20,8 @@ import {
   lastEvidenceError,
   PUBLISHED_NEEDS_SOURCE_ERROR,
   RESET_EVIDENCE_ERROR,
+  type ExerciseUpdateEvidence,
+  type ExerciseUpdateSuggestion,
 } from "@/lib/exercise-rules";
 import { getEvent, toDateParam } from "@/lib/events";
 import { logEditReviewAction } from "@/lib/review";
@@ -46,6 +50,8 @@ export type Exercise = {
   follow_on_activity: string | null;
   summary: string | null;
   review_status: ReviewStatus;
+  /** suggestionKey of the suggested update a reviewer dismissed (migration 0016). */
+  dismissed_suggestion: string | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -62,6 +68,7 @@ export type ExerciseListItem = Pick<
   | "observed_start_date"
   | "observed_end_date"
   | "post_exercise_reset"
+  | "dismissed_suggestion"
   | "updated_at"
 >;
 
@@ -116,7 +123,7 @@ export type ExerciseFormValues = Record<ExerciseField, string>;
 export type ExerciseFormErrors = Partial<Record<ExerciseField | `xs_${number}_${string}`, string>>;
 
 export type ExerciseWritePayload = {
-  exercise: Omit<Exercise, "id" | "created_at" | "updated_at">;
+  exercise: Omit<Exercise, "id" | "dismissed_suggestion" | "created_at" | "updated_at">;
   sources: Array<ExerciseSourceFormRow & { is_primary: boolean }>;
 };
 
@@ -132,7 +139,7 @@ const EXERCISE_COLUMNS = `
   equipment, announced_start_date, announced_end_date, observed_start_date, observed_end_date,
   exercise_status, exercise_objectives, post_exercise_reset, personnel_return_status,
   equipment_return_status, infrastructure_status, follow_on_activity, summary, review_status,
-  created_at, updated_at
+  dismissed_suggestion, created_at, updated_at
 `;
 
 function optionalText(value: string): string | null {
@@ -236,6 +243,23 @@ export function exerciseFormValuesFromExercise(x: Exercise): ExerciseFormValues 
     follow_on_activity: x.follow_on_activity ?? "",
     summary: x.summary ?? "",
     review_status: x.review_status,
+  };
+}
+
+/** The form values with a suggestion filled in, for the reviewer to check and save. */
+export function withSuggestion(
+  values: ExerciseFormValues,
+  suggestion: ExerciseUpdateSuggestion,
+): ExerciseFormValues {
+  return {
+    ...values,
+    ...(suggestion.exercise_status ? { exercise_status: suggestion.exercise_status.value } : {}),
+    ...(suggestion.observed_start_date
+      ? { observed_start_date: formatDate(suggestion.observed_start_date.value) }
+      : {}),
+    ...(suggestion.observed_end_date
+      ? { observed_end_date: formatDate(suggestion.observed_end_date.value) }
+      : {}),
   };
 }
 
@@ -455,7 +479,7 @@ export async function listExercises(): Promise<ExerciseListItem[]> {
   const { rows } = await getPool().query<ExerciseListItem>(
     `SELECT id, exercise_name, actor, exercise_status, review_status, announced_start_date,
             announced_end_date, observed_start_date, observed_end_date, post_exercise_reset,
-            updated_at
+            dismissed_suggestion, updated_at
      FROM exercises
      ORDER BY coalesce(observed_start_date, announced_start_date) DESC NULLS LAST,
               updated_at DESC`,
@@ -494,6 +518,33 @@ export async function listLinkedEvents(exerciseId: string): Promise<LinkedEvent[
     [exerciseId],
   );
   return rows;
+}
+
+/**
+ * Published linked events that report an exercise status or observed dates, keyed by exercise
+ * (for suggestExerciseUpdate). All exercises when no ids are given.
+ */
+export async function listExerciseUpdateEvidence(
+  exerciseIds?: string[],
+  db: Pick<Client, "query"> = getPool(),
+): Promise<Map<string, ExerciseUpdateEvidence[]>> {
+  const ids = exerciseIds?.filter((id) => UUID_RE.test(id));
+  if (ids && ids.length === 0) return new Map();
+  const { rows } = await db.query<ExerciseUpdateEvidence & { exercise_id: string }>(
+    `SELECT exercise_id, event_id, headline, event_date, exercise_status,
+            observed_start_date, observed_end_date
+     FROM events
+     WHERE exercise_id IS NOT NULL
+       AND review_status = 'PUBLISHED'
+       AND (exercise_status IS NOT NULL OR observed_start_date IS NOT NULL OR observed_end_date IS NOT NULL)
+       AND ($1::uuid[] IS NULL OR exercise_id = ANY($1::uuid[]))`,
+    [ids ?? null],
+  );
+  const byExercise = new Map<string, ExerciseUpdateEvidence[]>();
+  for (const { exercise_id, ...evidence } of rows) {
+    byExercise.set(exercise_id, [...(byExercise.get(exercise_id) ?? []), evidence]);
+  }
+  return byExercise;
 }
 
 /** Published events not linked to any exercise, for the link picker. */
@@ -684,6 +735,42 @@ export function updateExercise(
 ): Promise<boolean> {
   if (!UUID_RE.test(id)) return Promise.resolve(false);
   return inTransaction((client) => updateExerciseInTransaction(client, id, payload, reviewer));
+}
+
+/**
+ * Dismisses the exercise's current suggested update. Refused when the suggestion on screen
+ * (`key`) is no longer the current one. Logged as DISMISS_SUGGESTION with the dismissed key.
+ */
+export function dismissExerciseSuggestion(
+  id: string,
+  key: string,
+  reviewer: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!UUID_RE.test(id)) return Promise.resolve({ ok: false, error: "Exercise not found." });
+  return inTransaction(async (client) => {
+    const { rows } = await client.query<Exercise>(
+      `SELECT ${EXERCISE_COLUMNS} FROM exercises WHERE id = $1 FOR UPDATE`,
+      [id],
+    );
+    const exercise = rows[0];
+    if (!exercise) return { ok: false, error: "Exercise not found." };
+    const evidence = await listExerciseUpdateEvidence([id], client);
+    const current = activeExerciseSuggestion(exercise, evidence.get(id) ?? []);
+    if (!current || suggestionKey(current) !== key) {
+      return { ok: false, error: "The suggested update has changed. Reload the page and check it again." };
+    }
+    await client.query(`UPDATE exercises SET dismissed_suggestion = $1 WHERE id = $2`, [key, id]);
+    await client.query(
+      `INSERT INTO exercise_actions (exercise_id, action, reviewer, previous_values)
+       VALUES ($1, 'DISMISS_SUGGESTION', $2, $3)`,
+      [
+        id,
+        reviewer,
+        JSON.stringify({ dismissed_suggestion: exercise.dismissed_suggestion, dismissed: key }),
+      ],
+    );
+    return { ok: true };
+  });
 }
 
 /**

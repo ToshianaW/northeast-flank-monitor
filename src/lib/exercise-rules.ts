@@ -116,6 +116,139 @@ export function announcedEndHasPassed(
   );
 }
 
+/** How far along each status is. A suggestion only ever moves an exercise forward. */
+const STATUS_RANK: Record<ExerciseStatus, number> = {
+  UNCLEAR: 0,
+  ANNOUNCED: 1,
+  UPCOMING: 2,
+  ACTIVE: 3,
+  EXTENDED: 4,
+  CONCLUDING: 5,
+  CONCLUDED: 6,
+};
+
+/** A published event linked to the exercise, with the exercise fields it reports. */
+export type ExerciseUpdateEvidence = {
+  event_id: string;
+  headline: string;
+  event_date: Date;
+  exercise_status: ExerciseStatus | null;
+  observed_start_date: Date | null;
+  observed_end_date: Date | null;
+};
+
+export type SuggestedValue<T> = {
+  value: T;
+  /** The linked event that reports it. */
+  event: Pick<ExerciseUpdateEvidence, "event_id" | "headline" | "event_date">;
+};
+
+export type ExerciseUpdateSuggestion = {
+  exercise_status?: SuggestedValue<ExerciseStatus>;
+  observed_start_date?: SuggestedValue<Date>;
+  observed_end_date?: SuggestedValue<Date>;
+};
+
+function eventRef(e: ExerciseUpdateEvidence): SuggestedValue<never>["event"] {
+  return { event_id: e.event_id, headline: e.headline, event_date: e.event_date };
+}
+
+/**
+ * What the exercise's published linked events report that the exercise does not have yet: a
+ * later status, an observed start or an observed end. Only suggests; a reviewer applies it from
+ * the edit form. Dates already on the exercise are never replaced, and a status never moves back.
+ * An observed end on or before today also suggests Concluded.
+ */
+export function suggestExerciseUpdate(
+  exercise: {
+    exercise_status: ExerciseStatus;
+    observed_start_date: Date | null;
+    observed_end_date: Date | null;
+  },
+  events: ReadonlyArray<ExerciseUpdateEvidence>,
+  now: Date = new Date(),
+): ExerciseUpdateSuggestion | null {
+  const byDate = [...events].sort((a, b) => isoDay(a.event_date).localeCompare(isoDay(b.event_date)));
+  const suggestion: ExerciseUpdateSuggestion = {};
+
+  if (!exercise.observed_start_date) {
+    const first = byDate
+      .filter((e) => e.observed_start_date)
+      .sort((a, b) => isoDay(a.observed_start_date!).localeCompare(isoDay(b.observed_start_date!)))[0];
+    if (first) suggestion.observed_start_date = { value: first.observed_start_date!, event: eventRef(first) };
+  }
+
+  const start = exercise.observed_start_date ?? suggestion.observed_start_date?.value ?? null;
+  if (!exercise.observed_end_date) {
+    const last = byDate
+      .filter((e) => e.observed_end_date && (!start || isoDay(e.observed_end_date) >= isoDay(start)))
+      .sort((a, b) => isoDay(a.observed_end_date!).localeCompare(isoDay(b.observed_end_date!)))
+      .at(-1);
+    if (last) suggestion.observed_end_date = { value: last.observed_end_date!, event: eventRef(last) };
+  }
+
+  const latestStatus = byDate.filter((e) => e.exercise_status && e.exercise_status !== "UNCLEAR").at(-1);
+  if (latestStatus && STATUS_RANK[latestStatus.exercise_status!] > STATUS_RANK[exercise.exercise_status]) {
+    suggestion.exercise_status = { value: latestStatus.exercise_status!, event: eventRef(latestStatus) };
+  }
+
+  const end = suggestion.observed_end_date;
+  if (
+    end &&
+    isoDay(end.value) <= isoDay(now) &&
+    STATUS_RANK[suggestion.exercise_status?.value ?? exercise.exercise_status] < STATUS_RANK.CONCLUDED
+  ) {
+    suggestion.exercise_status = { value: "CONCLUDED", event: end.event };
+  }
+
+  return Object.keys(suggestion).length > 0 ? suggestion : null;
+}
+
+/**
+ * Identifies a suggestion by what it suggests and which event reports it, so a dismissal hides
+ * only that suggestion: if the linked events later report something different, the key changes.
+ */
+export function suggestionKey(suggestion: ExerciseUpdateSuggestion): string {
+  const part = <T>(field: string, s: SuggestedValue<T> | undefined, value: (v: T) => string) =>
+    s ? `${field}=${value(s.value)}@${s.event.event_id}` : null;
+  return [
+    part("exercise_status", suggestion.exercise_status, String),
+    part("observed_start_date", suggestion.observed_start_date, isoDay),
+    part("observed_end_date", suggestion.observed_end_date, isoDay),
+  ]
+    .filter(Boolean)
+    .join("|");
+}
+
+/** suggestExerciseUpdate, minus a suggestion the reviewer has dismissed. */
+export function activeExerciseSuggestion(
+  exercise: Parameters<typeof suggestExerciseUpdate>[0] & { dismissed_suggestion: string | null },
+  events: ReadonlyArray<ExerciseUpdateEvidence>,
+  now: Date = new Date(),
+): ExerciseUpdateSuggestion | null {
+  const suggestion = suggestExerciseUpdate(exercise, events, now);
+  if (!suggestion || suggestionKey(suggestion) === exercise.dismissed_suggestion) return null;
+  return suggestion;
+}
+
+/** Why the admin list flags an exercise for an update; empty when it needs none. */
+export function exerciseUpdateReasons(
+  exercise: {
+    exercise_status: ExerciseStatus;
+    review_status: ReviewStatus;
+    announced_end_date: Date | null;
+    observed_end_date: Date | null;
+  },
+  suggestion: ExerciseUpdateSuggestion | null,
+  now: Date = new Date(),
+): string[] {
+  if (exercise.review_status === "REJECTED") return [];
+  const reasons: string[] = [];
+  if (announcedEndHasPassed(exercise, now)) reasons.push(END_PASSED_NOTE);
+  if (suggestion) reasons.push("Linked events report newer details.");
+  return reasons;
+}
+
 export type ResetDisplay = { symbol: string; text: string; tone: ToneClass };
 
 const NO_EVIDENCE: ResetDisplay = { symbol: "?", text: NO_EVIDENCE_TEXT, tone: "tone-neutral" };

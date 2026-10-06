@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/admin-session";
 import { exerciseConstraintMessage, lastEvidenceError } from "@/lib/exercise-rules";
 import {
   createExercise,
+  dismissExerciseSuggestion,
   exerciseFormValuesFrom,
   exerciseSourceRowsFromFormData,
   getExercise,
@@ -99,6 +100,28 @@ export async function updateExerciseAction(
   formData: FormData,
 ): Promise<ExerciseFormState> {
   return saveExercise(formData, id);
+}
+
+export type DismissSuggestionState = { error?: string };
+
+/** "Dismiss": hides this suggested update until the linked events report something different. */
+export async function dismissExerciseSuggestionAction(
+  exerciseId: string,
+  key: string,
+  _prev: DismissSuggestionState,
+  formData: FormData,
+): Promise<DismissSuggestionState> {
+  await requireAdmin();
+  const reviewer = reviewerFromForm(formData);
+  const reviewerError = requireReviewerName(reviewer);
+  if (reviewerError) return { error: reviewerError };
+
+  const result = await dismissExerciseSuggestion(exerciseId, key, reviewer);
+  if (!result.ok) return { error: result.error };
+
+  await rememberReviewerName(reviewer);
+  revalidatePath("/admin/exercises");
+  redirect(`/admin/exercises/${exerciseId}/edit?dismissed=1`);
 }
 
 export type ExerciseLinksState = { error?: string };

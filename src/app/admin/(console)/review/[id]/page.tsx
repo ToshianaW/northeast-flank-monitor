@@ -16,6 +16,8 @@ import {
 } from "@/lib/event-labels";
 import { suggestConfidence } from "@/lib/confidence-suggestion";
 import { getEvent } from "@/lib/events";
+import { activeExerciseSuggestion } from "@/lib/exercise-rules";
+import { getExercise, listExerciseUpdateEvidence } from "@/lib/exercises";
 import {
   getEventXBreaking,
   getReviewEventDetail,
@@ -165,6 +167,14 @@ export default async function ReviewEventPage({
   ]);
 
   if (!event) notFound();
+
+  // Does the linked exercise have a suggested update (status, observed dates) from its events?
+  const linkedExercise = event.exercise_id
+    ? await Promise.all([getExercise(event.exercise_id), listExerciseUpdateEvidence([event.exercise_id])])
+    : null;
+  const linkedExerciseHasSuggestion =
+    linkedExercise?.[0] != null &&
+    activeExerciseSuggestion(linkedExercise[0], linkedExercise[1].get(linkedExercise[0].id) ?? []) !== null;
 
   const editHref = `/admin/events/${id}/edit?fromReview=1`;
   const canModerate = event.review_status === "DRAFT" || event.review_status === "PENDING_REVIEW";
@@ -423,6 +433,7 @@ export default async function ReviewEventPage({
             editHref={editHref}
             isExerciseType={event.event_type === "EXERCISE"}
             linkedExerciseId={event.exercise_id}
+            linkedExerciseHasSuggestion={linkedExerciseHasSuggestion}
             defaultMergeTarget={
               typeof mergeTarget === "string" && mergeTargets.some((t) => t.event_id === mergeTarget)
                 ? mergeTarget

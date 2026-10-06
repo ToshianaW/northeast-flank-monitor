@@ -5,9 +5,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  activeExerciseSuggestion,
   announcedEndHasPassed,
   dimensionDisplay,
+  END_PASSED_NOTE,
   exerciseConstraintMessage,
+  exerciseUpdateReasons,
+  type ExerciseUpdateEvidence,
   followOnDisplay,
   FULL_RESET_ERROR,
   fullResetAllowed,
@@ -21,6 +25,8 @@ import {
   RESET_EVIDENCE_ERROR,
   RESET_OTHERS_UNKNOWN_TEXT,
   resetWidgetContent,
+  suggestExerciseUpdate,
+  suggestionKey,
 } from "./exercise-rules";
 import { DIMENSION_STATUS_VALUES, RESET_STATUS_VALUES } from "./event-labels";
 
@@ -158,6 +164,135 @@ test("end-passed note: ACTIVE/CONCLUDING, announced end before today, no observe
   assert.equal(announcedEndHasPassed({ ...x, exercise_status: "EXTENDED" }, now), false);
   assert.equal(announcedEndHasPassed(x, d("2026-10-02")), false);
   assert.equal(announcedEndHasPassed({ ...x, observed_end_date: d("2026-10-02") }, now), false);
+});
+
+const linkedEvent = (
+  id: string,
+  date: string,
+  fields: Partial<Pick<ExerciseUpdateEvidence, "exercise_status" | "observed_start_date" | "observed_end_date">>,
+): ExerciseUpdateEvidence => ({
+  event_id: id,
+  headline: `Event ${id}`,
+  event_date: d(date),
+  exercise_status: null,
+  observed_start_date: null,
+  observed_end_date: null,
+  ...fields,
+});
+const activeExercise = {
+  exercise_status: "ACTIVE",
+  observed_start_date: d("2026-09-20"),
+  observed_end_date: null,
+} as const;
+
+test("update suggestion: none when linked events report nothing new", () => {
+  const now = d("2026-10-06");
+  assert.equal(suggestExerciseUpdate(activeExercise, [], now), null);
+  assert.equal(
+    suggestExerciseUpdate(activeExercise, [linkedEvent("a", "2026-09-20", { exercise_status: "ACTIVE" })], now),
+    null,
+  );
+  // A status never moves back, and Unclear is never suggested.
+  assert.equal(
+    suggestExerciseUpdate(activeExercise, [linkedEvent("a", "2026-09-10", { exercise_status: "ANNOUNCED" })], now),
+    null,
+  );
+  assert.equal(
+    suggestExerciseUpdate({ ...activeExercise, exercise_status: "UNCLEAR" }, [linkedEvent("a", "2026-09-10", { exercise_status: "UNCLEAR" })], now),
+    null,
+  );
+});
+
+test("update suggestion: the latest reported status, when further along", () => {
+  const s = suggestExerciseUpdate(
+    activeExercise,
+    [
+      linkedEvent("a", "2026-09-28", { exercise_status: "CONCLUDING" }),
+      linkedEvent("b", "2026-09-25", { exercise_status: "EXTENDED" }),
+    ],
+    d("2026-10-06"),
+  );
+  assert.equal(s?.exercise_status?.value, "CONCLUDING");
+  assert.equal(s?.exercise_status?.event.event_id, "a");
+  assert.equal(s?.observed_end_date, undefined);
+});
+
+test("update suggestion: an observed end fills a missing end and suggests Concluded", () => {
+  const s = suggestExerciseUpdate(
+    activeExercise,
+    [
+      linkedEvent("a", "2026-09-30", { observed_end_date: d("2026-09-29") }),
+      linkedEvent("b", "2026-10-02", { observed_end_date: d("2026-10-01") }),
+    ],
+    d("2026-10-06"),
+  );
+  assert.equal(s?.observed_end_date?.value.toISOString().slice(0, 10), "2026-10-01");
+  assert.equal(s?.observed_end_date?.event.event_id, "b");
+  assert.equal(s?.exercise_status?.value, "CONCLUDED");
+  assert.equal(s?.observed_start_date, undefined);
+});
+
+test("update suggestion: an end in the future does not suggest Concluded; dates on the exercise stay", () => {
+  const future = suggestExerciseUpdate(
+    activeExercise,
+    [linkedEvent("a", "2026-10-01", { observed_end_date: d("2026-10-10") })],
+    d("2026-10-06"),
+  );
+  assert.equal(future?.observed_end_date?.event.event_id, "a");
+  assert.equal(future?.exercise_status, undefined);
+
+  const ended = { ...activeExercise, exercise_status: "CONCLUDED", observed_end_date: d("2026-09-30") } as const;
+  assert.equal(
+    suggestExerciseUpdate(ended, [linkedEvent("a", "2026-10-01", { observed_end_date: d("2026-10-01") })], d("2026-10-06")),
+    null,
+  );
+});
+
+test("update suggestion: earliest observed start when missing; an end before the start is ignored", () => {
+  const s = suggestExerciseUpdate(
+    { exercise_status: "ANNOUNCED", observed_start_date: null, observed_end_date: null },
+    [
+      linkedEvent("a", "2026-09-22", { observed_start_date: d("2026-09-21") }),
+      linkedEvent("b", "2026-09-20", { observed_start_date: d("2026-09-19"), exercise_status: "ACTIVE" }),
+      linkedEvent("c", "2026-09-18", { observed_end_date: d("2026-09-15") }),
+    ],
+    d("2026-10-06"),
+  );
+  assert.equal(s?.observed_start_date?.value.toISOString().slice(0, 10), "2026-09-19");
+  assert.equal(s?.observed_end_date, undefined);
+  assert.equal(s?.exercise_status?.value, "ACTIVE");
+});
+
+test("dismissal hides only the dismissed suggestion; new evidence brings the flag back", () => {
+  const now = d("2026-10-06");
+  const events = [linkedEvent("a", "2026-10-02", { observed_end_date: d("2026-10-01") })];
+  const suggestion = suggestExerciseUpdate(activeExercise, events, now)!;
+  const key = suggestionKey(suggestion);
+  assert.equal(key, "exercise_status=CONCLUDED@a|observed_end_date=2026-10-01@a");
+
+  assert.deepEqual(activeExerciseSuggestion({ ...activeExercise, dismissed_suggestion: null }, events, now), suggestion);
+  assert.equal(activeExerciseSuggestion({ ...activeExercise, dismissed_suggestion: key }, events, now), null);
+
+  const later = [...events, linkedEvent("b", "2026-10-04", { observed_end_date: d("2026-10-03") })];
+  assert.equal(
+    activeExerciseSuggestion({ ...activeExercise, dismissed_suggestion: key }, later, now)?.observed_end_date?.event.event_id,
+    "b",
+  );
+});
+
+test("needs-update reasons:passed announced end or a suggestion; never for rejected exercises", () => {
+  const now = d("2026-10-06");
+  const x = {
+    exercise_status: "ACTIVE",
+    review_status: "PUBLISHED",
+    announced_end_date: d("2026-10-01"),
+    observed_end_date: null,
+  } as const;
+  const suggestion = { exercise_status: { value: "CONCLUDED", event: linkedEvent("a", "2026-10-02", {}) } } as const;
+  assert.deepEqual(exerciseUpdateReasons(x, null, now), [END_PASSED_NOTE]);
+  assert.equal(exerciseUpdateReasons(x, suggestion, now).length, 2);
+  assert.deepEqual(exerciseUpdateReasons({ ...x, announced_end_date: d("2026-10-10") }, null, now), []);
+  assert.deepEqual(exerciseUpdateReasons({ ...x, review_status: "REJECTED" }, suggestion, now), []);
 });
 
 test("database constraint errors map to the form messages", () => {
