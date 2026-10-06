@@ -5,11 +5,14 @@ import { autoLinkEvent } from "@/lib/historical-references";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin-session";
 import { CONFIDENCE_LEVEL_VALUES, type ConfidenceLevel } from "@/lib/event-labels";
+import { getEvent } from "@/lib/events";
 import {
   approveEvent,
   mergeEventInto,
   rejectEvent,
+  searchMergeTargets,
   submitForReview,
+  type MergeTargetMatch,
 } from "@/lib/review";
 import {
   requireReviewerName,
@@ -124,4 +127,15 @@ export async function mergeEventAction(
   revalidatePath("/admin/review");
   revalidatePath(`/admin/review/${eventId}`);
   redirect("/admin/review?merged=1");
+}
+
+/**
+ * Merge target search for the review page (headline, summary and source excerpts). A published
+ * event can only be merged into another published one, so only those are offered for it.
+ */
+export async function searchMergeTargetsAction(eventId: string, query: string): Promise<MergeTargetMatch[]> {
+  await requireAdmin();
+  const event = await getEvent(eventId);
+  if (!event) return [];
+  return searchMergeTargets(eventId, query, { publishedOnly: event.review_status === "PUBLISHED" });
 }

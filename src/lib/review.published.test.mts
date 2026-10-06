@@ -8,7 +8,7 @@ import { test } from "node:test";
 import { openRollbackDb } from "./historical.testing.mjs";
 
 const db = await openRollbackDb({ installAsAppPool: true });
-const { mergeEventInto, rejectEvent } = await import("./review");
+const { mergeEventInto, rejectEvent, searchMergeTargets } = await import("./review");
 const { getMergedIntoPublishedEvent, getPublishedEvent } = await import("./public-events");
 const { LIVE_STATEMENT_SOURCE_ID } = await import("./source-labels");
 
@@ -76,6 +76,30 @@ test("a published event cannot be merged into an unpublished one", async () => {
   assert.equal(result.ok, false);
   const [row] = await q<{ review_status: string }>("SELECT review_status FROM events WHERE event_id = $1", [from]);
   assert.equal(row.review_status, "PUBLISHED");
+});
+
+test("merge target search finds events by a typed phrase or pasted excerpt, including close matches", async () => {
+  const self = await plant("DRAFT", "https://example.invalid/search-self");
+  const target = await plant("PUBLISHED", "https://example.invalid/search-target");
+  await q(
+    `UPDATE events SET headline = 'TEST Zorblax brigade arrives in Narva (rolled back)', summary = 'The zorblax brigade completed its move.' WHERE event_id = $1`,
+    [target],
+  );
+  await q(`UPDATE event_sources SET excerpt = 'Quuxvale battalion relocated to the Narva base' WHERE event_id = $1`, [target]);
+  const draft = await plant("DRAFT", "https://example.invalid/search-draft");
+  await q(`UPDATE events SET headline = 'TEST Zorblax draft twin (rolled back)' WHERE event_id = $1`, [draft]);
+
+  const ids = async (text: string, publishedOnly = false) =>
+    (await searchMergeTargets(self, text, { publishedOnly })).map((m) => m.event_id);
+  assert.ok((await ids("zorblax brigade")).includes(target), "headline phrase");
+  assert.ok((await ids("Quuxvale battalion relocated")).includes(target), "pasted source excerpt");
+  assert.ok((await ids("quuxvaal batallion")).includes(target), "close match (typos)");
+  assert.ok((await ids("zorblax")).includes(draft), "drafts are offered for a draft");
+  assert.ok(!(await ids("zorblax", true)).includes(draft), "published only for a published event");
+  assert.ok(!(await ids("zorblax")).includes(self), "never the event itself");
+  assert.deepEqual(await ids("zo"), [], "at least 3 characters");
+  const [hit] = await searchMergeTargets(self, "Quuxvale battalion", { publishedOnly: false });
+  assert.equal(hit.snippet, "Quuxvale battalion relocated to the Narva base", "the snippet shows where it matched");
 });
 
 test("rollback", async () => {

@@ -669,3 +669,58 @@ export async function getEventXBreaking(eventId: string): Promise<boolean> {
   );
   return rows[0]?.x_breaking ?? false;
 }
+
+export type MergeTargetMatch = {
+  event_id: string;
+  headline: string;
+  event_date: string;
+  review_status: Event["review_status"];
+  /** Where the text matched best, shortened for display. */
+  snippet: string | null;
+};
+
+/**
+ * Merge targets matching a typed phrase or pasted excerpt: other events (never merged-away ones;
+ * published only when `publishedOnly`) whose headline, summary or a source excerpt contains the
+ * text, or is close to it (pg_trgm word_similarity of at least 0.3). Exact contains first.
+ */
+export async function searchMergeTargets(
+  excludeEventId: string,
+  query: string,
+  options: { publishedOnly: boolean; limit?: number },
+): Promise<MergeTargetMatch[]> {
+  const q = query.replace(/\s+/g, " ").trim().slice(0, 300);
+  if (!UUID_RE.test(excludeEventId) || q.length < 3) return [];
+  const { rows } = await getPool().query<MergeTargetMatch>(
+    `WITH candidates AS (
+       SELECT e.event_id, e.headline, e.event_date::text AS event_date, e.review_status, e.summary,
+              (SELECT es.excerpt FROM event_sources es
+                WHERE es.event_id = e.event_id AND es.excerpt IS NOT NULL
+                ORDER BY word_similarity($2, es.excerpt) DESC LIMIT 1) AS excerpt
+       FROM events e
+       WHERE e.event_id <> $1 AND e.review_status <> 'MERGED'
+         AND (NOT $3 OR e.review_status = 'PUBLISHED')
+     ),
+     scored AS (
+       SELECT *,
+              greatest(word_similarity($2, headline), word_similarity($2, coalesce(summary, '')),
+                       word_similarity($2, coalesce(excerpt, ''))) AS score,
+              (strpos(lower(headline), lower($2)) > 0
+                OR strpos(lower(coalesce(summary, '')), lower($2)) > 0
+                OR strpos(lower(coalesce(excerpt, '')), lower($2)) > 0) AS contains,
+              CASE
+                WHEN word_similarity($2, coalesce(excerpt, '')) > greatest(word_similarity($2, headline), word_similarity($2, coalesce(summary, '')))
+                  THEN excerpt
+                ELSE summary
+              END AS snippet
+       FROM candidates
+     )
+     SELECT event_id, headline, event_date, review_status, left(snippet, 220) AS snippet
+     FROM scored
+     WHERE contains OR score >= 0.3
+     ORDER BY contains DESC, score DESC, event_date DESC
+     LIMIT $4`,
+    [excludeEventId, q, options.publishedOnly, options.limit ?? 10],
+  );
+  return rows;
+}

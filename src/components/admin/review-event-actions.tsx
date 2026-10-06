@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import {
   approveEventAction,
   mergeEventAction,
   rejectEventAction,
+  searchMergeTargetsAction,
   submitForReviewAction,
   type ReviewActionState,
 } from "@/app/admin/(console)/review/actions";
@@ -29,35 +30,92 @@ import {
   OFFICIAL_ONLY_NOTE,
   type ConfidenceSuggestion,
 } from "@/lib/confidence-suggestion";
+import type { MergeTargetMatch } from "@/lib/review";
 
 type MergeTarget = { event_id: string; headline: string; event_date: string; review_status: ReviewStatus };
 
-function MergeTargetSelect({
-  targets,
-  defaultValue,
-}: {
-  targets: MergeTarget[];
-  defaultValue?: string;
-}) {
-  const selected = defaultValue && targets.some((t) => t.event_id === defaultValue) ? defaultValue : "";
+/**
+ * Search for the merge target by a phrase or a pasted excerpt (headline, summary and source
+ * excerpts; close matches too), then pick one result. A target preselected from a "Possible
+ * duplicate" link is shown first.
+ */
+function MergeTargetSearch({ eventId, preselected }: { eventId: string; preselected?: MergeTarget }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<{ query: string; matches: MergeTargetMatch[] } | null>(null);
+  const [selected, setSelected] = useState(preselected?.event_id ?? "");
+  const [pending, startTransition] = useTransition();
+  const latest = useRef("");
+
+  useEffect(() => {
+    const q = query.trim();
+    latest.current = q;
+    if (q.length < 3) return;
+    const timer = setTimeout(() => {
+      startTransition(async () => {
+        const matches = await searchMergeTargetsAction(eventId, q);
+        if (latest.current === q) setResults({ query: q, matches });
+      });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query, eventId]);
+
+  const q = query.trim();
+  const matches = q.length >= 3 && results?.query === q ? results.matches : [];
+  const shown =
+    preselected && !matches.some((m) => m.event_id === preselected.event_id)
+      ? [{ ...preselected, snippet: null }, ...matches]
+      : matches;
+
   return (
     <div className="grid gap-2">
-      <Label htmlFor="target_event_id">Target event</Label>
-      <NativeSelect
-        key={selected}
-        id="target_event_id"
-        name="target_event_id"
-        required
-        defaultValue={selected}
-        className="w-full"
-      >
-        <NativeSelectOption value="">Choose…</NativeSelectOption>
-        {targets.map((target) => (
-          <NativeSelectOption key={target.event_id} value={target.event_id}>
-            {target.event_date} — {target.headline}
-          </NativeSelectOption>
-        ))}
-      </NativeSelect>
+      <Label htmlFor="merge_search">Find the event to merge into</Label>
+      <Input
+        id="merge_search"
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Type a few words, or paste an excerpt from the article"
+        autoComplete="off"
+      />
+      <p className="text-xs text-text-muted" aria-live="polite">
+        {q.length > 0 && q.length < 3
+          ? "Keep typing (at least 3 characters)."
+          : pending
+            ? "Searching…"
+            : q.length >= 3 && results?.query === q
+              ? `${matches.length === 0 ? "No" : matches.length} matching event${matches.length === 1 ? "" : "s"} (headlines, summaries and source excerpts).`
+              : "Searches headlines, summaries and source excerpts, including close matches."}
+      </p>
+      {shown.length > 0 ? (
+        <ul className="grid max-h-80 gap-1 overflow-y-auto" role="radiogroup" aria-label="Merge target">
+          {shown.map((m) => (
+            <li key={m.event_id}>
+              <label
+                className={`flex cursor-pointer items-start gap-2 border px-3 py-2 text-sm ${
+                  selected === m.event_id ? "border-teal-blue bg-teal-blue/10" : "border-border hover:bg-surface-raised"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="target_event_id"
+                  value={m.event_id}
+                  checked={selected === m.event_id}
+                  onChange={() => setSelected(m.event_id)}
+                  required
+                  className="mt-1 size-4 accent-teal-blue"
+                />
+                <span className="grid gap-0.5">
+                  <span className="font-medium">{m.headline}</span>
+                  <span className="text-xs text-text-muted">
+                    {m.event_date} · {m.review_status.replace("_", " ").toLowerCase()}
+                  </span>
+                  {m.snippet ? <span className="text-xs text-text-secondary">{m.snippet}</span> : null}
+                </span>
+              </label>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
@@ -185,6 +243,10 @@ export function ReviewEventActions({
 }: Props) {
   const canModerate =
     reviewStatus === "DRAFT" || reviewStatus === "PENDING_REVIEW";
+  // From a "Possible duplicate" link: shown preselected in the merge search.
+  const preselectedTarget = defaultMergeTarget
+    ? mergeTargets.find((t) => t.event_id === defaultMergeTarget)
+    : undefined;
 
   return (
     <div className="grid gap-6">
@@ -251,7 +313,7 @@ export function ReviewEventActions({
               reviewerDefault={reviewerDefault}
               submitLabel="Merge into target"
             >
-              <MergeTargetSelect targets={mergeTargets} defaultValue={defaultMergeTarget} />
+              <MergeTargetSearch eventId={eventId} preselected={preselectedTarget} />
             </ActionForm>
           </div>
         </div>
@@ -290,9 +352,9 @@ export function ReviewEventActions({
                 Moves this event&apos;s sources to the target and takes this event off the site.
                 Its public link redirects to the target.
               </p>
-              <MergeTargetSelect
-                targets={mergeTargets.filter((t) => t.review_status === "PUBLISHED")}
-                defaultValue={defaultMergeTarget}
+              <MergeTargetSearch
+                eventId={eventId}
+                preselected={preselectedTarget?.review_status === "PUBLISHED" ? preselectedTarget : undefined}
               />
             </ActionForm>
           </div>
