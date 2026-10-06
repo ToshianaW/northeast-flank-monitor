@@ -128,7 +128,8 @@ test("posting: posts summary + source link once, records the post id, never post
   await withFakeX(ok, async (calls) => {
     await Promise.all([runQueue(true), runQueue(true)]); // two saves at the same moment
     await runQueue(true);
-    assert.deepEqual(calls.filter((t) => t.includes("live summary")), [`${tag} live summary.\nhttps://example.org/src`]);
+    // No country on the test event, so no flag; not marked breaking, so NEW.
+    assert.deepEqual(calls.filter((t) => t.includes("live summary")), [`🚨 NEW: ${tag} live summary.\nhttps://example.org/src`]);
   });
   assert.deepEqual(await status(id), { status: "POSTED", post_id: "1234567890", attempts: 1 });
 });

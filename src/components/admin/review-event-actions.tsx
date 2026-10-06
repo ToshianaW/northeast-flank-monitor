@@ -215,6 +215,15 @@ export function ReviewEventActions({
             submitLabel="Approve and publish"
           >
             <ConfidenceField defaultValue={confidenceLevel} suggestion={confidenceSuggestion} />
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" name="x_breaking" className="mt-0.5 size-4 accent-teal-blue" />
+              <span>
+                Post on X as 🚨 BREAKING
+                <span className="block text-xs text-text-muted">
+                  Extreme situations only. Otherwise the post starts &ldquo;🚨 NEW:&rdquo; with the country&apos;s flag.
+                </span>
+              </span>
+            </label>
           </ActionForm>
 
           <ActionForm

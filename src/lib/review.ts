@@ -293,6 +293,8 @@ export async function approveEventInTransaction(
   eventId: string,
   reviewer: string,
   confidence: ConfidenceLevel,
+  /** Post on X as BREAKING (extreme situations only); otherwise NEW. */
+  breaking = false,
 ): Promise<ApproveResult> {
   const { rows } = await client.query<Event>(
     `SELECT * FROM events WHERE event_id = $1 FOR UPDATE`,
@@ -332,9 +334,9 @@ export async function approveEventInTransaction(
   }
 
   await client.query(
-    `UPDATE events SET review_status = 'PUBLISHED', human_reviewed = true, confidence_level = $2
+    `UPDATE events SET review_status = 'PUBLISHED', human_reviewed = true, confidence_level = $2, x_breaking = $3
      WHERE event_id = $1`,
-    [eventId, confidence],
+    [eventId, confidence, breaking],
   );
 
   await insertReviewAction(client, {
@@ -355,12 +357,13 @@ export async function approveEvent(
   eventId: string,
   reviewer: string,
   confidence: ConfidenceLevel,
+  breaking = false,
 ): Promise<ApproveResult> {
   if (!UUID_RE.test(eventId)) return { ok: false, error: "Event not found." };
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
-    const result = await approveEventInTransaction(client, eventId, reviewer, confidence);
+    const result = await approveEventInTransaction(client, eventId, reviewer, confidence, breaking);
     await client.query(result.ok ? "COMMIT" : "ROLLBACK");
     return result;
   } catch (error) {
@@ -651,4 +654,14 @@ export async function listMergeTargetOptions(
     [excludeEventId],
   );
   return rows;
+}
+
+/** Whether the reviewer marked the event as breaking for its X post (migration 0014). */
+export async function getEventXBreaking(eventId: string): Promise<boolean> {
+  if (!UUID_RE.test(eventId)) return false;
+  const { rows } = await getPool().query<{ x_breaking: boolean }>(
+    `SELECT x_breaking FROM events WHERE event_id = $1`,
+    [eventId],
+  );
+  return rows[0]?.x_breaking ?? false;
 }

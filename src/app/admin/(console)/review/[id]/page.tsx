@@ -17,6 +17,7 @@ import {
 import { suggestConfidence } from "@/lib/confidence-suggestion";
 import { getEvent } from "@/lib/events";
 import {
+  getEventXBreaking,
   getReviewEventDetail,
   listDuplicateCandidates,
   listMergeTargetOptions,
@@ -147,13 +148,14 @@ export default async function ReviewEventPage({
   const { id } = await params;
   const { mergeTarget } = await searchParams;
 
-  const [event, detail, duplicates, history, mergeTargets, reviewerDefault] = await Promise.all([
+  const [event, detail, duplicates, history, mergeTargets, reviewerDefault, xBreaking] = await Promise.all([
     getEvent(id),
     getReviewEventDetail(id),
     listDuplicateCandidates(id),
     listReviewActions(id),
     listMergeTargetOptions(id),
     getReviewerName(),
+    getEventXBreaking(id),
   ]);
 
   if (!event) notFound();
@@ -172,6 +174,8 @@ export default async function ReviewEventPage({
       const linked = supports.filter((s) => s.article_url);
       return (linked.find((s) => s.is_primary) ?? linked[0])?.article_url ?? event.source_url;
     })(),
+    // Before approval this shows NEW; the reviewer can choose BREAKING when approving.
+    alert: { countries: [event.country], breaking: xBreaking },
   });
 
   const warnings = [

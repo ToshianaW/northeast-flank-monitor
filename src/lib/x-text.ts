@@ -31,7 +31,38 @@ export function weightedLength(text: string): number {
 /** Decimal coordinate pairs, degree marks, or grid references: never posted (spec section 60). */
 const COORDINATES = /\d{1,3}[.,]\d{2,}\s*°?\s*[NSEW]?\s*[,;/ ]\s*\d{1,3}[.,]\d{2,}|\d+\s*°|\b\d{1,2}[C-X]\s?[A-Z]{2}\s?\d{4,10}\b/;
 
-export type PostInput = { summary: string | null; headline: string; sourceUrl: string | null };
+export type PostInput = {
+  summary: string | null;
+  headline: string;
+  sourceUrl: string | null;
+  /** Events and exercises open with "🚨<flags> NEW:" (or "BREAKING:", set by the reviewer). Digests have none. */
+  alert?: { countries: ReadonlyArray<string | null>; breaking: boolean };
+};
+
+/** ISO 3166-1 alpha-2 codes for the country names and codes the registry and events use. */
+const COUNTRY_CODES: Record<string, string> = {
+  lithuania: "LT", latvia: "LV", estonia: "EE", poland: "PL", belarus: "BY", russia: "RU",
+  "russian federation": "RU", kaliningrad: "RU", "kaliningrad oblast": "RU", finland: "FI",
+  sweden: "SE", norway: "NO", denmark: "DK", germany: "DE", ukraine: "UA", moldova: "MD",
+  "united states": "US", usa: "US", "u.s.": "US", us: "US", "united kingdom": "GB", uk: "GB",
+  britain: "GB", "great britain": "GB", france: "FR", netherlands: "NL", czechia: "CZ",
+  "czech republic": "CZ", slovakia: "SK", hungary: "HU", romania: "RO", canada: "CA", iceland: "IS",
+  lt: "LT", lv: "LV", ee: "EE", pl: "PL", by: "BY", ru: "RU", fi: "FI", se: "SE", no: "NO",
+  dk: "DK", de: "DE", ua: "UA", gb: "GB",
+};
+
+/** The flag emoji for a country name or ISO code, or "" when it is not a single known country. */
+export function countryFlag(country: string | null): string {
+  const code = COUNTRY_CODES[country?.trim().toLowerCase() ?? ""];
+  if (!code) return "";
+  return String.fromCodePoint(...[...code].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+}
+
+/** "🚨🇸🇪 NEW: " — at most two distinct flags; no flag when no country is known. */
+export function alertPrefix(alert: NonNullable<PostInput["alert"]>): string {
+  const flags = [...new Set(alert.countries.map(countryFlag).filter(Boolean))].slice(0, 2).join("");
+  return `🚨${flags} ${alert.breaking ? "BREAKING" : "NEW"}: `;
+}
 export type PostText = { ok: true; text: string } | { ok: false; reason: string };
 
 /** Shortens `text` to at most `budget` weighted characters, at a word boundary, ending in "…". */
@@ -101,9 +132,10 @@ export function buildPostText(input: PostInput): PostText {
   if (phrase) return { ok: false, reason: `predictive wording ("${phrase}")` };
   if (COORDINATES.test(body)) return { ok: false, reason: "coordinates in the text" };
   // Budget: 280 minus the link (23) and the line break (1).
-  const budget = MAX_WEIGHT - LINK_WEIGHT - 1;
+  const prefix = input.alert ? alertPrefix(input.alert) : "";
+  const budget = MAX_WEIGHT - LINK_WEIGHT - 1 - weightedLength(prefix);
   const fitted = weightedLength(body) <= budget ? body : (fitWholeSentences(body, budget) ?? truncateToWeight(body, budget));
-  const text = `${fitted}\n${url.href}`;
+  const text = `${prefix}${fitted}\n${url.href}`;
   return { ok: true, text };
 }
 

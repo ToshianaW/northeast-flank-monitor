@@ -59,6 +59,10 @@ type Queued = {
   digest_date: string | null;
   digest_sections: Record<string, unknown> | null;
   source_url: string | null;
+  /** The event's country, or the exercise's countries; null for digests. */
+  countries: Array<string | null> | null;
+  /** Set by the reviewer at approval (migration 0014). */
+  breaking: boolean;
 };
 
 export type XQueueOptions = {
@@ -85,6 +89,8 @@ export async function processXQueue(db: Queryable, opts: XQueueOptions): Promise
             COALESCE(e.summary, x.summary) AS summary,
             d.digest_date::text AS digest_date,
             d.sections AS digest_sections,
+            CASE o.item_kind WHEN 'event' THEN ARRAY[e.country] WHEN 'exercise' THEN x.countries END AS countries,
+            COALESCE(e.x_breaking, false) AS breaking,
             CASE o.item_kind
               WHEN 'event' THEN COALESCE(
                 (SELECT es.article_url FROM event_sources es
@@ -127,7 +133,12 @@ export async function processXQueue(db: Queryable, opts: XQueueOptions): Promise
     const built = buildPostText(
       item.item_kind === "digest"
         ? digestPostInput({ digest_date: item.digest_date!, title: item.headline ?? "", sections: item.digest_sections ?? {} }, opts.siteUrl)
-        : { summary: item.summary, headline: item.headline ?? "", sourceUrl: item.source_url },
+        : {
+            summary: item.summary,
+            headline: item.headline ?? "",
+            sourceUrl: item.source_url,
+            alert: { countries: item.countries ?? [], breaking: item.breaking },
+          },
     );
     if (!built.ok) {
       if (opts.live) await db.query(`UPDATE x_post_outbox SET status = 'SKIPPED', last_error = $2 WHERE id = $1`, [item.id, built.reason]);

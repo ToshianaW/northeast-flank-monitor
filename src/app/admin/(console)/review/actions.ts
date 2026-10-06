@@ -69,7 +69,8 @@ export async function approveEventAction(
     return { error: "Choose a confidence level." };
   }
 
-  const result = await approveEvent(eventId, reviewer.name, confidence as ConfidenceLevel);
+  const breaking = formData.get("x_breaking") === "on";
+  const result = await approveEvent(eventId, reviewer.name, confidence as ConfidenceLevel, breaking);
   if (!result.ok) return { error: result.error };
 
   // Automatic "similar in nature" links (same type AND country; no model). A failure here never

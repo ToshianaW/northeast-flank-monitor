@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildPostText,
+  countryFlag,
   digestPostInput,
   fitWholeSentences,
   MAX_WEIGHT,
@@ -75,6 +76,26 @@ test("a long summary posts its whole leading sentences (the hook), never a cut-o
     "No. 5 Brigade moved.",
   ]);
   assert.equal(fitWholeSentences(`${"x".repeat(300)}. Short.`, 100), null, "first sentence too long: caller cuts it");
+});
+
+test("events open with 🚨, the country's flag and NEW, or BREAKING when the reviewer chose it", () => {
+  const summary = "Sweden's armed forces said two Russian aircraft were intercepted over the Baltic Sea.";
+  const post = (countries: Array<string | null>, breaking: boolean) =>
+    buildPostText({ summary, headline: "H", sourceUrl: url, alert: { countries, breaking } });
+  const n = post(["Sweden"], false);
+  assert.ok(n.ok);
+  assert.equal(n.text, `🚨🇸🇪 NEW: ${summary}\n${url}`);
+  const b = post(["SE"], true);
+  assert.ok(b.ok && b.text.startsWith("🚨🇸🇪 BREAKING: "));
+  const none = post(["International"], false);
+  assert.ok(none.ok && none.text.startsWith("🚨 NEW: "), "no flag when no single known country");
+  const two = post(["Lithuania", "Poland", "Latvia"], false);
+  assert.ok(two.ok && two.text.startsWith("🚨🇱🇹🇵🇱 NEW: "), "exercises show at most two flags");
+  assert.equal(countryFlag("russian federation"), "🇷🇺");
+  assert.equal(countryFlag(null), "");
+  // The prefix comes out of the same 280 budget.
+  const long = buildPostText({ summary: "word ".repeat(120), headline: "H", sourceUrl: url, alert: { countries: ["Poland"], breaking: true } });
+  assert.ok(long.ok && postWeight(long.text) <= MAX_WEIGHT && long.text.startsWith("🚨🇵🇱 BREAKING: "));
 });
 
 test("weights: Latin and Cyrillic count 1, emoji and CJK count 2", () => {
