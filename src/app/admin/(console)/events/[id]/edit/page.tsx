@@ -90,6 +90,8 @@ export default async function EditEventPage({
                 source_id: row.source_id,
                 article_url: row.article_url ?? "",
                 source_label: row.source_label ?? "",
+                social: row.social_account ? "on" : "",
+                social_account: row.social_account ?? "",
                 relationship: row.relationship,
                 excerpt: row.excerpt ?? "",
               }))
@@ -98,6 +100,8 @@ export default async function EditEventPage({
                   source_id: "",
                   article_url: "",
                   source_label: "",
+                  social: "",
+                  social_account: "",
                   relationship: "SUPPORTS" as const,
                   excerpt: "",
                 },

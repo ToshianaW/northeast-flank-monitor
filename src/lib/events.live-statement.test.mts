@@ -121,3 +121,46 @@ test("a registry source without a URL, or a live row without a name, is refused"
     client.release();
   }
 });
+
+// Migration 0015: a registered source's post on its social media account.
+const { rows: [socialColumn] } = await getPool().query(
+  "SELECT 1 FROM information_schema.columns WHERE table_name = 'event_sources' AND column_name = 'social_account'",
+);
+const skipSocial = socialColumn ? false : "migration 0015 not applied";
+
+function socialForm(account: string, sourceId: string): FormData {
+  const fd = liveForm("");
+  fd.set("es_0_source_id", sourceId);
+  fd.set("es_0_social", "on");
+  fd.set("es_0_social_account", account);
+  return fd;
+}
+
+test("a registered source's social media post keeps the source, names the account, and needs no URL", { skip: skipSocial }, async () => {
+  const { rows: [registered] } = await getPool().query<{ id: string; name: string }>(
+    "SELECT id, name FROM sources WHERE id <> $1 AND NOT historical_only LIMIT 1",
+    [LIVE_STATEMENT_SOURCE_ID],
+  );
+  const missing = await validateEventForm(socialForm(" ", registered.id), { humanReviewed: false });
+  assert.ok(!missing.ok && missing.errors.es_0_social_account);
+  assert.equal(!missing.ok && missing.errors.es_0_article_url, undefined);
+
+  const result = await validateEventForm(socialForm("X: @Latvijas_armija", registered.id), { humanReviewed: false });
+  assert.ok(result.ok, JSON.stringify(!result.ok && result.errors));
+  assert.equal(result.payload.event.source_name, registered.name, "the registered source is still named");
+
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const id = await insertEvent(client, result.payload.event);
+    await replaceEventSources(client, id, result.payload.sources);
+    const { rows: [row] } = await client.query(
+      "SELECT source_id, article_url, social_account FROM event_sources WHERE event_id = $1",
+      [id],
+    );
+    assert.deepEqual(row, { source_id: registered.id, article_url: null, social_account: "X: @Latvijas_armija" });
+  } finally {
+    await client.query("ROLLBACK");
+    client.release();
+  }
+});

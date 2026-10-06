@@ -74,6 +74,8 @@ const emptySourceRow = (): EventSourceFormRow => ({
   source_id: "",
   article_url: "",
   source_label: "",
+  social: "",
+  social_account: "",
   relationship: "SUPPORTS",
   excerpt: "",
 });
@@ -95,6 +97,8 @@ function SourceRow({
 }) {
   const [sourceId, setSourceId] = useState(row.source_id);
   const isLive = isLiveStatementSource(sourceId);
+  const [socialChecked, setIsSocial] = useState(row.social === "on");
+  const isSocial = socialChecked && !isLive;
 
   return (
     <div className="grid gap-3 border border-border/80 bg-surface-raised p-3">
@@ -154,10 +158,44 @@ function SourceRow({
             message={sourceError("source_label")}
           />
         </div>
-      ) : null}
+      ) : (
+        <div className="grid gap-2">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              name={`es_${index}_social`}
+              checked={isSocial}
+              onChange={(e) => setIsSocial(e.target.checked)}
+              className="size-4 accent-teal-blue"
+            />
+            From their social media account (not yet on their website)
+          </label>
+          {isSocial ? (
+            <>
+              <Label htmlFor={`es_${index}_social_account`}>Account</Label>
+              <Input
+                id={`es_${index}_social_account`}
+                name={`es_${index}_social_account`}
+                defaultValue={row.social_account}
+                maxLength={200}
+                placeholder="X: @Latvijas_armija"
+                aria-invalid={sourceError("social_account") ? true : undefined}
+              />
+              <FieldError
+                id={`es_${index}_social_account-error`}
+                message={sourceError("social_account")}
+              />
+            </>
+          ) : null}
+        </div>
+      )}
       <div className="grid gap-2">
         <Label htmlFor={`es_${index}_article_url`}>
-          {isLive ? "Link (optional, e.g. a clip once posted)" : "Article URL"}
+          {isLive
+            ? "Link (optional, e.g. a clip once posted)"
+            : isSocial
+              ? "Post link (optional, e.g. https://x.com/…/status/…)"
+              : "Article URL"}
         </Label>
         <Input
           id={`es_${index}_article_url`}

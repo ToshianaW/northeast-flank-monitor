@@ -44,6 +44,9 @@ export function isLiveStatementSource(sourceId: string | null | undefined): bool
 /** Shown where a live statement has no link. */
 export const LIVE_STATEMENT_NO_LINK = "Live broadcast — no link yet";
 
+/** Shown where a social media post (migration 0015) has no link. */
+export const SOCIAL_POST_NO_LINK = "Social media post — no link yet";
+
 /** Spec §§26–29 */
 export const TIER_LABELS: Record<1 | 2 | 3 | 4, string> = {
   1: "Tier 1 — Official primary sources",

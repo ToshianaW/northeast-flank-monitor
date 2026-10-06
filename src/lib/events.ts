@@ -88,6 +88,8 @@ export type EventSourceRow = {
   article_url: string | null;
   /** Who said it and where it was seen; set only on the live-statement source. */
   source_label: string | null;
+  /** The registered source's social media account the statement was seen on (migration 0015). */
+  social_account: string | null;
   relationship: SourceRelationship;
   is_primary: boolean;
   excerpt: string | null;
@@ -97,6 +99,9 @@ export type EventSourceFormRow = {
   source_id: string;
   article_url: string;
   source_label: string;
+  /** "on" when the citation is the source's social media post. */
+  social: string;
+  social_account: string;
   relationship: SourceRelationship;
   excerpt: string;
 };
@@ -354,6 +359,8 @@ export function eventSourceRowsFromFormData(formData: FormData): EventSourceForm
     source_id: String(formData.get(`es_${index}_source_id`) ?? ""),
     article_url: String(formData.get(`es_${index}_article_url`) ?? ""),
     source_label: String(formData.get(`es_${index}_source_label`) ?? ""),
+    social: formData.get(`es_${index}_social`) === "on" ? "on" : "",
+    social_account: String(formData.get(`es_${index}_social_account`) ?? ""),
     relationship: String(
       formData.get(`es_${index}_relationship`) ?? "SUPPORTS",
     ) as SourceRelationship,
@@ -566,8 +573,20 @@ export async function validateEventForm(
       }
     }
 
+    // A registered source's post on its social media account: the account is typed freely and the
+    // post link is optional (the website may not carry the statement yet).
+    const isSocial = !isLive && row.social === "on";
+    const social_account = isSocial ? row.social_account.trim() : "";
+    if (isSocial) {
+      if (!social_account) {
+        errors[`${prefix}_social_account`] = "Name the account, for example X: @Latvijas_armija.";
+      } else if (social_account.length > 200) {
+        errors[`${prefix}_social_account`] = "Keep this under 200 characters.";
+      }
+    }
+
     if (!article_url) {
-      if (!isLive) errors[`${prefix}_article_url`] = "Article URL is required.";
+      if (!isLive && !isSocial) errors[`${prefix}_article_url`] = "Article URL is required.";
     } else {
       try {
         const url = new URL(article_url);
@@ -604,6 +623,8 @@ export async function validateEventForm(
       source_id,
       article_url,
       source_label,
+      social: isSocial ? "on" : "",
+      social_account,
       excerpt: row.excerpt,
       is_primary,
     });
@@ -756,8 +777,8 @@ export async function replaceEventSources(
   for (const row of sources) {
     await client.query(
       `INSERT INTO event_sources
-         (event_id, source_id, article_url, relationship, is_primary, excerpt, source_label)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+         (event_id, source_id, article_url, relationship, is_primary, excerpt, source_label, social_account)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         eventId,
         row.source_id,
@@ -766,6 +787,7 @@ export async function replaceEventSources(
         row.is_primary,
         optionalText(row.excerpt),
         optionalText(row.source_label),
+        optionalText(row.social_account),
       ],
     );
   }
@@ -801,7 +823,7 @@ export async function getEvent(id: string): Promise<Event | null> {
 export async function listEventSources(eventId: string): Promise<EventSourceRow[]> {
   if (!UUID_RE.test(eventId)) return [];
   const { rows } = await getPool().query<EventSourceRow>(
-    `SELECT id, source_id, article_url, source_label, relationship, is_primary, excerpt
+    `SELECT id, source_id, article_url, source_label, social_account, relationship, is_primary, excerpt
      FROM event_sources
      WHERE event_id = $1
      ORDER BY is_primary DESC, created_at ASC`,

@@ -67,6 +67,8 @@ export type PublicEventSource = {
   tier: number | null;
   /** Null for a live statement with no link yet. */
   article_url: string | null;
+  /** The source's social media account, when the citation is a post there (migration 0015). */
+  social_account: string | null;
   relationship: SourceRelationship;
   is_primary: boolean;
   excerpt: string | null;
@@ -180,7 +182,7 @@ export async function listPublicEventSources(
   if (!UUID_RE.test(eventId)) return [];
   const { rows } = await getPool().query<PublicEventSource>(
     `SELECT coalesce(es.source_label, s.name) AS name, s.home_url, s.source_type, s.source_country, s.tier,
-            es.article_url, es.relationship, es.is_primary, es.excerpt
+            es.article_url, es.social_account, es.relationship, es.is_primary, es.excerpt
      FROM event_sources es
      JOIN events e ON e.event_id = es.event_id
      JOIN sources s ON s.id = es.source_id

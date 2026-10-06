@@ -32,6 +32,7 @@ import {
   isTier4OnlySupport,
   LIVE_STATEMENT_NO_LINK,
   RELIABILITY_LABELS,
+  SOCIAL_POST_NO_LINK,
   SOURCE_TYPE_LABELS,
 } from "@/lib/source-labels";
 import { requireAdminPage } from "@/lib/admin-session";
@@ -107,6 +108,9 @@ function PrimarySourceBox({ source }: { source: ReviewEventSource | undefined })
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{source.name}</span>
+          {source.social_account ? (
+            <Badge variant="outline" className="text-text-secondary">Social media · {source.social_account}</Badge>
+          ) : null}
           <Badge variant="outline">{tierLabel(source.tier)}</Badge>
           <Badge variant="outline">{RELIABILITY_LABELS[source.reliability]} reliability</Badge>
           <Badge variant="outline" className="text-text-secondary">
@@ -127,7 +131,9 @@ function PrimarySourceBox({ source }: { source: ReviewEventSource | undefined })
             <ExternalLink className="size-3.5" aria-hidden />
           </a>
         ) : (
-          <span className="text-sm text-text-muted">{LIVE_STATEMENT_NO_LINK}</span>
+          <span className="text-sm text-text-muted">
+            {source.social_account ? SOCIAL_POST_NO_LINK : LIVE_STATEMENT_NO_LINK}
+          </span>
         )}
       </div>
       {source.excerpt ? (
@@ -345,7 +351,12 @@ export default async function ReviewEventPage({
                 <tbody className="divide-y divide-border align-top">
                   {sources.map((s, i) => (
                     <tr key={`${s.name}-${s.article_url ?? i}`}>
-                      <td className="px-3 py-2 font-medium">{s.name}</td>
+                      <td className="px-3 py-2 font-medium">
+                        {s.name}
+                        {s.social_account ? (
+                          <span className="block text-xs font-normal text-text-muted">Social media · {s.social_account}</span>
+                        ) : null}
+                      </td>
                       <td className="px-3 py-2 font-mono text-xs">{s.tier ?? "—"}</td>
                       <td className="px-3 py-2">{RELIABILITY_LABELS[s.reliability]}</td>
                       <td
@@ -369,7 +380,9 @@ export default async function ReviewEventPage({
                             {s.article_url}
                           </a>
                         ) : (
-                          <span className="text-xs text-text-muted">{LIVE_STATEMENT_NO_LINK}</span>
+                          <span className="text-xs text-text-muted">
+                            {s.social_account ? SOCIAL_POST_NO_LINK : LIVE_STATEMENT_NO_LINK}
+                          </span>
                         )}
                       </td>
                       <td className="px-3 py-2 text-text-secondary">

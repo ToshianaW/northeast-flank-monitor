@@ -25,7 +25,7 @@ import {
 } from "@/lib/public-events";
 import { listApprovedReferences } from "@/lib/historical-references";
 import { referenceLine } from "@/lib/historical-references-rules";
-import { isStateOfficialSource, LIVE_STATEMENT_NO_LINK, SOURCE_TYPE_LABELS } from "@/lib/source-labels";
+import { isStateOfficialSource, LIVE_STATEMENT_NO_LINK, SOCIAL_POST_NO_LINK, SOURCE_TYPE_LABELS } from "@/lib/source-labels";
 
 export async function generateMetadata({ params }: PageProps<"/events/[id]">) {
   const { id } = await params;
@@ -98,6 +98,9 @@ function SourceItem({ source }: { source: PublicEventSource }) {
           <span className="font-mono text-xs text-text-muted">PRIMARY</span>
         ) : null}
       </div>
+      {source.social_account ? (
+        <p className="mt-1 text-xs text-text-secondary">Social media post · {source.social_account}</p>
+      ) : null}
       {source.article_url ? (
         <a
           href={source.article_url}
@@ -108,7 +111,9 @@ function SourceItem({ source }: { source: PublicEventSource }) {
           {source.article_url}
         </a>
       ) : (
-        <p className="mt-1 font-mono text-xs text-text-muted">{LIVE_STATEMENT_NO_LINK}</p>
+        <p className="mt-1 font-mono text-xs text-text-muted">
+          {source.social_account ? SOCIAL_POST_NO_LINK : LIVE_STATEMENT_NO_LINK}
+        </p>
       )}
       {source.excerpt ? (
         <blockquote className="mt-2 max-w-3xl border-l-2 border-border pl-3 text-base text-text-secondary">

@@ -183,6 +183,8 @@ export type ReviewEventSource = {
   source_country: string | null;
   /** Null for a live statement with no link yet. */
   article_url: string | null;
+  /** The source's social media account, when the citation is a post there (migration 0015). */
+  social_account: string | null;
   excerpt: string | null;
   relationship: SourceRelationship;
   is_primary: boolean;
@@ -201,7 +203,7 @@ export async function getReviewEventDetail(eventId: string): Promise<{
     ),
     getPool().query<ReviewEventSource>(
       `SELECT s.id AS source_id, coalesce(es.source_label, s.name) AS name, s.tier, s.reliability, s.source_type, s.source_country,
-              es.article_url, es.excerpt, es.relationship, es.is_primary
+              es.article_url, es.social_account, es.excerpt, es.relationship, es.is_primary
        FROM event_sources es
        JOIN sources s ON s.id = es.source_id
        WHERE es.event_id = $1
@@ -554,11 +556,12 @@ export async function mergeEventInto(
       source_id: string;
       article_url: string | null;
       source_label: string | null;
+      social_account: string | null;
       relationship: string;
       is_primary: boolean;
       excerpt: string | null;
     }>(
-      `SELECT source_id, article_url, source_label, relationship, is_primary, excerpt
+      `SELECT source_id, article_url, source_label, social_account, relationship, is_primary, excerpt
        FROM event_sources WHERE event_id = $1`,
       [sourceEventId],
     );
@@ -575,9 +578,9 @@ export async function mergeEventInto(
       const { rows: dupRows } = await client.query(
         `SELECT 1 FROM event_sources
          WHERE event_id = $1 AND source_id = $2 AND article_url IS NOT DISTINCT FROM $3
-           AND source_label IS NOT DISTINCT FROM $4
+           AND source_label IS NOT DISTINCT FROM $4 AND social_account IS NOT DISTINCT FROM $5
          LIMIT 1`,
-        [targetEventId, row.source_id, row.article_url, row.source_label],
+        [targetEventId, row.source_id, row.article_url, row.source_label, row.social_account],
       );
       if (dupRows.length > 0) continue;
 
@@ -587,8 +590,8 @@ export async function mergeEventInto(
 
       await client.query(
         `INSERT INTO event_sources
-           (event_id, source_id, article_url, relationship, is_primary, excerpt, source_label)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+           (event_id, source_id, article_url, relationship, is_primary, excerpt, source_label, social_account)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           targetEventId,
           row.source_id,
@@ -597,6 +600,7 @@ export async function mergeEventInto(
           isPrimary,
           row.excerpt,
           row.source_label,
+          row.social_account,
         ],
       );
     }

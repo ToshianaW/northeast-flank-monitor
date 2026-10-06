@@ -30,6 +30,8 @@ export default async function NewEventPage() {
             source_id: "",
             article_url: "",
             source_label: "",
+            social: "",
+            social_account: "",
             relationship: "SUPPORTS",
             excerpt: "",
           },
