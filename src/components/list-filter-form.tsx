@@ -3,7 +3,10 @@ import { Button } from "@/components/ui/button";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { monthLabel, type ListFilters } from "@/lib/list-filters";
 
-/** Country and month/year filter: a plain GET form, so it works without JavaScript. */
+/**
+ * Country and month/year filter: a plain GET form, so it works without JavaScript. Without
+ * `countries` (digests) only the month is shown. Searching starts again at page 1.
+ */
 export function ListFilterForm({
   action,
   filters,
@@ -12,25 +15,27 @@ export function ListFilterForm({
 }: {
   action: string;
   filters: ListFilters;
-  countries: readonly string[];
+  countries?: readonly string[];
   months: readonly string[];
 }) {
   const active = filters.country !== null || filters.month !== null;
   return (
     <form method="get" action={action} className="panel flex flex-wrap items-end gap-4 p-4">
-      <div className="grid gap-1">
-        <label htmlFor="filter-country" className="meta-label">
-          Country
-        </label>
-        <NativeSelect id="filter-country" name="country" defaultValue={filters.country ?? ""} className="min-w-44">
-          <NativeSelectOption value="">All countries</NativeSelectOption>
-          {countries.map((c) => (
-            <NativeSelectOption key={c} value={c}>
-              {c}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
-      </div>
+      {countries ? (
+        <div className="grid gap-1">
+          <label htmlFor="filter-country" className="meta-label">
+            Country
+          </label>
+          <NativeSelect id="filter-country" name="country" defaultValue={filters.country ?? ""} className="min-w-44">
+            <NativeSelectOption value="">All countries</NativeSelectOption>
+            {countries.map((c) => (
+              <NativeSelectOption key={c} value={c}>
+                {c}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </div>
+      ) : null}
       <div className="grid gap-1">
         <label htmlFor="filter-month" className="meta-label">
           Month

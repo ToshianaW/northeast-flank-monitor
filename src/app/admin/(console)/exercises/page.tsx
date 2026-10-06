@@ -18,6 +18,9 @@ import {
 } from "@/lib/event-labels";
 import { activeExerciseSuggestion, exerciseUpdateReasons } from "@/lib/exercise-rules";
 import { listExercises, listExerciseUpdateEvidence } from "@/lib/exercises";
+import { ListPager } from "@/components/admin/list-pager";
+import { ListFilterForm } from "@/components/list-filter-form";
+import { filterOptions, matchesFilters, paginate, parseListFilters } from "@/lib/list-filters";
 
 export const metadata = { title: "Exercises" };
 
@@ -26,18 +29,38 @@ function range(start: Date | null, end: Date | null): string {
   return start || end ? `${day(start)} → ${day(end)}` : "—";
 }
 
-export default async function AdminExercisesPage() {
+/** Start month (observed, else announced) as YYYY-MM, for the month filter (as on /exercises). */
+function startMonth(x: { observed_start_date: Date | null; announced_start_date: Date | null }): string | null {
+  const d = x.observed_start_date ?? x.announced_start_date;
+  return d ? d.toISOString().slice(0, 7) : null;
+}
+
+export default async function AdminExercisesPage({ searchParams }: PageProps<"/admin/exercises">) {
   await requireAdminPage();
   await connection();
-  const [all, evidence] = await Promise.all([listExercises(), listExerciseUpdateEvidence()]);
+  const [params, all, evidence] = await Promise.all([
+    searchParams,
+    listExercises(),
+    listExerciseUpdateEvidence(),
+  ]);
   // Exercises that need an update first; otherwise the list keeps its date order.
-  const exercises = all
+  const flagged = all
     .map((x) => ({
       ...x,
       updateReasons: exerciseUpdateReasons(x, activeExerciseSuggestion(x, evidence.get(x.id) ?? [])),
     }))
     .sort((a, b) => Number(b.updateReasons.length > 0) - Number(a.updateReasons.length > 0));
-  const needUpdate = exercises.filter((x) => x.updateReasons.length > 0).length;
+  const needUpdate = flagged.filter((x) => x.updateReasons.length > 0).length;
+
+  const keyed = flagged.map((x) => ({ exercise: x, countries: x.countries, month: startMonth(x) }));
+  const options = filterOptions(keyed);
+  const filters = parseListFilters(params, options);
+  const page = paginate(
+    keyed.filter((k) => matchesFilters(k, filters)).map((k) => k.exercise),
+    params.page,
+  );
+  const exercises = page.items;
+  const searching = filters.country !== null || filters.month !== null;
 
   return (
     <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
@@ -46,7 +69,7 @@ export default async function AdminExercisesPage() {
           <p className="meta-label mb-2">Admin · exercises</p>
           <h1 className="text-2xl font-semibold tracking-tight">Exercises</h1>
           <p className="mt-1 text-sm text-text-secondary">
-            {exercises.length === 1 ? "1 exercise" : `${exercises.length} exercises`}
+            {all.length === 1 ? "1 exercise" : `${all.length} exercises`}
             {needUpdate > 0 ? (
               <span className="text-foreground">
                 {` · ${needUpdate} need${needUpdate === 1 ? "s" : ""} an update`}
@@ -59,10 +82,25 @@ export default async function AdminExercisesPage() {
         </Link>
       </div>
 
-      {exercises.length === 0 ? (
+      {all.length > 0 ? (
+        <div className="mt-6">
+          <ListFilterForm
+            action="/admin/exercises"
+            filters={filters}
+            countries={options.countries}
+            months={options.months}
+          />
+        </div>
+      ) : null}
+
+      {all.length === 0 ? (
         <div className="mt-8 border border-dashed border-border bg-surface-dark px-6 py-10 text-center">
           <p className="text-sm text-text-secondary">No exercises yet.</p>
         </div>
+      ) : exercises.length === 0 ? (
+        <p className="mt-6 text-sm text-text-muted">
+          {searching ? "No exercises for this search." : "No exercises on this page."}
+        </p>
       ) : (
         <div className="mt-6 overflow-x-auto border border-border bg-surface-dark">
           <Table>
@@ -120,6 +158,7 @@ export default async function AdminExercisesPage() {
           </Table>
         </div>
       )}
+      <ListPager base="/admin/exercises" filters={filters} page={page} noun="exercises" />
     </section>
   );
 }

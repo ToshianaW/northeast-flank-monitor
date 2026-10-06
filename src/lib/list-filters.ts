@@ -1,6 +1,7 @@
 /**
- * Country and month filters for the Air Activity and Exercises pages. Pure. The options come
- * from the items on the page; a value that is not an option is ignored (shows everything).
+ * Country and month filters for the Air Activity and Exercises pages and the admin lists, and
+ * the admin lists' pages of 20. Pure. The options come from the items on the page; a value that
+ * is not an option is ignored (shows everything).
  */
 
 /** Items shown per group before "Show more", and how many each click adds. */
@@ -36,6 +37,47 @@ export function parseListFilters(params: Params, options: { countries: readonly 
     country: options.countries.find((c) => c.toLowerCase() === country.toLowerCase()) ?? null,
     month: options.months.includes(month) ? month : null,
   };
+}
+
+/** Rows per page on the admin lists (events, exercises, digests). */
+export const ADMIN_PAGE_SIZE = 20;
+
+export type Page<T> = {
+  items: T[];
+  /** 1-based, clamped to the pages that exist. */
+  page: number;
+  pageCount: number;
+  total: number;
+  /** 1-based positions of the first and last item shown; 0 when there are none. */
+  from: number;
+  to: number;
+};
+
+/** ?page=N, clamped to 1…pageCount; anything else is page 1. */
+export function paginate<T>(items: readonly T[], pageParam: string | string[] | undefined, size = ADMIN_PAGE_SIZE): Page<T> {
+  const pageCount = Math.max(1, Math.ceil(items.length / size));
+  const requested = Number.parseInt(first(pageParam), 10);
+  const page = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), pageCount) : 1;
+  const start = (page - 1) * size;
+  const shown = items.slice(start, start + size);
+  return {
+    items: shown,
+    page,
+    pageCount,
+    total: items.length,
+    from: shown.length > 0 ? start + 1 : 0,
+    to: start + shown.length,
+  };
+}
+
+/** The list URL with the current filters and a page (page 1 is left out). */
+export function listHref(base: string, filters: ListFilters, page = 1): string {
+  const params = new URLSearchParams();
+  if (filters.country) params.set("country", filters.country);
+  if (filters.month) params.set("month", filters.month);
+  if (page > 1) params.set("page", String(page));
+  const query = params.toString();
+  return query ? `${base}?${query}` : base;
 }
 
 export function matchesFilters(item: { countries: readonly string[]; month: string | null }, filters: ListFilters): boolean {

@@ -13,6 +13,9 @@ import {
 import { EVENT_TYPE_LABELS, REVIEW_STATUS_LABELS } from "@/lib/event-labels";
 import { listEvents } from "@/lib/events";
 import { requireAdminPage } from "@/lib/admin-session";
+import { ListPager } from "@/components/admin/list-pager";
+import { ListFilterForm } from "@/components/list-filter-form";
+import { filterOptions, matchesFilters, paginate, parseListFilters } from "@/lib/list-filters";
 
 export const metadata = { title: "Events" };
 
@@ -25,7 +28,18 @@ export default async function AdminEventsPage({
 }: PageProps<"/admin/events">) {
   await requireAdminPage();
   await connection();
-  const [{ saved }, events] = await Promise.all([searchParams, listEvents()]);
+  const [params, all] = await Promise.all([searchParams, listEvents()]);
+  const keyed = all.map((event) => ({
+    event,
+    countries: event.country ? [event.country] : [],
+    month: event.event_date.toISOString().slice(0, 7),
+  }));
+  const options = filterOptions(keyed);
+  const filters = parseListFilters(params, options);
+  const matching = keyed.filter((k) => matchesFilters(k, filters)).map((k) => k.event);
+  const page = paginate(matching, params.page);
+  const events = page.items;
+  const searching = filters.country !== null || filters.month !== null;
 
   return (
     <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
@@ -34,7 +48,7 @@ export default async function AdminEventsPage({
           <p className="meta-label mb-2">Admin · events</p>
           <h1 className="text-2xl font-semibold tracking-tight">Events</h1>
           <p className="mt-1 text-sm text-text-secondary">
-            {events.length === 1 ? "1 event" : `${events.length} events`}
+            {all.length === 1 ? "1 event" : `${all.length} events`}
           </p>
         </div>
         <Link href="/admin/events/new" className={buttonVariants()}>
@@ -42,7 +56,7 @@ export default async function AdminEventsPage({
         </Link>
       </div>
 
-      {saved ? (
+      {params.saved ? (
         <p
           role="status"
           className="mt-6 border border-operational-teal/40 bg-operational-teal/10 px-3 py-2 text-sm text-foreground"
@@ -51,19 +65,35 @@ export default async function AdminEventsPage({
         </p>
       ) : null}
 
-      {events.length === 0 ? (
+      {all.length > 0 ? (
+        <div className="mt-6">
+          <ListFilterForm
+            action="/admin/events"
+            filters={filters}
+            countries={options.countries}
+            months={options.months}
+          />
+        </div>
+      ) : null}
+
+      {all.length === 0 ? (
         <div className="mt-8 border border-dashed border-border bg-surface-dark px-6 py-10 text-center">
           <p className="text-sm text-text-secondary">No events yet.</p>
           <p className="mt-1 text-xs text-text-muted">
             Add a draft event with at least one attached source.
           </p>
         </div>
+      ) : events.length === 0 ? (
+        <p className="mt-6 text-sm text-text-muted">
+          {searching ? "No events for this search." : "No events on this page."}
+        </p>
       ) : (
         <div className="mt-6 overflow-x-auto border border-border bg-surface-dark">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="meta-label">Date</TableHead>
+                <TableHead className="meta-label">Country</TableHead>
                 <TableHead className="meta-label">Headline</TableHead>
                 <TableHead className="meta-label">Type</TableHead>
                 <TableHead className="meta-label">Status</TableHead>
@@ -76,6 +106,7 @@ export default async function AdminEventsPage({
                   <TableCell className="whitespace-nowrap font-mono text-xs">
                     {formatDate(event.event_date)}
                   </TableCell>
+                  <TableCell className="whitespace-nowrap text-xs">{event.country ?? "—"}</TableCell>
                   <TableCell className="max-w-md whitespace-normal font-medium">{event.headline}</TableCell>
                   <TableCell className="text-xs">
                     {EVENT_TYPE_LABELS[event.event_type]}
@@ -106,6 +137,7 @@ export default async function AdminEventsPage({
           </Table>
         </div>
       )}
+      <ListPager base="/admin/events" filters={filters} page={page} noun="events" />
     </section>
   );
 }

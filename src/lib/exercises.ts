@@ -61,6 +61,7 @@ export type ExerciseListItem = Pick<
   | "id"
   | "exercise_name"
   | "actor"
+  | "countries"
   | "exercise_status"
   | "review_status"
   | "announced_start_date"
@@ -477,7 +478,7 @@ export async function validateExerciseForm(
 
 export async function listExercises(): Promise<ExerciseListItem[]> {
   const { rows } = await getPool().query<ExerciseListItem>(
-    `SELECT id, exercise_name, actor, exercise_status, review_status, announced_start_date,
+    `SELECT id, exercise_name, actor, countries, exercise_status, review_status, announced_start_date,
             announced_end_date, observed_start_date, observed_end_date, post_exercise_reset,
             dismissed_suggestion, updated_at
      FROM exercises

@@ -78,7 +78,7 @@ export type Event = {
 
 export type EventListItem = Pick<
   Event,
-  "event_id" | "headline" | "event_date" | "event_type" | "review_status" | "updated_at"
+  "event_id" | "headline" | "event_date" | "event_type" | "country" | "review_status" | "updated_at"
 >;
 
 export type EventSourceRow = {
@@ -795,7 +795,7 @@ export async function replaceEventSources(
 
 export async function listEvents(): Promise<EventListItem[]> {
   const { rows } = await getPool().query<EventListItem>(
-    `SELECT event_id, headline, event_date, event_type, review_status, updated_at
+    `SELECT event_id, headline, event_date, event_type, country, review_status, updated_at
      FROM events
      ORDER BY event_date DESC, updated_at DESC`,
   );
