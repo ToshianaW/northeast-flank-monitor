@@ -6,7 +6,8 @@ import { isStatementType, type EventType } from "./event-labels";
  * back to events. An item goes where the place it concerns is, never where a statement was
  * made or published: venues (Moscow, Brussels, the UN...) are matched and then ignored.
  * Order: stored source coordinates, location_name, the event's own text, then the country
- * field (Activity only: for a statement the country field is usually the speaker's).
+ * field (Activity only: for a statement the country field is usually the speaker's; a country
+ * on a multi-country card, such as the United Kingdom, goes to that card).
  * On-map areas always beat the "Outside the theater" cards (Russia elsewhere, Ukraine,
  * Western Europe, North America). The finest result is an admin-1 region; a district or
  * town rolls up to its region (spec §60). What is left is "Location unclear".
@@ -154,7 +155,17 @@ function unitForCountry(country: string | null | undefined): Unit | null {
   return units.find((u) => u.countryFallback) ?? null;
 }
 
-const THEATER_COUNTRIES = new Set(["poland", "lithuania", "latvia", "estonia", "belarus", "russia"]);
+/**
+ * The "Outside the theater" card that lists a country field value among its names, for the cards
+ * that cover several countries (Western Europe, North America): "United Kingdom" → Western Europe.
+ */
+function cardForCountry(country: string | null | undefined): Unit | null {
+  if (!country) return null;
+  const key = fold(country);
+  return UNITS.find((u) => u.onMap === false && u.country === null && u.names.some((n) => fold(n) === key)) ?? null;
+}
+
+const THEATER_COUNTRIES =new Set(["poland", "lithuania", "latvia", "estonia", "belarus", "russia"]);
 
 type Context = { country: string | null | undefined; text: string };
 
@@ -313,7 +324,9 @@ export function placeEvent(event: PlaceableEvent, geo?: RegionFeatureCollection)
   const t = fromText();
   if (t && t.kind !== "unplaced") return t;
 
-  const unit = isStatementType(event.event_type) ? null : unitForCountry(event.country);
+  const unit = isStatementType(event.event_type)
+    ? null
+    : (unitForCountry(event.country) ?? cardForCountry(event.country));
   if (unit) return placed(unit.id, null, `country field "${event.country}"`);
   return { kind: "unplaced", reason: t?.reason ?? "no gazetteer match" };
 }

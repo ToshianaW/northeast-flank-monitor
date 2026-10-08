@@ -112,6 +112,25 @@ test("text step: no country adjectives; Activity falls back to the country field
   assert.equal(where(place({ headline: "Statement on NATO", event_type: S, location_name: null, country: "Russia" })), "unplaced");
 });
 
+test("Activity: a country field on a multi-country card goes to that card; statements still skip it", () => {
+  const molesworth = {
+    headline: "Two Latvian nationals arrested after security breach at RAF Molesworth",
+    summary: "British police arrested two Latvian nationals inside the perimeter of RAF Molesworth in Cambridgeshire.",
+    event_type: "INFRASTRUCTURE" as const,
+    location_name: null,
+    country: "United Kingdom",
+  };
+  assert.equal(where(place(molesworth)), "WEST-EU/*");
+  assert.equal(where(place({ ...molesworth, country: "UK" })), "WEST-EU/*");
+  assert.equal(where(place({ headline: "Air base drill", location_name: null, country: "Germany" })), "WEST-EU/*");
+  assert.equal(where(place({ headline: "Air base drill", location_name: null, country: "Canada" })), "NORTH-AM/*");
+  assert.equal(where(place({ headline: "Air base drill", location_name: null, country: "Ukraine" })), "UA/*");
+  assert.equal(where(place({ ...molesworth, event_type: S })), "unplaced");
+  assert.equal(where(place({ headline: "Air base drill", location_name: null, country: "Atlantis" })), "unplaced");
+  // An on-map area named in the text still wins over the card.
+  assert.equal(where(place({ ...molesworth, summary: "British troops arrive in Tapa, Estonia." })), "EE/EE-59");
+});
+
 test("stored coordinates: used when consistent, Unplaced when they contradict the location", () => {
   const square = (id: string, unit: string, x: number, y: number) => ({
     type: "Feature" as const,
