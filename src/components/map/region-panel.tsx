@@ -81,6 +81,32 @@ export function RegionPanel({
   );
 }
 
+/**
+ * Overview (nothing selected): every item in the window, newest first, 4 at a time, each with
+ * where it is. Selecting an area narrows it.
+ */
+export function OverviewPanel({ data }: { data: MapData }) {
+  const where = (i: MapItem): string => {
+    if (i.placement.kind === "theater-wide") return "Theater-wide";
+    if (i.placement.kind === "unplaced") return "Location unclear";
+    const { unit: unitId, region: regionId } = i.placement;
+    const unit = data.units.find((u) => u.id === unitId);
+    const region = regionId ? unit?.regions.find((r) => r.id === regionId) : undefined;
+    return region && unit && unit.regions.length > 1 ? `${unit.name} · ${region.name}` : (unit?.name ?? unitId);
+  };
+  return (
+    <Shell
+      title="All activity"
+      days={data.days}
+      count={data.items.length}
+      note="Select a dot, an area on the map, or a button or card below the map to narrow the list."
+      escapeCloses={false}
+    >
+      <MapItemList key="overview" items={data.items} areaLabel={where} />
+    </Shell>
+  );
+}
+
 function Shell({
   headingRef,
   eyebrow,
@@ -88,14 +114,17 @@ function Shell({
   days,
   count,
   note,
+  escapeCloses = true,
   children,
 }: {
-  headingRef: Ref<HTMLHeadingElement>;
+  headingRef?: Ref<HTMLHeadingElement>;
   eyebrow?: string;
   title: string;
   days: number;
   count: number;
   note?: string;
+  /** False for the overview, which has nothing to close. */
+  escapeCloses?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -111,7 +140,7 @@ function Shell({
       </h2>
       <p className="mt-1 mb-4 text-xs text-text-secondary">
         {count === 1 ? "1 published item" : `${count} published items`} in the last {days} days, all
-        layers. Escape closes.
+        layers.{escapeCloses ? " Escape closes." : null}
         {note ? <> {note}</> : null}
       </p>
       {children}

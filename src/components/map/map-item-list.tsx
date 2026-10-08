@@ -35,6 +35,16 @@ export function MapItemList({
 
   return (
     <div>
+      {pageCount > 1 ? (
+        <Pager
+          current={current}
+          pageCount={pageCount}
+          start={start}
+          shownCount={shown.length}
+          total={sorted.length}
+          setPage={setPage}
+        />
+      ) : null}
       <ul className="divide-y divide-border">
         {shown.map((item) => {
           const area = areaLabel?.(item);
@@ -69,29 +79,47 @@ export function MapItemList({
           );
         })}
       </ul>
-      {pageCount > 1 ? (
-        <nav aria-label="More items" className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3">
-          <button
-            type="button"
-            onClick={() => setPage(current - 1)}
-            disabled={current === 0}
-            className="rounded-full border border-border px-3 py-1.5 text-sm text-text-secondary hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-          >
-            ← Previous
-          </button>
-          <p className="font-mono text-xs text-text-muted" aria-live="polite">
-            {start + 1}–{start + shown.length} of {sorted.length}
-          </p>
-          <button
-            type="button"
-            onClick={() => setPage(current + 1)}
-            disabled={current === pageCount - 1}
-            className="rounded-full border border-border px-3 py-1.5 text-sm text-text-secondary hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-          >
-            Next →
-          </button>
-        </nav>
-      ) : null}
     </div>
+  );
+}
+
+/** Previous / Next above the list, so it is in view without scrolling past the items. */
+function Pager({
+  current,
+  pageCount,
+  start,
+  shownCount,
+  total,
+  setPage,
+}: {
+  current: number;
+  pageCount: number;
+  start: number;
+  shownCount: number;
+  total: number;
+  setPage: (page: number) => void;
+}) {
+  return (
+    <nav aria-label="More items" className="mb-3 flex items-center justify-between gap-3 border-b border-border pb-3">
+      <button
+        type="button"
+        onClick={() => setPage(current - 1)}
+        disabled={current === 0}
+        className="rounded-full border border-border px-3 py-1.5 text-sm text-text-secondary hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+      >
+        ← Previous
+      </button>
+      <p className="font-mono text-xs text-text-muted" aria-live="polite">
+        {start + 1}–{start + shownCount} of {total}
+      </p>
+      <button
+        type="button"
+        onClick={() => setPage(current + 1)}
+        disabled={current === pageCount - 1}
+        className="rounded-full border border-border px-3 py-1.5 text-sm text-text-secondary hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+      >
+        Next →
+      </button>
+    </nav>
   );
 }

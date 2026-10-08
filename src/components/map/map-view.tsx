@@ -9,7 +9,7 @@ import { dotRadii, DOTS_SOURCE, mapLayers, OUTLINES_SOURCE } from "@/lib/map-lay
 import { MAP_BACKGROUND, REGION_DOT_SCALE, SEA_AREAS, STEP_LABELS, THEATER_WIDE_ID } from "@/lib/map-style";
 import type { RegionFeatureCollection } from "@/lib/placement";
 import { OutsideCards } from "./outside-cards";
-import { RegionPanel, type MapSelection } from "./region-panel";
+import { OverviewPanel, RegionPanel, type MapSelection } from "./region-panel";
 
 type Bounds = [number, number, number, number];
 
@@ -343,10 +343,7 @@ export function MapView({ data }: { data: MapData }) {
         {selection ? (
           <RegionPanel data={data} selection={selection} headingRef={headingRef} onSelect={setSelection} />
         ) : (
-          <div className="panel text-sm text-text-secondary">
-            Select a dot, an area on the map, or a button or card below the map to list its published
-            events and exercises.
-          </div>
+          <OverviewPanel data={data} />
         )}
       </div>
     </div>
