@@ -279,7 +279,9 @@ export function EventForm({
 
   return (
     <form
-      key={JSON.stringify({ values, sourceRows, primaryIndex, rowCount })}
+      // Rebuilt only when the server returns (to show the values it sent back). Not on "Add
+      // another source": that would reset everything typed so far.
+      key={JSON.stringify(state)}
       action={formAction}
       className="grid max-w-4xl gap-6"
       noValidate

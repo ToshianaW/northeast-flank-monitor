@@ -25,12 +25,12 @@ export function RegionPanel({
     return (
       <Shell headingRef={headingRef} title="Theater-wide" days={data.days} count={items.length}
         note="Items about the whole flank rather than one area. Not drawn on the map.">
-        <MapItemList items={items} />
+        <MapItemList key={THEATER_WIDE_ID} items={items} />
       </Shell>
     );
   }
 
-  const unit = data.units.find((u) => u.id === selection.unit)!;
+  const unit =data.units.find((u) => u.id === selection.unit)!;
   const multiRegion = unit.regions.length > 1;
   const region = selection.region ? unit.regions.find((r) => r.id === selection.region) : undefined;
   const inUnit = data.items.filter((i) => i.placement.kind === "placed" && i.placement.unit === unit.id);
@@ -54,15 +54,15 @@ export function RegionPanel({
             and {wideCount === 1 ? "is" : "are"} listed under All of {unit.name}.
           </p>
         ) : null}
-        <MapItemList items={items} />
+        <MapItemList key={region.id} items={items} />
       </Shell>
     );
   }
 
+  // One list, newest first: each item says its region, or that it concerns the whole area.
   const wideLabel = COUNTRY_UNITS.has(unit.id) ? "Country-wide" : `${unit.name}, no specific region`;
-  const wide = multiRegion ? inUnit.filter((i) => regionOf(i) === null) : [];
-  const inRegions = multiRegion ? inUnit.filter((i) => regionOf(i) !== null) : inUnit;
-  const regionName = (i: MapItem) => unit.regions.find((r) => r.id === regionOf(i))?.name ?? null;
+  const areaLabel = (i: MapItem) =>
+    unit.regions.find((r) => r.id === regionOf(i))?.name ?? wideLabel;
   return (
     <Shell
       headingRef={headingRef}
@@ -71,17 +71,11 @@ export function RegionPanel({
       days={data.days}
       count={inUnit.length}
     >
-      {wide.length > 0 ? (
-        <section aria-label={wideLabel} className="mb-5">
-          <h3 className="meta-label mb-2">{wideLabel}</h3>
-          <MapItemList items={wide} />
-        </section>
-      ) : null}
-      {multiRegion && wide.length > 0 ? <h3 className="meta-label mb-2">By region</h3> : null}
       <MapItemList
-        items={inRegions}
-        areaLabel={multiRegion ? regionName : undefined}
-        empty={wide.length > 0 ? "No region-level items." : "No published items in this window."}
+        key={unit.id}
+        items={inUnit}
+        areaLabel={multiRegion ? areaLabel : undefined}
+        empty="No published items in this window."
       />
     </Shell>
   );
