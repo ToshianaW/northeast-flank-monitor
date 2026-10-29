@@ -130,7 +130,7 @@ test("collector.json: exactly the approved sources opt in; the refused ones stay
   assert.deepEqual(optedIn, [
     "15min-lt", "certlv-en", "defence24", "err-news", "estonianworld", "euronews", "govpl-mon", "govpl-mswia", "govpl-rcb",
     "kyivindependent-news", "mil-ee-en", "mil-lv", "milmag", "portalmorski", "rmf24-fakty", "rp-konflikty", "rp-radar-zbrojeniowy",
-    "rp-swiat", "rp-wojsko", "sargs-lv", "wargov-news",
+    "rp-swiat", "rp-wojsko", "wargov-news",
   ]);
   // Round 5 (decision 25): not enabled, never collected.
   assert.ok(!all.some((f: { url: string }) => /bbn\.gov\.pl|gov\.pl\/web\/border/.test(f.url)));
@@ -140,7 +140,7 @@ test("collector.json: exactly the approved sources opt in; the refused ones stay
     ["LRT", "NPR", "Stars and Stripes", "OSINT613"].includes(f.source));
   for (const f of refused) assert.ok(!f.full_text, `${f.key} must not opt in`);
   // Skipped or undecided in round 3: never collected at all.
-  assert.ok(!all.some((f: { url: string }) => /pagd\.lrv\.lt|pap\.pl|postimees\.ee|bundeswehr\.de|fontanka\.ru|spiegel\.de|defencenet\.gr|marine\.org\.ru|mezha\.net/.test(f.url)));
+  assert.ok(!all.some((f: { url: string }) => /pagd\.lrv\.lt|pap\.pl|postimees\.ee|bundeswehr\.de|fontanka\.ru|spiegel\.de|defencenet\.gr|marine\.org\.ru|mezha\.net|sargs\.lv/.test(f.url)));
   for (const d of ["jauns.lv", "ve.lt", "lrvk.lrv.lt", "pagd.lrv.lt", "pap.pl", "news.postimees.ee", "bundeswehr.de", "fontanka.ru", "spiegel.de", "defencenet.gr", "mezha.net"]) {
     assert.ok([...config.blocked_automated_access, ...config.tos_prohibited_domains].includes(d), `${d} is on a skip list`);
   }

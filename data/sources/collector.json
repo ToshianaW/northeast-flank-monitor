@@ -752,20 +752,6 @@
       "time_zone": "Europe/Riga",
       "no_ai_processing": false,
       "full_text": true
-    },
-    {
-      "key": "sargs-lv",
-      "source": "Sargs.lv (Latvian Ministry of Defence portal)",
-      "url": "https://www.sargs.lv/lv",
-      "_comment": "Latvian MoD news portal, front page (no feed). Enabled by the project owner on the decision 17 basis (decision 25): 'Portāla „Sargs.lv” lietotāji drīkst izmantot informāciju bez portāla redakcijas atļaujas tikai nekomerciāliem nolūkiem ..., norādot atsauci uz portālu' (non-commercial use with attribution). News sections only (no podcasts or video), and each title needs a Latvian region term (for example Latvija, Lietuva, Baltkrievija).",
-      "parser": "dated-path",
-      "link_prefix": "/lv/",
-      "sections": ["latvija", "nato", "arvalstis", "pasaule"],
-      "language": "Latvian",
-      "time_zone": "Europe/Riga",
-      "no_ai_processing": false,
-      "region_filter": true,
-      "full_text": true
     }
   ],
   "gdelt": {
