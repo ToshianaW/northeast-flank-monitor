@@ -1,3 +1,5 @@
+import http from "node:http";
+import https from "node:https";
 import robotsParser from "robots-parser";
 
 type Robot = ReturnType<typeof robotsParser>;
@@ -9,6 +11,63 @@ type Robot = ReturnType<typeof robotsParser>;
 type RobotsRules = { kind: "rules"; robot: Robot } | { kind: "allow-all" } | { kind: "deny-all"; reason: string };
 
 export class RobotsDisallowedError extends Error {}
+
+/** fetch() follows at most this many redirects. Internal hops are not rate-limited. */
+const MAX_REDIRECTS = 20;
+
+/**
+ * One GET over Node's HTTP/1.1 client. Global fetch (undici, HTTP/2) is answered HTTP 403
+ * with a Cloudflare challenge on sites such as mezha.net; this client is served the feed for
+ * the same identified user agent. No browser user agent and no client hints.
+ */
+function requestOnce(url: string, userAgent: string, signal: AbortSignal): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const fail = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      const reason = signal.aborted ? signal.reason : undefined;
+      if (reason instanceof Error && reason.name === "TimeoutError") reject(reason);
+      else reject(error instanceof Error ? error : new Error(String(error)));
+    };
+    const succeed = (response: Response) => {
+      if (settled) return;
+      settled = true;
+      resolve(response);
+    };
+
+    const protocol = new URL(url).protocol;
+    const lib = protocol === "https:" ? https : protocol === "http:" ? http : null;
+    if (!lib) {
+      fail(new Error(`unsupported URL protocol ${protocol}`));
+      return;
+    }
+
+    const req = lib.request(
+      url,
+      {
+        method: "GET",
+        headers: { "User-Agent": userAgent, Accept: "*/*" },
+        signal,
+      },
+      (incoming) => {
+        const chunks: Buffer[] = [];
+        incoming.on("data", (chunk: Buffer) => chunks.push(chunk));
+        incoming.on("end", () => {
+          const headers = new Headers();
+          for (const [key, value] of Object.entries(incoming.headers)) {
+            if (value === undefined || key === "transfer-encoding" || key === "connection") continue;
+            for (const part of Array.isArray(value) ? value : [value]) headers.append(key, part);
+          }
+          succeed(new Response(new Uint8Array(Buffer.concat(chunks)), { status: incoming.statusCode ?? 0, headers }));
+        });
+        incoming.on("error", fail);
+      },
+    );
+    req.on("error", fail);
+    req.end();
+  });
+}
 
 export class HttpClient {
   private readonly robots = new Map<string, RobotsRules>();
@@ -36,13 +95,16 @@ export class HttpClient {
   }
 
   private async rawGet(url: string, intervalMs: number, redirect: RequestRedirect = "follow"): Promise<Response> {
-    const { host } = new URL(url);
-    await this.waitTurn(host, intervalMs);
-    return fetch(url, {
-      headers: { "User-Agent": this.userAgent, Accept: "*/*" },
-      redirect,
-      signal: AbortSignal.timeout(this.timeoutMs),
-    });
+    await this.waitTurn(new URL(url).host, intervalMs);
+    const signal = AbortSignal.timeout(this.timeoutMs);
+    let current = url;
+    for (let hop = 0; ; hop++) {
+      const res = await requestOnce(current, this.userAgent, signal);
+      const location = res.headers.get("location");
+      // "manual" returns the 3xx. "follow" continues, including onto another host.
+      if (redirect !== "follow" || res.status < 300 || res.status >= 400 || !location || hop >= MAX_REDIRECTS) return res;
+      current = new URL(location, current).toString();
+    }
   }
 
   private async loadRobots(origin: string): Promise<RobotsRules> {
@@ -78,7 +140,7 @@ export class HttpClient {
 
   /**
    * robots.txt check, per-host rate limit, then GET. Non-2xx responses are returned, not thrown.
-   * redirect "follow" (default) lets fetch follow any redirect. "same-host" follows up to 3
+   * redirect "follow" (default) follows any redirect, including onto another host. "same-host" follows up to 3
    * redirects only when they stay on the same host, checking robots.txt and the rate limit for
    * each hop; a redirect to another host is returned as-is (3xx).
    */
@@ -109,7 +171,7 @@ export class HttpClient {
 export function errorMessage(error: unknown): string {
   if (error instanceof Error) {
     if (error.name === "TimeoutError") return "request timed out";
-    // fetch() reports network failures as "fetch failed" with the real reason in .cause.
+    // A failed request may carry the real reason on .cause.
     const cause = error.cause as { code?: string; message?: string } | undefined;
     return cause?.code || cause?.message ? `${error.message} (${cause.code ?? cause.message})` : error.message;
   }
