@@ -123,10 +123,10 @@ test("Polish region terms: case endings and diacritics fold; English terms still
   }
 });
 
-test("region filters on rp.pl, mezha.net, 15min and AiF-Kaliningrad; none on Defence24 or the Polish MoD listing", () => {
+test("region filters on rp.pl, 15min and AiF-Kaliningrad; none on Defence24 or the Polish MoD listing", () => {
   const byKey = new Map(regionConfig.feeds.map((f) => [f.key, f]));
   for (const key of [
-    "rp-wojsko", "rp-radar-zbrojeniowy", "rp-konflikty", "rp-swiat", "mezha-en", "15min-lt", "aif-klg",
+    "rp-wojsko", "rp-radar-zbrojeniowy", "rp-konflikty", "rp-swiat", "15min-lt", "aif-klg",
     "wargov-news", "kremlin-en", "rmf24-fakty", "radio-lublin", "kyivindependent-news", "theinsider-ru",
     "estonianworld", "portalmorski", "zerkalo", "defence-industry-eu", "kaliningrad-news",
   ]) {
@@ -135,7 +135,7 @@ test("region filters on rp.pl, mezha.net, 15min and AiF-Kaliningrad; none on Def
   assert.ok(!byKey.get("defence24")?.region_filter, "Defence24 keeps every row it kept before");
   assert.equal(byKey.get("defence24")?.keyword_filter, true);
   assert.ok(!regionConfig.listings.find((l) => l.key === "govpl-mon")?.region_filter);
-  for (const key of ["mezha-en", "wargov-news", "kremlin-en", "kyivindependent-news", "defence-industry-eu"]) {
+  for (const key of ["wargov-news", "kremlin-en", "kyivindependent-news", "defence-industry-eu"]) {
     const feed = byKey.get(key)!;
     assert.equal(feed.keyword_filter, true, key);
     assert.equal(feed.match_chars, 500, `${key}: region term must be in the title or first 500 characters`);

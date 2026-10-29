@@ -21,7 +21,7 @@
   "citation_only_sources": [
     "RFE/RL"
   ],
-  "_blocked_automated_access": "Domains no worker fetches or sends to a model, because the site blocks automated access. These sites' terms were not read; the entry records the blocking, not a terms decision. lrvk.lrv.lt answers HTTP 403 even for robots.txt; ve.lt's robots.txt blocks Anthropic's crawlers (decision 16); pagd.lrv.lt answers HTTP 403 to robots.txt, and the robots.txt of pap.pl and news.postimees.ee blocks Anthropic's crawlers (decision 19). Subdomains are included.",
+  "_blocked_automated_access": "Domains no worker fetches or sends to a model, because the site blocks automated access. These sites' terms were not read, except mezha.net (decision 19; the feed now returns HTTP 403, decision 27); the entry records the blocking, not a new terms decision. lrvk.lrv.lt answers HTTP 403 even for robots.txt; ve.lt's robots.txt blocks Anthropic's crawlers (decision 16); pagd.lrv.lt answers HTTP 403 to robots.txt, and the robots.txt of pap.pl and news.postimees.ee blocks Anthropic's crawlers (decision 19). Subdomains are included.",
   "blocked_automated_access": [
     "kam.lt",
     "kariuomene.lt",
@@ -30,7 +30,8 @@
     "ve.lt",
     "pagd.lrv.lt",
     "pap.pl",
-    "news.postimees.ee"
+    "news.postimees.ee",
+    "mezha.net"
   ],
   "_tos_prohibited_domains": "Domains no worker fetches or sends to a model, because their terms were read and prohibit automated aggregation or AI use of their content (decision 9: Telegram's Content Licensing and AI Scraping terms and API terms section 1.5; Discord's ban on self-bots; jauns.lv's terms forbid indexing, copying and analytical use, decision 16; bundeswehr.de, fontanka.ru and spiegel.de forbid automated reading or reserve text and data mining, decision 19; defencenet.gr forbids copying, downloading and derivative works without written permission, decision 20). Subdomains are included.",
   "tos_prohibited_domains": [
@@ -431,17 +432,6 @@
       "language": "English",
       "keyword_filter": false,
       "no_ai_processing": true
-    },
-    {
-      "key": "mezha-en",
-      "source": "mezha.net",
-      "url": "https://mezha.net/eng/rss/",
-      "_comment": "Ukrainian general news with full text in the feed: an item needs a keyword and a region term in its title or first 500 characters (match_chars), so passing mentions further down do not count.",
-      "language": "English",
-      "keyword_filter": true,
-      "region_filter": true,
-      "match_chars": 500,
-      "no_ai_processing": false
     },
     {
       "key": "defence24",
