@@ -2,6 +2,7 @@
  * The digest's event input (step 2 of generate.mts), in its own module so tests can run it
  * against a transaction without starting the generator.
  */
+import { FRESH_REVIEW_EVENT } from "@/lib/review-freshness";
 import type { QueryResult, QueryResultRow } from "pg";
 import type { ConfidenceLevel, EventType } from "@/lib/event-labels";
 
@@ -22,13 +23,16 @@ export type DigestEventRow = {
   contradiction_flag: boolean;
 };
 
-/** PUBLISHED events for the day, with only the approved fields. */
+/** Published events and fresh pipeline events for the private digest draft. */
 export async function loadDigestEvents(db: Queryable, date: string): Promise<DigestEventRow[]> {
   const { rows } = await db.query<DigestEventRow>(
     `SELECT event_id, headline, summary, event_date::text AS event_date, event_type, actor, country,
             location_name, confidence_level, contradiction_flag
-     FROM events
-     WHERE review_status = 'PUBLISHED' AND event_date = $1::date
+     FROM events e
+     WHERE event_date = $1::date
+       AND (review_status = 'PUBLISHED'
+         OR (review_status IN ('DRAFT', 'PENDING_REVIEW') AND extraction_run_id IS NOT NULL
+             AND (${FRESH_REVIEW_EVENT})))
      ORDER BY created_at, event_id`,
     [date],
   );

@@ -1,4 +1,4 @@
-# Daily digest (roadmap step 2.7): drafts yesterday's digest from PUBLISHED events.
+# Daily digest (roadmap step 2.7): drafts yesterday's digest from published events and fresh pipeline events.
 # Nothing is published: the digest is a DRAFT for human review in /admin/digests.
 # The repository is public, so the step logs counts and codes only and never digest text,
 # even on a dry run. No artifacts are uploaded.
@@ -95,7 +95,7 @@ jobs:
             echo "|---|---|"
             echo "| Date | ${DATE:-–} |"
             echo "| Status | ${STATUS:-not run}${DETAIL:+ ($DETAIL)} |"
-            echo "| Published events | ${EVENTS:-–} |"
+            echo "| Input events | ${EVENTS:-–} |"
             echo "| Sections / sentences | ${SECTIONS:-–} / ${SENTENCES:-–} |"
             echo "| Model attempts | ${ATTEMPTS:-–}${RETRIED_FOR:+ (retried for $RETRIED_FOR)} |"
             echo "| Cost | \$${COST:-0} |"

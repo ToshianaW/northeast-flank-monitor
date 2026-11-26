@@ -1,11 +1,12 @@
 /**
  * Duplicate-pair finding and classification (roadmap step 2.3).
- * Suggestions only: nothing here merges events.
+ * Pair finding supports both reviewer suggestions and automatic resolution.
  */
 import type { QueryResult, QueryResultRow } from "pg";
 
 /** Headline trigram similarity at or above this is a likely duplicate without a model call. */
 export const LIKELY_SIMILARITY = 0.55;
+export const AUTO_RESOLVE_SIMILARITY = 0.30;
 /** Below this a pair is ignored; between the two it is borderline. */
 export const BORDERLINE_SIMILARITY = 0.25;
 /** Maximum distance between the two events' dates. */
@@ -18,6 +19,7 @@ export type Queryable = {
 };
 
 export type PairRow = {
+  original_id: string;
   a_id: string;
   b_id: string;
   a_headline: string;
@@ -45,7 +47,7 @@ export async function findPairs(
 ): Promise<PairRow[]> {
   const { rows } = await db.query<PairRow>(
     `WITH pool AS (
-       SELECT e.event_id, e.headline, e.event_type, e.country, e.event_date, e.review_status,
+       SELECT e.event_id, e.headline, e.event_type, e.country, e.event_date, e.review_status, e.created_at,
               (e.review_status IN ('DRAFT', 'PENDING_REVIEW') OR $1::boolean) AS is_subject,
               (SELECT array_agg(s.name ORDER BY s.name)
                  FROM event_sources es JOIN sources s ON s.id = es.source_id
@@ -62,7 +64,10 @@ export async function findPairs(
             similarity(a.headline, b.headline)::float8 AS similarity,
             EXISTS (SELECT 1 FROM event_sources x JOIN event_sources y ON y.article_url = x.article_url
                      WHERE x.event_id = a.event_id AND y.event_id = b.event_id) AS same_article,
-            a.support_names AS a_support, b.support_names AS b_support
+            a.support_names AS a_support, b.support_names AS b_support,
+            CASE WHEN (a.review_status <> 'PUBLISHED', a.created_at, a.event_id)
+                    < (b.review_status <> 'PUBLISHED', b.created_at, b.event_id)
+                 THEN a.event_id ELSE b.event_id END AS original_id
      FROM pool a
      JOIN pool b
        ON a.event_id < b.event_id

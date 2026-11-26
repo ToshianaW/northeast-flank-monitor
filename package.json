@@ -12,7 +12,7 @@
     "lint": "eslint",
     "collect": "tsx workers/collector/collect.mts",
     "extract": "tsx --conditions=react-server workers/extractor/extract.mts",
-    "dedup": "tsx workers/deduplication/dedup.mts",
+    "dedup": "tsx --conditions=react-server workers/deduplication/dedup.mts",
     "spend:report": "tsx --conditions=react-server workers/spend/report.mts",
     "digest": "tsx --conditions=react-server workers/digest/generate.mts",
     "references:backfill": "tsx --conditions=react-server scripts/backfill-references.mts",

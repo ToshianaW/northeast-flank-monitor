@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Dry run: extractor --dry-run, dedup --no-model (the collector still runs for real)"
+        description: "Dry run: extractor --dry-run, dedup --dry-run --no-model (the collector still runs for real)"
         type: boolean
         default: false
 
@@ -79,7 +79,11 @@ jobs:
           # $0.005 per run (room for two judge calls at the worst-case estimate); past it, borderline
           # pairs are judged on trigram similarity alone.
           args=(--ci --max-usd 0.005)
-          if [ "$DRY_RUN" = "true" ]; then args+=(--no-model); fi
+          if [ "$DRY_RUN" = "true" ]; then
+            args+=(--dry-run --no-model)
+          else
+            args+=(--auto-resolve)
+          fi
           npm run dedup -- "${args[@]}"
 
       # Recorded API spend for the summary (read-only, no model calls). It can never fail the job:
@@ -126,6 +130,7 @@ jobs:
           OVER_RUN_CAP: ${{ steps.extract.outputs.over_run_cap }}
           TOO_LONG_FOR_CAP: ${{ steps.extract.outputs.too_long_for_cap }}
           EXTRACT_COST: ${{ steps.extract.outputs.cost_usd }}
+          RESOLVED: ${{ steps.dedup.outputs.resolved }}
           CANDIDATES: ${{ steps.dedup.outputs.candidates }}
           DEDUP_COST: ${{ steps.dedup.outputs.cost_usd }}
         run: |
@@ -149,6 +154,7 @@ jobs:
             echo "| Full-text pages | attempted ${FT_ATTEMPTED:-–} · succeeded ${FT_FETCHED:-–} · fell back ${FT_FAILED:-–} (${FT_REASONS:-–}) · paywalled, not fetched ${FT_PAYWALLED:-–} · over cap ${FT_CAPPED:-–} · retried ${FT_RETRIED:-–} · recovered ${FT_RECOVERED:-–} |"
             echo "| Sources failed | ${FAILED_SOURCES:-–} of ${TOTAL_SOURCES:-–} |"
             echo "| Drafts created | $drafts |"
+            echo "| Duplicates resolved | ${RESOLVED:-0} |"
             echo "| Duplicate candidates found | ${CANDIDATES:-–} |"
             echo "| Cost (extract + dedup) | $cost |"
             echo

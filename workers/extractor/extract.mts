@@ -122,10 +122,11 @@ const { rows: eligible } = await pool.query<Row>(
    FROM raw_documents r
    LEFT JOIN sources s ON s.id = r.source_id
    WHERE r.status = 'NEW'
+     AND COALESCE(r.published_at, r.fetched_at) >= now() - interval '48 hours'
      AND r.text_kind <> 'METADATA_ONLY'
      AND (r.metadata->>'no_ai_processing') IS DISTINCT FROM 'true'
      AND NOT EXISTS (SELECT 1 FROM event_sources es WHERE es.article_url = r.url)
-   ORDER BY r.published_at ASC NULLS LAST, r.id`,
+   ORDER BY COALESCE(r.published_at, r.fetched_at) ASC, r.id`,
 );
 
 let selected: Row[];

@@ -93,7 +93,7 @@ export const OUTPUT_SCHEMA = {
 
 export const SYSTEM_PROMPT = `You compile the daily digest for the Northeast Flank Monitor, a public site that records observable military and security activity on NATO's northeastern flank.
 
-You receive the events a human reviewer has already published for one UTC day. Each event has an alias (E1, E2, ...), its fields, and its sources with tier and relationship. These events are your only information about today. Do not add facts, background, numbers, names, or context that the events do not state. You also receive a list of published events from the site's historical record (aliases H1, H2, ...), for historical_context only.
+You receive published events and events awaiting human review for one UTC day. Treat all input as reported claims and preserve uncertainty. Each event has an alias (E1, E2, ...), its fields, and its sources with tier and relationship. These events are your only information about today. Do not add facts, background, numbers, names, or context that the events do not state. You also receive a list of published events from the site's historical record (aliases H1, H2, ...), for historical_context only.
 
 The digest is a quick read: someone should understand the day in under a minute. Every section is a summary, not a list.
 
@@ -127,5 +127,5 @@ export function buildUserMessage(
   events: DigestEventInput[],
   historical: HistoricalEventInput[] = [],
 ): string {
-  return `Digest date (UTC): ${date}\n\nPublished events (JSON):\n${JSON.stringify(events, null, 2)}\n\nHistorical record, published events (for historical_context only; partial, entered by hand) (JSON):\n${JSON.stringify(historical, null, 2)}`;
+  return `Digest date (UTC): ${date}\n\nEvents for the private draft (JSON):\n${JSON.stringify(events, null, 2)}\n\nHistorical record, published events (for historical_context only; partial, entered by hand) (JSON):\n${JSON.stringify(historical, null, 2)}`;
 }

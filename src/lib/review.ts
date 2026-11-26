@@ -1,5 +1,6 @@
 import "server-only";
 import { getPool } from "@/lib/db";
+import { FRESH_REVIEW_EVENT } from "@/lib/review-freshness";
 import type { ConfidenceLevel, EventType, SourceRelationship } from "@/lib/event-labels";
 import { exerciseConstraintMessage } from "@/lib/exercise-rules";
 import {
@@ -169,6 +170,7 @@ export async function listReviewQueue(): Promise<ReviewQueueItem[]> {
      LEFT JOIN event_sources es ON es.event_id = e.event_id AND es.is_primary
      LEFT JOIN sources s ON s.id = es.source_id
      WHERE e.review_status IN ('DRAFT', 'PENDING_REVIEW')
+       AND (${FRESH_REVIEW_EVENT})
      ORDER BY e.event_date ASC, e.created_at ASC`,
   );
   return rows;
@@ -503,6 +505,7 @@ export async function mergeEventInto(
   sourceEventId: string,
   targetEventId: string,
   reviewer: string,
+  automatic = false,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!UUID_RE.test(sourceEventId) || !UUID_RE.test(targetEventId)) {
     return { ok: false, error: "Invalid event id." };
@@ -515,11 +518,11 @@ export async function mergeEventInto(
   try {
     await client.query("BEGIN");
 
-    const { rows: sourceRows } = await client.query<Event>(
-      `SELECT * FROM events WHERE event_id = $1 FOR UPDATE`,
-      [sourceEventId],
+    const { rows: lockedEvents } = await client.query<Event>(
+      `SELECT * FROM events WHERE event_id = ANY($1::uuid[]) ORDER BY event_id FOR UPDATE`,
+      [[sourceEventId, targetEventId]],
     );
-    const sourceEvent = sourceRows[0];
+    const sourceEvent = lockedEvents.find((event) => event.event_id === sourceEventId);
     if (!sourceEvent) {
       await client.query("ROLLBACK");
       return { ok: false, error: "Source event not found." };
@@ -533,11 +536,7 @@ export async function mergeEventInto(
       return { ok: false, error: "Only draft, pending or published events can be merged away." };
     }
 
-    const { rows: targetRows } = await client.query<Event>(
-      `SELECT * FROM events WHERE event_id = $1 FOR UPDATE`,
-      [targetEventId],
-    );
-    const targetEvent = targetRows[0];
+    const targetEvent = lockedEvents.find((event) => event.event_id === targetEventId);
     if (!targetEvent) {
       await client.query("ROLLBACK");
       return { ok: false, error: "Target event not found." };
@@ -550,6 +549,41 @@ export async function mergeEventInto(
     if (sourceEvent.review_status === "PUBLISHED" && targetEvent.review_status !== "PUBLISHED") {
       await client.query("ROLLBACK");
       return { ok: false, error: "A published event can only be merged into another published event." };
+    }
+
+    if (automatic) {
+      const inReview = (event: Event) =>
+        event.review_status === "DRAFT" || event.review_status === "PENDING_REVIEW";
+      if (!inReview(sourceEvent) || (!inReview(targetEvent) && targetEvent.review_status !== "PUBLISHED")) {
+        await client.query("ROLLBACK");
+        return { ok: false, error: "The duplicate pair is no longer eligible." };
+      }
+      const { rows: [{ fresh }] } = await client.query<{ fresh: boolean }>(
+        `SELECT (${FRESH_REVIEW_EVENT}) AS fresh FROM events e WHERE event_id = $1`,
+        [sourceEventId],
+      );
+      if (!fresh) {
+        const { rows: sources } = await client.query<{ source_id: string }>(
+          `SELECT source_id FROM event_sources WHERE event_id = $1`,
+          [sourceEventId],
+        );
+        await client.query(`UPDATE events SET review_status = 'REJECTED' WHERE event_id = $1`, [
+          sourceEventId,
+        ]);
+        await insertReviewAction(client, {
+          event_id: sourceEventId,
+          action: "REJECT",
+          reviewer,
+          event_type: sourceEvent.event_type,
+          source_ids: sources.map((source) => source.source_id),
+          previous_values: {
+            review_status: sourceEvent.review_status,
+            reject_reason: "Duplicate article older than two days.",
+          },
+        });
+        await client.query("COMMIT");
+        return { ok: true };
+      }
     }
 
     const { rows: moving } = await client.query<{

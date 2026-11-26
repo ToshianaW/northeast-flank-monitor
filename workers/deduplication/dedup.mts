@@ -1,8 +1,7 @@
 /**
- * Duplicate suggestions (roadmap step 2.3). Never merges anything: it records candidate
- * pairs that the review page shows as "Possible duplicate of ...".
+ * Finds duplicate suggestions and, with --auto-resolve, resolves matches at 30% or higher.
  *
- * Usage: npm run dedup -- [--dry-run] [--no-model] [--max-usd X] [--max-calls N] [--subjects pending|all]
+ * Usage: npm run dedup -- [--dry-run] [--no-model] [--max-usd X] [--max-calls N] [--subjects pending|all] [--auto-resolve]
  * --dry-run writes only the dedup_runs row and prints the pairs.
  * --subjects all also treats PUBLISHED events as subjects (for testing).
  * --ci prints counts only (no headlines or model reasons) and writes GitHub Actions step outputs.
@@ -12,9 +11,11 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import Anthropic from "@anthropic-ai/sdk";
 import pg from "pg";
+import { getPool } from "@/lib/db";
+import { mergeEventInto } from "@/lib/review";
 import { setOutput } from "../lib/ci.mjs";
 import { ESTIMATED_CALL_USD, JUDGE_MODEL, judgePair, type Verdict } from "./judge.mjs";
-import { classifyPair, DEDUP_MAX_USD, findPairs, isNoAiOnly, judgeCapReached, type ModelSkip } from "./pairs.mjs";
+import { AUTO_RESOLVE_SIMILARITY, classifyPair, DEDUP_MAX_USD, findPairs, isNoAiOnly, judgeCapReached, type ModelSkip } from "./pairs.mjs";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 const envFile = `${repoRoot}.env.local`;
@@ -22,6 +23,7 @@ if (existsSync(envFile)) process.loadEnvFile(envFile);
 
 const { values: args } = parseArgs({
   options: {
+    "auto-resolve": { type: "boolean", default: false },
     "dry-run": { type: "boolean", default: false },
     "no-model": { type: "boolean", default: false },
     "max-usd": { type: "string", default: String(DEDUP_MAX_USD) },
@@ -32,6 +34,8 @@ const { values: args } = parseArgs({
 });
 const dryRun = args["dry-run"]!;
 const ci = args.ci!;
+const autoResolve = args["auto-resolve"] && !dryRun;
+if (autoResolve && process.env.DATABASE_URL) process.env.DATABASE_URL_POOLED = process.env.DATABASE_URL;
 const noModel = args["no-model"]!;
 const maxUsd = Number(args["max-usd"]);
 const maxCalls = Number(args["max-calls"]);
@@ -68,6 +72,26 @@ const { rows: runRows } = await client.query<{ id: string }>(
 );
 const runId = runRows[0].id;
 
+let resolved = 0;
+if (autoResolve) {
+  try {
+    const matches = await findPairs(client, { subjects: "pending", skipExisting: false });
+    const removed = new Set<string>();
+    for (const pair of matches) {
+      if (!pair.same_article && pair.similarity < AUTO_RESOLVE_SIMILARITY) continue;
+      const target = pair.original_id;
+      const source = target === pair.a_id ? pair.b_id : pair.a_id;
+      if (removed.has(source) || removed.has(target)) continue;
+      const result = await mergeEventInto(source, target, "Daily duplicate cleanup", true);
+      if (result.ok) {
+        removed.add(source);
+        resolved++;
+      }
+    }
+  } finally {
+    await getPool().end();
+  }
+}
 const pairs = await findPairs(client, { subjects, skipExisting: !dryRun });
 const totals = { likely: 0, borderline: 0, calls: 0, inputTokens: 0, outputTokens: 0, costUsd: 0 };
 const errors: Array<{ pair: string; error: string }> = [];
@@ -170,6 +194,7 @@ if (!ci) for (const line of lines) console.log(line);
 for (const e of errors) console.log(`error ${e.pair}: ${e.error}`);
 if (ci) {
   setOutput("completed", "true");
+  setOutput("resolved", resolved);
   setOutput("candidates", totals.likely + totals.borderline);
   setOutput("cost_usd", totals.costUsd.toFixed(4));
 }

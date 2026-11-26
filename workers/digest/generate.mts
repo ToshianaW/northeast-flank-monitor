@@ -1,6 +1,6 @@
 /**
  * Claude-drafted daily digest (roadmap step 2.7).
- * Reads the PUBLISHED events for one UTC day, asks Claude for the spec §16 sections, checks the
+ * Reads published and fresh pipeline events for one UTC day, asks Claude for the spec §16 sections, checks the
  * result in code, and stores it as a DRAFT digest for human review. Nothing is published.
  *
  * Usage: npm run digest -- [--date YYYY-MM-DD] [--dry-run] [--replace-draft] [--force]
@@ -128,7 +128,7 @@ async function run(): Promise<never> {
   );
   if (decision.action === "SKIP" && !dryRun) finish(decision.status);
 
-  // 2. Input: PUBLISHED events for the day, with only the approved fields.
+  // 2. Input: published events and fresh pipeline events for the draft date.
   const eventRows = await loadDigestEvents(pool, date);
   eventCount = eventRows.length;
   if (eventCount === 0) finish("NO_EVENTS");
