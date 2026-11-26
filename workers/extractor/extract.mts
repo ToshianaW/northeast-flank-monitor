@@ -15,6 +15,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { PoolClient } from "pg";
 import { getPool } from "@/lib/db";
 import { insertEvent, type EventWritePayload } from "@/lib/events";
+import { oldestReviewEventDate, REVIEW_MAX_AGE_DAYS } from "@/lib/review-freshness";
 import type { Reliability, SourceType } from "@/lib/source-labels";
 import { setOutput } from "../lib/ci.mjs";
 import {
@@ -113,6 +114,7 @@ type RowResult = {
 
 const pool = getPool();
 const anthropic = new Anthropic();
+const oldestEventDate = oldestReviewEventDate();
 
 // Eligible: NEW, has text, not no_ai_processing, and not already cited by an event.
 const { rows: eligible } = await pool.query<Row>(
@@ -122,7 +124,7 @@ const { rows: eligible } = await pool.query<Row>(
    FROM raw_documents r
    LEFT JOIN sources s ON s.id = r.source_id
    WHERE r.status = 'NEW'
-     AND COALESCE(r.published_at, r.fetched_at) >= now() - interval '48 hours'
+     AND COALESCE(r.published_at, r.fetched_at) >= now() - interval '${REVIEW_MAX_AGE_DAYS * 24} hours'
      AND r.text_kind <> 'METADATA_ONLY'
      AND (r.metadata->>'no_ai_processing') IS DISTINCT FROM 'true'
      AND NOT EXISTS (SELECT 1 FROM event_sources es WHERE es.article_url = r.url)
@@ -271,7 +273,7 @@ async function extractRow(row: Row): Promise<RowResult> {
   }
 
   for (const event of result.output.events) {
-    const outcome = validateEvent(event, { title: row.title, text, publishedAt });
+    const outcome = validateEvent(event, { title: row.title, text, publishedAt, oldestEventDate });
     if (outcome.ok) result.kept.push(outcome.value);
     else result.dropped.push({ headline: event.headline, excerpt: event.supporting_excerpt, reason: outcome.reason });
   }

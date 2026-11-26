@@ -56,7 +56,7 @@ export type ValidationOutcome =
 
 export function validateEvent(
   extracted: ExtractedEvent,
-  doc: { title: string | null; text: string; publishedAt: Date },
+  doc: { title: string | null; text: string; publishedAt: Date; oldestEventDate?: Date },
 ): ValidationOutcome {
   const flags: string[] = [];
   const cleaned = stripVerificationCommentary(extracted.summary);
@@ -74,6 +74,9 @@ export function validateEvent(
 
   const eventDate = parseIsoDate(event.event_date);
   if (!eventDate) return { ok: false, reason: `invalid event_date "${event.event_date}"` };
+  if (doc.oldestEventDate && eventDate < doc.oldestEventDate) {
+    return { ok: false, reason: "event_date is older than the review cutoff" };
+  }
   const publishedDay = new Date(`${doc.publishedAt.toISOString().slice(0, 10)}T00:00:00Z`);
   if (eventDate > publishedDay) {
     return { ok: false, reason: `event_date ${event.event_date} is after the published date` };
