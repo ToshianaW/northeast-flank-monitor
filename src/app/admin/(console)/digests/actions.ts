@@ -39,16 +39,14 @@ async function save(
     const errors = checkAiDigestSections(result.input.sections);
     if (Object.keys(errors).length > 0) return { values, errors };
   }
-  if (result.input.review_status === "PUBLISHED") {
-    const unpublished = await findUnpublishedEventIds(
-      collectDigestRefs(Object.values(result.input.sections)),
-    );
-    if (unpublished.length > 0) {
-      return {
-        values,
-        formError: `${unpublished.length} [ref …] marker id(s) are not published events: ${unpublished.join(", ")}. Publish the cited events, remove those sentences, or fix the ids.`,
-      };
-    }
+  const unpublished = await findUnpublishedEventIds(
+    collectDigestRefs(Object.values(result.input.sections)),
+  );
+  if (unpublished.length > 0) {
+    return {
+      values,
+      formError: `${unpublished.length} [ref …] marker id(s) are not published events: ${unpublished.join(", ")}. Remove those sentences or fix the ids.`,
+    };
   }
 
   try {
